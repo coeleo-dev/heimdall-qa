@@ -61,6 +61,8 @@ Quatro raízes: 01, 04, 09 e 07. Nenhuma ADR depende de 04 — a UI é folha em 
 
 ## 2. As fases
 
+> **O plano executável é [`../plano-implementacao-heimdall.md`](../plano-implementacao-heimdall.md).** Esta seção é o resumo de origem — a tabela por onde as fases nasceram. O documento irmão expande cada passo no formato da casa (Objetivo / Arquivos / Não fazer / Aceite / Verificar / Gate), nomeia os arquivos que mudam em cada um e traz a tabela de PRs. **Para executar, use o irmão; para entender a decisão, use esta seção.**
+
 A ordem do plano é **REST primeiro, navegador por último**. As fases são aditivas e reversíveis; a coluna de gate é um comando.
 
 ### Fase 1 — Núcleo agnóstico HTTP
