@@ -3,10 +3,10 @@ from pathlib import Path
 import httpx
 from fastapi.testclient import TestClient
 
-from nokr_qa.config import HarnessConfig
-from nokr_qa.config import LogFiles
-from nokr_qa.serve.app import create_app
-from nokr_qa.workspace import WorkspaceSession
+from heimdall_qa.config import HarnessConfig
+from heimdall_qa.config import LogFiles
+from heimdall_qa.serve.app import create_app
+from heimdall_qa.workspace import WorkspaceSession
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 H01_ONLY = FIXTURES / "rounds" / "h01-only.yaml"

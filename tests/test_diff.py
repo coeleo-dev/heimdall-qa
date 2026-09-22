@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from nokr_qa.diff import apply_diff
+from heimdall_qa.diff import apply_diff
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 BASELINE = json.loads(

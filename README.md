@@ -1,8 +1,8 @@
-# Nokr QA
+# Heimdall QA
 
 Harness de **review** da [NokrAPI](../NokrAPI). Você percorre HTTP no browser; agentes Cursor escrevem YAML e leem a pasta do run. Não é a suíte JUnit e não substitui o Bruno.
 
-**Spec:** [docs/nokr-qa.md](docs/nokr-qa.md). **Agentes:** [AGENTS.md](AGENTS.md) e [`.cursor/skills/nokr-qa-round/SKILL.md`](.cursor/skills/nokr-qa-round/SKILL.md).
+**Spec:** [docs/nokr-qa.md](docs/nokr-qa.md). **Agentes:** [AGENTS.md](AGENTS.md) e [`.cursor/skills/heimdall-qa-round/SKILL.md`](.cursor/skills/heimdall-qa-round/SKILL.md).
 
 A UI só existe para o operador. Bind `127.0.0.1` (nunca `0.0.0.0`). Sem OpenAPI (`/docs` 404). O agente **não** chama a porta 7878 — a API dele é `runs/latest`.
 
@@ -10,14 +10,14 @@ A UI só existe para o operador. Bind `127.0.0.1` (nunca `0.0.0.0`). Sem OpenAPI
 
 ## Instalação
 
-Na raiz deste repo (`nokr-qa`):
+Na raiz deste repo (`heimdall-qa`):
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 playwright install chromium   # passo `ui` (A.19); sem o binário o passo falha
-nokr-qa --help
+heimdall-qa --help
 ```
 
 Python ≥ 3.12. `--verbose` em qualquer comando imprime traceback. O Chromium só é
@@ -72,64 +72,64 @@ nokr_user_id: …             # UUID do user no tenant
 
 Todos os paths de round são relativos a `--root` (default: diretório atual). Falhas: `error[CODE]:` + `hint:` no stderr.
 
-### `nokr-qa validate ROUND`
+### `heimdall-qa validate ROUND`
 
 Confere YAML do round, cases, `expect.status` ≠ TODO e **cobertura** do contract (`expand()`), excepto suites com `steps` (loop/probe da conferência de valores).
 
 ```bash
-nokr-qa validate rounds/piloto-ingest.yaml
-nokr-qa validate rounds/values-10m-7i.yaml
-nokr-qa validate tests/fixtures/rounds/walk-hn.yaml --root tests/fixtures
+heimdall-qa validate rounds/piloto-ingest.yaml
+heimdall-qa validate rounds/values-10m-7i.yaml
+heimdall-qa validate tests/fixtures/rounds/walk-hn.yaml --root tests/fixtures
 ```
 
 Exit `0` = zero erros. Exit `1` = lista no stderr (ex.: `coverage: missing ingest-N-omit-timestamp`).
 
-### `nokr-qa scaffold-endpoint CONTRACT`
+### `heimdall-qa scaffold-endpoint CONTRACT`
 
 Gera stubs H/O/B/N/I/E/P. O que o contract determina é preenchido (`N-omit`/`N-pattern`/`N-over` → 400, `N-auth` → 401, `N-rule-*` → `rules[]`). O resto fica `TODO` (a rodada **não** valida enquanto houver TODO). `--h01-status 202` semente o H01 e clona o 2xx para `B-*` / `I-replay` / `I-new-key`.
 
 ```bash
-nokr-qa scaffold-endpoint contracts/api-ingest-post.yaml --out cases/ingest
-nokr-qa scaffold-endpoint tests/fixtures/contracts/api-ingest-post.yaml --out /tmp/stubs
+heimdall-qa scaffold-endpoint contracts/api-ingest-post.yaml --out cases/ingest
+heimdall-qa scaffold-endpoint tests/fixtures/contracts/api-ingest-post.yaml --out /tmp/stubs
 ```
 
 `--force` sobrescreve ficheiros existentes. Preencha diffs e status **um eixo por vez**, depois `validate`.
 
-### `nokr-qa scaffold-round CONTRACT --out rounds/`
+### `heimdall-qa scaffold-round CONTRACT --out rounds/`
 
 `scaffold-endpoint` + YAML do round com `include` = todos os ids de `expand()`.
 
 ```bash
-nokr-qa scaffold-round contracts/api-metering-post.yaml --out rounds/ --cases-out cases/metering --h01-status 202
+heimdall-qa scaffold-round contracts/api-metering-post.yaml --out rounds/ --cases-out cases/metering --h01-status 202
 ```
 
 Não regenere [`rounds/piloto-ingest.yaml`](rounds/piloto-ingest.yaml).
 
-### `nokr-qa campaign validate CAMPAIGN`
+### `heimdall-qa campaign validate CAMPAIGN`
 
 Corre `validate` em cada round do manifesto. Stderr nomeia o path que falhou (ficheiro em falta ou erro de cobertura).
 
 ```bash
-nokr-qa campaign validate campaigns/trilho-a-http.yaml
+heimdall-qa campaign validate campaigns/trilho-a-http.yaml
 ```
 
-### `nokr-qa campaign status CAMPAIGN`
+### `heimdall-qa campaign status CAMPAIGN`
 
 Para cada round, se existe `runs/<stamp>-<round-id>/summary.json` (pass / fail / 5xx) ou **ainda não reviewado**. JSON no stdout. Gancho do relatório de campanha.
 
 ```bash
-nokr-qa campaign status campaigns/trilho-a-http.yaml
+heimdall-qa campaign status campaigns/trilho-a-http.yaml
 ```
 
-### `nokr-qa run ROUND --mode headless`
+### `heimdall-qa run ROUND --mode headless`
 
 Executa a rodada sem browser: HTTP real (ou mock em teste), packs, `runs/<stamp>-<id>/`, symlink `runs/latest`. Imprime o path absoluto do run.
 
 Só `--mode headless` é válido aqui. `walk` / `review` exigem `serve`.
 
 ```bash
-nokr-qa run tests/fixtures/rounds/example.yaml --root tests/fixtures --mode headless
-nokr-qa run rounds/piloto-ingest.yaml --mode headless
+heimdall-qa run tests/fixtures/rounds/example.yaml --root tests/fixtures --mode headless
+heimdall-qa run rounds/piloto-ingest.yaml --mode headless
 ```
 
 Exit `1` se `counts.fail` ou `http_5xx` no `summary.json`.
@@ -208,36 +208,36 @@ Artefatos por passo, em `steps/NNN-ui-<id>/`: `ui.json`, `aria.yml`, `a11y.json`
 transporte sem alterá-los: `http.baseline`, `observability`, `http.success`.
 
 ```bash
-./bin/nokr-qa run rounds/ui-overview.yaml --mode headless   # suíte de demonstração
+./bin/heimdall-qa run rounds/ui-overview.yaml --mode headless   # suíte de demonstração
 ```
 
-### `nokr-qa last-run`
+### `heimdall-qa last-run`
 
 Imprime o path absoluto de `runs/latest`. `--runs-dir` default `runs`.
 
 ```bash
-nokr-qa last-run
+heimdall-qa last-run
 ```
 
-### `nokr-qa fixture KIND`
+### `heimdall-qa fixture KIND`
 
 JSON de identidade no stdout (faker `pt_BR` + validate-docbr). Um kind por invocação: `email`, `password`, `person_name`, `company_name`, `address`, `cpf`, `cnpj`, ou `register` (bloco típico). O runner aceita esses kinds em `generate:`, `secret.<nome>` (`secrets.local.yaml`) e o e-mail/senha/`jwt`/`refresh_token`/`api_key` do `register-H01` em `runs/shared-captures.json` (`capture` + `capture_response`). Não inventar e-mail/CNPJ no YAML.
 
 ```bash
-nokr-qa fixture register
-nokr-qa fixture cnpj
+heimdall-qa fixture register
+heimdall-qa fixture cnpj
 ```
 
-### `nokr-qa serve [TARGET]`
+### `heimdall-qa serve [TARGET]`
 
 Sobe a UI da coleção em `http://127.0.0.1:7878`. Recusa bind que não seja localhost. Carrega `config.yaml` + `secrets.local.yaml` da working directory. Sem argumento indexa `campaigns/*.yaml` e rounds órfãos. Opcional: focar uma campanha ou um round.
 
 ```bash
-nokr-qa serve
-nokr-qa serve campaigns/trilho-a-http.yaml
-nokr-qa serve rounds/piloto-ingest.yaml
-nokr-qa serve rounds/values-10m-7i.yaml
-nokr-qa serve tests/fixtures/rounds/walk-hn.yaml --root tests/fixtures
+heimdall-qa serve
+heimdall-qa serve campaigns/trilho-a-http.yaml
+heimdall-qa serve rounds/piloto-ingest.yaml
+heimdall-qa serve rounds/values-10m-7i.yaml
+heimdall-qa serve tests/fixtures/rounds/walk-hn.yaml --root tests/fixtures
 ```
 
 YAML ilegível (ficheiro partido) **não sobe**: `ROUND_INVALID`. Round parseável mas incompleto (TODO / cobertura) **sobe** na árvore como não pronto e **não inicia**. `Ctrl+C` encerra. Um processo = um round HTTP de review de cada vez; com veredito pendente, iniciar outro é `ROUND_BUSY`.
@@ -297,7 +297,7 @@ KPIs (pass/fail/skip/5xx, packs, cobertura, p50/p95, logs incompletos, rejeiçã
 
 **Superfície de browser (A.19):** especificada nas Fases 11–12 — passo `ui` e packs `ui.*` implementados (E2/E3); a campanha do **Trilho C ainda não existe** (não procure `campaigns/trilho-c-ui.yaml`: só nasce na E5). O Trilho C é round separado e não se mistura com A0–A4.
 
-**Campanha Trilho A:** o agente gera os rounds até `campaign validate` = 0 errors nos manifestos sandbox e (se pedido) live; você abre `nokr-qa serve` e opera a árvore (um round HTTP de cada vez). Depois **analise a campanha trilho-a** lê `campaign status` + `runs/` e escreve `analysis-campanha.md`. Sem UI de 300 itens na fila. Sem misturar o 10+7.
+**Campanha Trilho A:** o agente gera os rounds até `campaign validate` = 0 errors nos manifestos sandbox e (se pedido) live; você abre `heimdall-qa serve` e opera a árvore (um round HTTP de cada vez). Depois **analise a campanha trilho-a** lê `campaign status` + `runs/` e escreve `analysis-campanha.md`. Sem UI de 300 itens na fila. Sem misturar o 10+7.
 
 **Piloto ao vivo:** NokrAPI **web + worker**, catálogo `llm_tokens` SUM `properties.tokens`, user `ext-ta-001`, `rating_engine_dimensional` ligado, `api_key` `nk_test_`, logs em ficheiro.
 
@@ -320,7 +320,7 @@ runs/<stamp>-<round-id>/
 runs/latest -> <último run>
 ```
 
-O agente, depois do review: `nokr-qa last-run`, lê esses ficheiros, escreve `analysis.md`. Depois de uma campanha: `nokr-qa campaign status` e `analysis-campanha.md`. Não gera o harness.
+O agente, depois do review: `heimdall-qa last-run`, lê esses ficheiros, escreve `analysis.md`. Depois de uma campanha: `heimdall-qa campaign status` e `analysis-campanha.md`. Não gera o harness.
 
 ---
 
@@ -328,7 +328,7 @@ O agente, depois do review: `nokr-qa last-run`, lê esses ficheiros, escreve `an
 
 ```bash
 pytest
-NOKR_QA_SLOW=1 pytest     # opcional: tenta localhost:8080; senão skip
+HEIMDALL_QA_SLOW=1 pytest     # opcional: tenta localhost:8080; senão skip
 ```
 
-Pytest **não** exige NokrAPI no ar. O 10+7 live é aceite humano (`nokr-qa serve rounds/values-10m-7i.yaml`).
+Pytest **não** exige NokrAPI no ar. O 10+7 live é aceite humano (`heimdall-qa serve rounds/values-10m-7i.yaml`).

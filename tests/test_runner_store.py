@@ -3,12 +3,12 @@ from pathlib import Path
 
 import httpx
 
-from nokr_qa.config import HarnessConfig
-from nokr_qa.config import LogFiles
-from nokr_qa.runner import execute_step
-from nokr_qa.run_store import read_shared_captures
-from nokr_qa.schema.load import load_contract
-from nokr_qa.schema.models import CaseFile
+from heimdall_qa.config import HarnessConfig
+from heimdall_qa.config import LogFiles
+from heimdall_qa.runner import execute_step
+from heimdall_qa.run_store import read_shared_captures
+from heimdall_qa.schema.load import load_contract
+from heimdall_qa.schema.models import CaseFile
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 BASELINE = json.loads(

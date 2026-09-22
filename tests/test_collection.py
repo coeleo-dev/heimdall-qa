@@ -1,9 +1,9 @@
 from pathlib import Path
 import json
 
-from nokr_qa.collection import find_node
-from nokr_qa.collection import index_workspace
-from nokr_qa.collection import inspect_round
+from heimdall_qa.collection import find_node
+from heimdall_qa.collection import index_workspace
+from heimdall_qa.collection import inspect_round
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 

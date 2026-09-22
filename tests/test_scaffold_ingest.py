@@ -1,8 +1,8 @@
 from pathlib import Path
 import shutil
 
-from nokr_qa.scaffold import scaffold_endpoint
-from nokr_qa.validate import validate_round
+from heimdall_qa.scaffold import scaffold_endpoint
+from heimdall_qa.validate import validate_round
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 INGEST_CONTRACT = FIXTURES / "contracts" / "api-ingest-post.yaml"

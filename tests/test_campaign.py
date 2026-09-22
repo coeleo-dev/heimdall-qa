@@ -1,12 +1,12 @@
 import json
 from pathlib import Path
 
-from nokr_qa.campaign import campaign_status
-from nokr_qa.campaign import find_latest_run
-from nokr_qa.campaign import validate_campaign
-from nokr_qa.cli import main
-from nokr_qa.schema.load import load_campaign
-from nokr_qa.validate import validate_round
+from heimdall_qa.campaign import campaign_status
+from heimdall_qa.campaign import find_latest_run
+from heimdall_qa.campaign import validate_campaign
+from heimdall_qa.cli import main
+from heimdall_qa.schema.load import load_campaign
+from heimdall_qa.validate import validate_round
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 OK = FIXTURES / "campaigns" / "ok.yaml"

@@ -4,10 +4,10 @@ from pydantic import ValidationError
 import pytest
 import yaml
 
-from nokr_qa.schema.models import LoopSpec
-from nokr_qa.schema.models import ProbeSpec
-from nokr_qa.schema.models import SurfaceSpec
-from nokr_qa.validate import validate_round
+from heimdall_qa.schema.models import LoopSpec
+from heimdall_qa.schema.models import ProbeSpec
+from heimdall_qa.schema.models import SurfaceSpec
+from heimdall_qa.validate import validate_round
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 H01_ROUND = FIXTURES / "rounds" / "h01-only.yaml"

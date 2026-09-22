@@ -1,14 +1,14 @@
 from pathlib import Path
 
-from nokr_qa.schema.load import load_campaign
-from nokr_qa.schema.models import CaseFile
-from nokr_qa.schema.models import Contract
-from nokr_qa.schema.models import ExpectSpec
-from nokr_qa.schema.models import FieldSpec
-from nokr_qa.schema.models import RoundFile
-from nokr_qa.session_validate import _unique_json_errors
-from nokr_qa.session_validate import validate_campaign_chain
-from nokr_qa.session_validate import validate_round_session
+from heimdall_qa.schema.load import load_campaign
+from heimdall_qa.schema.models import CaseFile
+from heimdall_qa.schema.models import Contract
+from heimdall_qa.schema.models import ExpectSpec
+from heimdall_qa.schema.models import FieldSpec
+from heimdall_qa.schema.models import RoundFile
+from heimdall_qa.session_validate import _unique_json_errors
+from heimdall_qa.session_validate import validate_campaign_chain
+from heimdall_qa.session_validate import validate_round_session
 
 
 def test_e_isolate_sandbox_200_fails_round_session():

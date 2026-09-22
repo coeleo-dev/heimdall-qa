@@ -4,15 +4,15 @@ from pathlib import Path
 import httpx
 import pytest
 
-from nokr_qa.config import HarnessConfig
-from nokr_qa.config import LogFiles
-from nokr_qa.errors import HarnessError
-from nokr_qa.runner import _auto_verdict
-from nokr_qa.runner import _prepare_case
-from nokr_qa.runner import execute_step
-from nokr_qa.schema.load import load_case
-from nokr_qa.schema.load import load_contract
-from nokr_qa.session import RoundSession
+from heimdall_qa.config import HarnessConfig
+from heimdall_qa.config import LogFiles
+from heimdall_qa.errors import HarnessError
+from heimdall_qa.runner import _auto_verdict
+from heimdall_qa.runner import _prepare_case
+from heimdall_qa.runner import execute_step
+from heimdall_qa.schema.load import load_case
+from heimdall_qa.schema.load import load_contract
+from heimdall_qa.session import RoundSession
 
 ROOT = Path(__file__).resolve().parents[1]
 USERS_POST = ROOT / "rounds" / "api-users-post.yaml"

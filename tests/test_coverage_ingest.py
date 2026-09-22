@@ -4,11 +4,11 @@ import shutil
 import pytest
 from pydantic import ValidationError
 
-from nokr_qa.coverage import expand
-from nokr_qa.schema.load import load_contract
-from nokr_qa.schema.models import Contract
-from nokr_qa.schema.models import Waive
-from nokr_qa.validate import validate_round
+from heimdall_qa.coverage import expand
+from heimdall_qa.schema.load import load_contract
+from heimdall_qa.schema.models import Contract
+from heimdall_qa.schema.models import Waive
+from heimdall_qa.validate import validate_round
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 INGEST_CONTRACT = FIXTURES / "contracts" / "api-ingest-post.yaml"

@@ -13,14 +13,14 @@ from pydantic import ValidationError
 import pytest
 import yaml
 
-from nokr_qa.schema.load import load_suite
-from nokr_qa.schema.models import SuiteStep
-from nokr_qa.step_kinds import PROBE
-from nokr_qa.step_kinds import PROBE_BEGIN
-from nokr_qa.step_kinds import LOOP
-from nokr_qa.step_kinds import registered_step_kinds
-from nokr_qa.step_kinds import unknown_step_kind_message
-from nokr_qa.step_kinds import unknown_step_kinds
+from heimdall_qa.schema.load import load_suite
+from heimdall_qa.schema.models import SuiteStep
+from heimdall_qa.step_kinds import PROBE
+from heimdall_qa.step_kinds import PROBE_BEGIN
+from heimdall_qa.step_kinds import LOOP
+from heimdall_qa.step_kinds import registered_step_kinds
+from heimdall_qa.step_kinds import unknown_step_kind_message
+from heimdall_qa.step_kinds import unknown_step_kinds
 
 REPO = Path(__file__).resolve().parents[1]
 

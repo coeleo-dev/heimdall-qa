@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from nokr_qa.packs import PackResult
-from nokr_qa.runner import StepResult
-from nokr_qa.runner import _auto_verdict
-from nokr_qa.schema.models import CaseFile
-from nokr_qa.schema.models import ExpectSpec
-from nokr_qa.schema.models import SaturateSpec
+from heimdall_qa.packs import PackResult
+from heimdall_qa.runner import StepResult
+from heimdall_qa.runner import _auto_verdict
+from heimdall_qa.schema.models import CaseFile
+from heimdall_qa.schema.models import ExpectSpec
+from heimdall_qa.schema.models import SaturateSpec
 
 
 def _case(**overrides: object) -> CaseFile:

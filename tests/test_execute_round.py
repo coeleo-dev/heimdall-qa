@@ -4,10 +4,10 @@ from pathlib import Path
 import httpx
 import pytest
 
-from nokr_qa.config import HarnessConfig
-from nokr_qa.config import LogFiles
-from nokr_qa.errors import HarnessError
-from nokr_qa.runner import execute_round
+from heimdall_qa.config import HarnessConfig
+from heimdall_qa.config import LogFiles
+from heimdall_qa.errors import HarnessError
+from heimdall_qa.runner import execute_round
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 EXAMPLE_ROUND = FIXTURES / "rounds" / "example.yaml"

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from nokr_qa.bru_parser import parse_bru
+from heimdall_qa.bru_parser import parse_bru
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "bru" / "post-ingest.bru"
 

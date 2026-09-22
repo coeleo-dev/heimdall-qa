@@ -2,9 +2,9 @@ from pathlib import Path
 
 import httpx
 
-from nokr_qa.config import HarnessConfig
-from nokr_qa.config import load_config
-from nokr_qa.http_client import send
+from heimdall_qa.config import HarnessConfig
+from heimdall_qa.config import load_config
+from heimdall_qa.http_client import send
 
 
 def test_send_records_status_headers_body_and_elapsed():

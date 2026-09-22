@@ -4,10 +4,10 @@ from pathlib import Path
 import httpx
 from fastapi.testclient import TestClient
 
-from nokr_qa.config import HarnessConfig
-from nokr_qa.config import LogFiles
-from nokr_qa.serve.app import create_app
-from nokr_qa.session import RoundSession
+from heimdall_qa.config import HarnessConfig
+from heimdall_qa.config import LogFiles
+from heimdall_qa.serve.app import create_app
+from heimdall_qa.session import RoundSession
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 WALK_HN = FIXTURES / "rounds" / "walk-hn.yaml"

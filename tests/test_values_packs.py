@@ -5,9 +5,9 @@ import httpx
 import pytest
 import yaml
 
-from nokr_qa.config import HarnessConfig
-from nokr_qa.config import LogFiles
-from nokr_qa.runner import execute_round
+from heimdall_qa.config import HarnessConfig
+from heimdall_qa.config import LogFiles
+from heimdall_qa.runner import execute_round
 
 from test_loop_probe import _config
 from test_loop_probe import _secrets
@@ -368,4 +368,4 @@ def test_poll_pending_skips_probe(tmp_path: Path):
 
 @pytest.mark.slow
 def test_live_values_round_is_human_gate():
-    pytest.skip("live gate: nokr-qa serve rounds/values-10m-7i.yaml with web+worker+ClickHouse")
+    pytest.skip("live gate: heimdall-qa serve rounds/values-10m-7i.yaml with web+worker+ClickHouse")

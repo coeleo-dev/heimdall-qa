@@ -3,12 +3,12 @@ import shutil
 
 import yaml
 
-from nokr_qa.coverage import expand
-from nokr_qa.schema.load import load_case
-from nokr_qa.schema.load import load_contract
-from nokr_qa.schema.load import load_round
-from nokr_qa.scaffold import scaffold_endpoint
-from nokr_qa.scaffold import scaffold_round
+from heimdall_qa.coverage import expand
+from heimdall_qa.schema.load import load_case
+from heimdall_qa.schema.load import load_contract
+from heimdall_qa.schema.load import load_round
+from heimdall_qa.scaffold import scaffold_endpoint
+from heimdall_qa.scaffold import scaffold_round
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 INGEST = FIXTURES / "contracts" / "api-ingest-post.yaml"

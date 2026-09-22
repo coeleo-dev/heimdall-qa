@@ -2,8 +2,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from nokr_qa.serve.app import create_app
-from nokr_qa.session import RoundSession
+from heimdall_qa.serve.app import create_app
+from heimdall_qa.session import RoundSession
 
 from test_loop_probe import _config
 from test_loop_probe import _write_values_tree

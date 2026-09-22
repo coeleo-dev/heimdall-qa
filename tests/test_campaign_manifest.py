@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from nokr_qa.schema.load import load_campaign
+from heimdall_qa.schema.load import load_campaign
 
 REPO = Path(__file__).resolve().parents[1]
 CAMPAIGN = REPO / "campaigns" / "trilho-a-http.yaml"

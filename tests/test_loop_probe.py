@@ -4,10 +4,10 @@ import json
 import httpx
 import yaml
 
-from nokr_qa.config import HarnessConfig
-from nokr_qa.config import LogFiles
-from nokr_qa.jsonpath import lookup
-from nokr_qa.runner import execute_round
+from heimdall_qa.config import HarnessConfig
+from heimdall_qa.config import LogFiles
+from heimdall_qa.jsonpath import lookup
+from heimdall_qa.runner import execute_round
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 

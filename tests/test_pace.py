@@ -4,14 +4,14 @@ import json
 import httpx
 import pytest
 
-from nokr_qa.config import HarnessConfig
-from nokr_qa.config import LogFiles
-from nokr_qa.runner import _pace_register
-from nokr_qa.runner import execute_step
-from nokr_qa.schema.models import CaseFile
-from nokr_qa.schema.models import Contract
-from nokr_qa.schema.models import ExpectSpec
-from nokr_qa.schema.models import FieldSpec
+from heimdall_qa.config import HarnessConfig
+from heimdall_qa.config import LogFiles
+from heimdall_qa.runner import _pace_register
+from heimdall_qa.runner import execute_step
+from heimdall_qa.schema.models import CaseFile
+from heimdall_qa.schema.models import Contract
+from heimdall_qa.schema.models import ExpectSpec
+from heimdall_qa.schema.models import FieldSpec
 
 
 def _config(tmp_path, **kwargs) -> HarnessConfig:

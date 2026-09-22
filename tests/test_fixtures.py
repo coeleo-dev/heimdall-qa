@@ -3,11 +3,11 @@ import json
 from validate_docbr import CNPJ
 from validate_docbr import CPF
 
-from nokr_qa.cli import main
-from nokr_qa.errors import HarnessError
-from nokr_qa.fixtures import build_payload
-from nokr_qa.fixtures import build_value
-from nokr_qa.fixtures import make_faker
+from heimdall_qa.cli import main
+from heimdall_qa.errors import HarnessError
+from heimdall_qa.fixtures import build_payload
+from heimdall_qa.fixtures import build_value
+from heimdall_qa.fixtures import make_faker
 
 
 def test_email_is_unique_and_shaped():

@@ -2,8 +2,8 @@ from pathlib import Path
 
 import httpx
 
-from nokr_qa.cli import build_parser
-from nokr_qa.cli import main
+from heimdall_qa.cli import build_parser
+from heimdall_qa.cli import main
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 EXAMPLE_ROUND = FIXTURES / "rounds" / "example.yaml"
@@ -35,7 +35,7 @@ def test_cli_run_creates_run_dir(monkeypatch, tmp_path: Path, capsys):
             timeout=kwargs.get("timeout", 10.0),
         )
 
-    monkeypatch.setattr("nokr_qa.cli.httpx.Client", fake_client)
+    monkeypatch.setattr("heimdall_qa.cli.httpx.Client", fake_client)
     monkeypatch.chdir(tmp_path)
     code = main(
         [
@@ -152,7 +152,7 @@ def test_verbose_unexpected_prints_traceback(monkeypatch, tmp_path: Path, capsys
     def boom(*args, **kwargs):
         raise RuntimeError("synthetic failure")
 
-    monkeypatch.setattr("nokr_qa.cli.execute_round", boom)
+    monkeypatch.setattr("heimdall_qa.cli.execute_round", boom)
     monkeypatch.chdir(tmp_path)
     code = main(
         [

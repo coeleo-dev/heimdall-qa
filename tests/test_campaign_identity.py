@@ -26,7 +26,7 @@ def test_campaign_identity_does_not_invent_documents():
 
 
 def test_register_and_activate_h01_use_generate():
-    from nokr_qa.schema.load import load_case
+    from heimdall_qa.schema.load import load_case
 
     register = load_case(ROOT / "cases" / "auth-register" / "register-H01.yaml")
     assert register.generate["email"] == "email"

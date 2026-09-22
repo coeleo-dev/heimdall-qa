@@ -1,6 +1,6 @@
-from nokr_qa.errors import HarnessError
-from nokr_qa.errors import format_cli
-from nokr_qa.errors import to_dict
+from heimdall_qa.errors import HarnessError
+from heimdall_qa.errors import format_cli
+from heimdall_qa.errors import to_dict
 
 
 def test_format_cli_includes_code_message_and_hint():
@@ -20,7 +20,7 @@ def test_to_dict_exposes_fields_for_ui():
     err = HarnessError(
         code="LAST_RUN_MISSING",
         message="no runs/latest symlink",
-        hint="run a round first: nokr-qa run ROUND --mode headless",
+        hint="run a round first: heimdall-qa run ROUND --mode headless",
         details=("runs/latest",),
         exit_code=1,
     )

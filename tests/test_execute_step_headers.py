@@ -5,14 +5,14 @@ from pathlib import Path
 
 import httpx
 
-from nokr_qa.config import HarnessConfig
-from nokr_qa.config import LogFiles
-from nokr_qa.runner import _generated
-from nokr_qa.runner import execute_step
-from nokr_qa.schema.models import CaseFile
-from nokr_qa.schema.models import Contract
-from nokr_qa.schema.models import ExpectSpec
-from nokr_qa.schema.models import FieldSpec
+from heimdall_qa.config import HarnessConfig
+from heimdall_qa.config import LogFiles
+from heimdall_qa.runner import _generated
+from heimdall_qa.runner import execute_step
+from heimdall_qa.schema.models import CaseFile
+from heimdall_qa.schema.models import Contract
+from heimdall_qa.schema.models import ExpectSpec
+from heimdall_qa.schema.models import FieldSpec
 
 _FIXED_KEY = "550e8400-e29b-41d4-a716-446655440000"
 _BASELINE = {

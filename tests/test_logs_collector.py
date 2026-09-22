@@ -5,8 +5,8 @@ from pathlib import Path
 import threading
 import time
 
-from nokr_qa.logs.collector import collect
-from nokr_qa.logs.collector import file_size
+from heimdall_qa.logs.collector import collect
+from heimdall_qa.logs.collector import file_size
 
 LINE = (
     "{ts} [vt] {level} c.n.Foo [SANDBOX] - trace_id: [{trace}] - {msg}\n"

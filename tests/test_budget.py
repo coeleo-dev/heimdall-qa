@@ -1,5 +1,5 @@
-from nokr_qa.config import HarnessConfig
-from nokr_qa.runner import _budget_for
+from heimdall_qa.config import HarnessConfig
+from heimdall_qa.runner import _budget_for
 
 
 def test_auth_register_uses_onboarding_budget():

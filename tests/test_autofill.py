@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from nokr_qa.autofill import mechanical_diff
-from nokr_qa.autofill import mechanical_payload
-from nokr_qa.schema.models import Contract
-from nokr_qa.schema.models import FieldSpec
+from heimdall_qa.autofill import mechanical_diff
+from heimdall_qa.autofill import mechanical_payload
+from heimdall_qa.schema.models import Contract
+from heimdall_qa.schema.models import FieldSpec
 
 
 def _register_contract() -> Contract:

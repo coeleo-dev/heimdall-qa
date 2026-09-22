@@ -2,11 +2,11 @@ from pathlib import Path
 
 import pytest
 
-from nokr_qa.coverage import expand
-from nokr_qa.schema.load import load_case
-from nokr_qa.schema.load import load_contract
-from nokr_qa.schema.load import load_round
-from nokr_qa.validate import validate_round
+from heimdall_qa.coverage import expand
+from heimdall_qa.schema.load import load_case
+from heimdall_qa.schema.load import load_contract
+from heimdall_qa.schema.load import load_round
+from heimdall_qa.validate import validate_round
 
 TESTS = Path(__file__).resolve().parent
 REPO = TESTS.parent
@@ -44,11 +44,11 @@ def test_root_ingest_contract_matches_fixture_expand():
 
 def test_readme_documents_piloto_validate_and_serve():
     text = (REPO / "README.md").read_text(encoding="utf-8")
-    assert "nokr-qa validate rounds/piloto-ingest.yaml" in text
-    assert "nokr-qa serve rounds/piloto-ingest.yaml" in text
+    assert "heimdall-qa validate rounds/piloto-ingest.yaml" in text
+    assert "heimdall-qa serve rounds/piloto-ingest.yaml" in text
 
 
 @pytest.mark.slow
 def test_piloto_live_review_uses_serve_round():
-    """Operator aceite: nokr-qa serve rounds/piloto-ingest.yaml with NokrAPI web+worker."""
+    """Operator aceite: heimdall-qa serve rounds/piloto-ingest.yaml with NokrAPI web+worker."""
     assert PILOTO_ROUND.is_file()

@@ -1,9 +1,9 @@
 import json
 
-from nokr_qa.packs import CatalogRule
-from nokr_qa.packs import PackContext
-from nokr_qa.packs import PackResult
-from nokr_qa.packs import run_all
+from heimdall_qa.packs import CatalogRule
+from heimdall_qa.packs import PackContext
+from heimdall_qa.packs import PackResult
+from heimdall_qa.packs import run_all
 
 
 def _by_id(results: list[PackResult]) -> dict[str, PackResult]:

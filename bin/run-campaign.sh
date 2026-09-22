@@ -17,7 +17,7 @@ for r in $ROUNDS; do
   CURRENT=$((CURRENT + 1))
   echo ""
   echo "[$CURRENT/$TOTAL] >>> Executando: $r"
-  if ./bin/nokr-qa run "$r" --mode headless; then
+  if ./bin/heimdall-qa run "$r" --mode headless; then
     echo "[$CURRENT/$TOTAL] ✓ PASS: $r"
     PASS_ROUNDS=$((PASS_ROUNDS + 1))
   else
@@ -32,5 +32,5 @@ echo "Execução de todas as rodadas finalizada!"
 echo "Rounds PASS: $PASS_ROUNDS | Rounds com FAIL: $FAIL_ROUNDS | Total: $TOTAL"
 echo "=========================================================="
 
-./bin/nokr-qa campaign status "$CAMPAIGN" > runs/last-campaign-status.json
+./bin/heimdall-qa campaign status "$CAMPAIGN" > runs/last-campaign-status.json
 echo "Status gravado em runs/last-campaign-status.json"

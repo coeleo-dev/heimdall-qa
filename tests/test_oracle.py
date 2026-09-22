@@ -2,11 +2,11 @@ from decimal import Decimal
 
 import pytest
 
-from nokr_qa.errors import HarnessError
-from nokr_qa.oracle.money import ingest_flat
-from nokr_qa.oracle.money import metering_amount
-from nokr_qa.oracle.money import money_equal
-from nokr_qa.oracle.money import require_flat_model
+from heimdall_qa.errors import HarnessError
+from heimdall_qa.oracle.money import ingest_flat
+from heimdall_qa.oracle.money import metering_amount
+from heimdall_qa.oracle.money import money_equal
+from heimdall_qa.oracle.money import require_flat_model
 
 
 def test_ingest_flat_one_hundred_tokens_is_0_00300():

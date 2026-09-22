@@ -1,7 +1,7 @@
 import pytest
 
-from nokr_qa.errors import HarnessError
-from nokr_qa.serve.bind import assert_local_bind
+from heimdall_qa.errors import HarnessError
+from heimdall_qa.serve.bind import assert_local_bind
 
 
 def test_assert_local_bind_rejects_all_interfaces():

@@ -1,4 +1,4 @@
-from nokr_qa.redact import redact_obj
+from heimdall_qa.redact import redact_obj
 
 
 def test_redact_removes_full_nk_test_token():
