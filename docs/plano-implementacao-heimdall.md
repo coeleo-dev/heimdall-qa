@@ -1,172 +1,295 @@
 # Heimdall QA — plano de implementação
 
-> **O que é isto.** A Parte B da refatoração `nokr-qa` → `heimdall-qa`: a sequência de PRs que executa o que o estudo de nove frentes decidiu.
-> **Onde nasceu.** [`docs/estudo-heimdall/09-consolidacao.md`](estudo-heimdall/09-consolidacao.md) §2 (as fases), §1 (as 11 ADRs) e §4 (os 48 edge cases). O estudo é o *porquê*; este documento é o *o quê*, na ordem.
+> **O que é isto.** A sequência de PRs que transforma `nokr-qa` em **Heimdall QA**: um harness de **REST** genérico, renomeado e sem nenhuma referência ao Nokr no núcleo.
+> **Onde nasceu.** [`docs/estudo-heimdall/09-consolidacao.md`](estudo-heimdall/09-consolidacao.md) §1 (as 11 ADRs), §2 (as fases) e §4 (os 48 edge cases).
 > **Como usar.** Um PR, uma fase. A fase N+1 não começa sem o aceite da fase N. O aceite da fase anterior vai no corpo do PR seguinte.
-> **Registro em 22/09/2026.** Nada aqui está implementado.
-
-Ordem: **REST primeiro, navegador por último.** A Etapa 3 não entra no caminho crítico das Etapas 1 e 2.
-
----
-
-## Convenção de caminhos
-
-Os caminhos são os de **hoje**, antes de qualquer fase. Duas transformações se aplicam ao longo do plano:
-
-- depois de **1.3/1.4**, tudo que é conteúdo ou domínio passa a `providers/nokr/` (hoje está na raiz: `cases/`, `contracts/`, `campaigns/`, `rounds/`, `suites/`, `baselines/`, `p-gaps.yaml`, `oracle/`);
-- depois de **1.5**, `src/nokr_qa/` → `src/heimdall_qa/` em todos os caminhos.
-
-Um caminho ou superfície marcado **(novo)** ainda não existe — nem o arquivo, nem a flag. Em particular, `validate --explain` (Fase 2.4) e `serve --export` (Fase 3.2) são **criados por essas fases**; hoje `validate` só aceita `round` e `--root`, e `serve` não tem subcomando de export.
+> **Revisão de 22/09/2026.** Substitui a versão anterior deste plano, que incluía a Etapa 3 (navegador). **O frontend sai do escopo** (§2) e a identidade vira a primeira etapa (§4).
+> **Nada aqui está implementado.**
 
 ---
 
-## Invariantes
+## 1. Escopo
+
+**Dentro:** o harness de HTTP. Descriptor de projeto, adapter HTTP, provider, alavancas (auto-discovery, storage, logs, contrato do agente, saída como dado).
+
+**Fora:** todo o teste de navegador. Não é uma fase adiada — **não está neste plano** (§2).
+
+**Consequência dura:** o harness que sai deste plano é REST-only. Ele não instala `playwright`, não importa `browser`, não tem passo `ui`.
+
+**Sem Etapa 3.** A versão anterior tinha três fases de navegador (3.1–3.3). Elas saem, e a condição de retomada da emenda 11 deixa de estar neste plano. O código não é apagado: é **preservado fora de `main`** (§2.2), e volta como **provider**, nunca como código do núcleo.
+
+---
+
+## 2. O frontend sai sem quebrar o backend
+
+O requisito é: *commitar só a parte de REST, não subir nada de frontend, e ainda assim o backend funcionar normalmente*. Três partes.
+
+### 2.1 O que exatamente sai
+
+Inventariado por medição, não por glob:
+
+| O quê | Tamanho | Onde |
+|---|---:|---|
+| `browser.py` | 735 linhas | `src/nokr_qa/` |
+| `ui_step.py` | 383 linhas | `src/nokr_qa/` |
+| packs `ui.*` | ~130 linhas | dentro de `packs/__init__.py` (649) |
+| `UiStep`, `SurfaceSpec` | ~50 linhas | `schema/models.py:210,253` |
+| 8 arquivos de teste + `support_ui.py` | 2.307 linhas | `tests/` |
+| `overview.aria.yml` | — | `baselines/ui/` |
+| `ui-overview.yaml`, `ui-smoke.yaml` | — | `rounds/`, `suites/` |
+| `playwright`, `axe-playwright-python` | **1,3 GB** de binário | `pyproject.toml` |
+| 4 chaves do bloco `ui:` (`page_ms`, `logs_ms`, `screenshot`, `a11y`) | — | `config.yaml:9-15` |
+| **total** | **~3.605 linhas** | |
+
+**O que NÃO sai, e é fácil confundir:** `src/nokr_qa/serve/` (910 linhas) é a **UI de review do próprio harness** — a tela onde um humano lê um run. Não é teste de frontend e não sai. O mesmo vale para duas das seis chaves do bloco `ui:` do `config.yaml`: **`host` e `port` ficam** (são o bind da UI de review — `serve/bind.py` depende delas); `page_ms`, `logs_ms`, `screenshot` e `a11y` saem (são política do passo de navegador).
+
+**`campaigns/` está limpo e continua limpo.** A busca por `ui` em `campaigns/*.yaml` casa apenas `req`**`ui`**`red` — falso positivo. Nenhuma campanha referencia navegador, então a invariante I3 (`git diff campaigns/` vazio) não é tocada por esta etapa.
+
+### 2.2 Como preservar sem subir
+
+O código já está commitado — o E3 fechou antes desta refatoração. A operação é tirá-lo de `main` e deixá-lo recuperável:
+
+```bash
+git tag e3-freeze              # marco do congelamento (o registro está em 00-baseline.md §4)
+git branch ui-browser e3-freeze  # a linha do navegador continua viva, fora de main
+```
+
+Depois disso, `main` não carrega nada de navegador, e **recuperar é um comando**:
+```bash
+git checkout e3-freeze -- tests/test_ui_slow.py src/nokr_qa/browser.py
+```
+
+Trabalhar localmente no navegador sem subir nada é trabalhar num branch a partir de `e3-freeze`.
+
+> **Ressalva honesta.** A tag preserva o **conteúdo**; o **histórico** já contém o E3 e continuará contendo. Se a publicação exigir que nem o histórico mencione o frontend, isso é `git filter-repo` — operação destrutiva, **fora deste plano**, e só se a publicação realmente precisar.
+
+### 2.3 O corte técnico: 4 linhas
+
+O risco real daqui é `suite_run.py`, que é **caminho HTTP** e importa navegador **no topo do módulo**:
+
+```startLine:16:17:src/nokr_qa/suite_run.py
+from nokr_qa.browser import UiDriver
+from nokr_qa.browser import UiSession
+```
+```startLine:60:61:src/nokr_qa/suite_run.py
+from nokr_qa.ui_step import UiOutcome
+from nokr_qa.ui_step import execute_ui_step
+```
+
+Import removido, `suite_run` quebra. Então o corte **não** é `rm`: é instalar uma **costura** e depois remover.
+
+A costura já existe pela metade: `packs/__init__.py:101` despacha por tipo de passo —
+
+```startLine:101:110:src/nokr_qa/packs/__init__.py
+def run_all(ctx: PackContext) -> list[PackResult]:
+    # A `ui` step has no case contract, so it gets its own set instead of the
+    # HTTP one. Dispatching here (rather than in the caller) keeps every step
+    # kind going through a single `run_all`, so a new kind cannot silently skip
+    # its packs.
+    if ctx.case_kind == "ui":
+        return run_ui(ctx)
+```
+
+O trabalho é transformar esse `if` em **registro de tipos de passo**: o núcleo registra `http`; `ui` deixa de ser um `if` no código e passa a ser um tipo que ninguém registrou. Os 4 imports de `suite_run.py` viram resolução tardia pelo registro — a mesma forma que o provider vai usar em 1.6, o que faz desta costura a fundação da arquitetura de provider, e não um remendo.
+
+**Aceite do corte, prova de que o backend não quebrou:** um round que declara um passo `ui` falha com mensagem acionável (`tipo de passo não registrado: ui`), **nunca com `ImportError`**.
+
+---
+
+## 3. Invariantes
 
 Valem em toda fase. Uma PR que viole qualquer uma é recusada, independentemente de estar verde.
 
 | # | Invariante | Como se verifica |
 |---|---|---|
-| I1 | **O núcleo não importa provider, em nenhuma fase.** | T3 (§ gate de 1.4) |
-| I2 | **Nada de navegador nas Etapas 1 e 2** — nem "só um pouquinho". | `pyproject.toml` sem playwright; nenhum caso com passo `ui` |
-| I3 | **O E3 não avança nem é revertido** durante as Etapas 1 e 2. Congelado não é abandonado. | `git log` de `baselines/ui/` e dos packs `ui.*` |
-| I4 | **O Trilho A não muda.** | `git diff campaigns/` vazio |
+| I1 | **O núcleo não importa provider, em nenhuma fase.** | T3 (§ fase 1.6) |
+| I2 | **Nenhum código ou dependência de navegador em `main`.** | `rg -i 'playwright\|axe\|browser\|ui_step' src/ pyproject.toml` |
+| I3 | **O Trilho A não muda.** | `git diff campaigns/` vazio |
+| I4 | **O E3 não avança nem é revertido.** Preservado em `e3-freeze`, não em `main`. | `git tag --list e3-freeze`; `git diff e3-freeze --stat -- src/nokr_qa/browser.py` vazio |
 | I5 | **Não reescrever.** Aditivo e reversível, com prova de não-quebra por fase. | o aceite de cada fase |
-| I6 | **Não generalizar antes do segundo provider existir.** | o provider de brinquedo da fase 1.1 |
+| I6 | **Não generalizar antes do segundo provider existir.** | o provider de brinquedo da fase 1.6 |
 | I7 | **A fonte de verdade do conteúdo não vira binário.** | sem índice commitado em `cases/` |
-| I8 | **Não deixar o E3 pela metade sem registro.** | [`00-baseline.md`](estudo-heimdall/00-baseline.md) §4 |
+| I8 | **O núcleo fica com zero referências de produto.** | `rg -i nokr src/heimdall_qa/` vazio (fase 1.4) |
 
-**I4 é a que mais tenta ser quebrada por acidente**, porque 1.2 e 1.3 tocam exatamente os YAML que ela protege. O `git diff` vazio é o único juiz.
+**I2 e I8 são as duas que definem o resultado.** I2 é "não é um harness de browser"; I8 é "não é um harness do Nokr". Juntas: um harness de REST genérico.
 
----
-
-# Etapa 1 — Núcleo agnóstico HTTP
-
-**Entrega:** setup por projeto (F2), mapa de acoplamento aplicado (F1), corte do provider (F8) — só com o adapter HTTP.
-**Gate de saída:** `git diff campaigns/` vazio **e** o provider de brinquedo rodando numa wheel limpa sem Nokr em disco.
+**I4 mudou de forma.** Antes era "congelado no lugar"; agora é "preservado fora de linha". O E3 continua sendo um ativo — só não é um ativo dentro de `main`.
 
 ---
 
-## Fase 1.0 — Corte de dependências
+## 4. Convenção de caminhos
 
-**Objetivo:** instalar o núcleo para testar HTTP deixa de custar 1,3 GB. `playwright` e `axe` saem para o extra `[browser]`, que a Etapa 3 reativa.
+Os caminhos são os de **hoje**. Duas transformações se aplicam ao longo do plano:
 
-**Arquivos:** `pyproject.toml` (só ele), `tests/test_no_browser_extra.py` (novo — o gate vira teste).
+- depois de **1.2**, `src/nokr_qa/` → `src/heimdall_qa/` em todos os caminhos;
+- depois de **1.5**, tudo que é conteúdo ou domínio passa a `providers/nokr/` (hoje está na raiz: `cases/`, `contracts/`, `campaigns/`, `rounds/`, `suites/`, `baselines/`, `p-gaps.yaml`, `oracle/`).
 
-**Não fazer:** tocar em `src/` (o código **já** é lazy — verificado: `browser.py:229`, `:597`, `:709`, todos em `try/ImportError`); mover `faker`; mover `validate-docbr` (isso é 1.3); mexer em `tests/`.
+Um caminho ou superfície marcado **(novo)** ainda não existe — nem o arquivo, nem a flag. Em particular, `validate --explain` (fase 2.4) e `serve --export` (fase 2.5) são **criados por essas fases**.
 
-**Aceite:** `pip install -e .` num venv limpo **não** instala `playwright`; a suíte de HTTP passa com os dois módulos inexistentes no ambiente.
+---
+
+# Etapa 1 — Identidade e desacoplamento
+
+**Entrega:** o harness renomeado, REST-only, e sem nenhuma referência ao Nokr no núcleo — com o conteúdo do Nokr isolado num provider.
+**Gate de saída:** `rg -i nokr src/heimdall_qa/` vazio **e** `git diff campaigns/` vazio **e** T3 verde.
+
+**Por que o rename e a "remoção de todas as referências" não cabem num PR só, nem bastam sozinhos.** Remover as 53 referências de produto do núcleo é uma **migração, não um find-replace**: cada referência precisa de um destino. Os destinos são dois, e por isso as fases 1.3 e 1.5 existem dentro desta etapa:
+
+| Referência | Exemplo | Destino |
+|---|---|---|
+| **Valor de configuração** | `nokr_web: http://127.0.0.1:8080` (`config.py:50`) | o **descriptor** do projeto (fase 1.3) |
+| **Conhecimento de domínio** | `HALF_EVEN`, `exclude_settled_from` (`oracle/money.py`) | o **provider** (fase 1.5) |
+
+Um find-replace deixaria o núcleo sem saber para onde pedir a URL e o oráculo sem saber o que é uma compra. É por isso que a Etapa 1 tem sete fases e não duas.
+
+---
+
+## Fase 1.1 — Cortar o navegador
+
+**Objetivo:** `main` deixa de ter navegador. O harness passa a ser REST-only, com a costura de tipos de passo instalada no lugar dos `if` (§2.3).
+
+**Arquivos:** `src/nokr_qa/suite_run.py` (os 4 imports de `:16-17,60-61` viram registro), `src/nokr_qa/packs/__init__.py` (`run_all:101` despacha por registro; `run_ui`, `run_ui_transport`, `_ui_render`, `_ui_structure`, `_ui_a11y`, `_ui_visual`, `_describe_violations` saem; `NON_WAIVABLE_PACKS` perde `ui.value`), `schema/models.py` (`UiStep:210`, `SurfaceSpec:253` saem), `pyproject.toml`, `config.yaml`, `tests/test_step_kinds.py` (novo).
+
+**Remover:** `src/nokr_qa/browser.py`, `src/nokr_qa/ui_step.py`, `tests/test_ui_*.py` (8), `tests/support_ui.py`, `tests/fixtures/` de ui, `baselines/ui/`, `rounds/ui-overview.yaml`, `suites/ui-smoke.yaml`.
+
+**Não fazer:** **não tocar em `src/nokr_qa/serve/`** — é a UI de review do harness, não teste de frontend (§2.1); não remover `ui.host`/`ui.port` do `config.yaml` (são o bind da review, usados por `serve/bind.py`); não apagar nada antes de a tag `e3-freeze` existir; não mexer em `campaigns/` (está limpo).
+
+**Aceite:** os 257 testes de REST passam com `playwright` **e** `axe` inimportáveis; um round que declara um passo `ui` falha com mensagem acionável, não com `ImportError`; a UI de review continua subindo em `127.0.0.1:7878`.
 
 **Verificar:**
 ```
-# 1. os dois pacotes não estão mais nas deps obrigatórias
+git tag --list e3-freeze                                     # existe ANTES de remover
+PYTHONPATH=/tmp:src python -m pytest -q --ignore=tests/test_ui_*.py
+python -m pytest -q tests/test_step_kinds.py                 # passo ui -> erro claro
+rg -i 'playwright|axe|browser|ui_step' src/ pyproject.toml   # => vazio
 python -c "import tomllib;d=tomllib.load(open('pyproject.toml','rb'));\
 print([x for x in d['project']['dependencies'] if 'playwright' in x or 'axe' in x])"   # => []
-
-# 2. a suíte HTTP passa sem eles (bloqueio em sys.meta_path)
-PYTHONPATH=/tmp:src python -m pytest -q --ignore=tests/test_ui_*.py
 ```
-Script de bloqueio (`/tmp/block_plugin.py`), que vira `tests/test_no_browser_extra.py`:
+Script de bloqueio (`tests/test_step_kinds.py` usa o mesmo):
 ```python
 import sys
 BLOCKED = ("playwright", "axe_playwright_python")
 class Block:
     def find_spec(self, name, path=None, target=None):
         if name.split(".")[0] in BLOCKED:
-            raise ImportError(f"BLOCKED for [browser]-extra gate: {name}")
+            raise ImportError(f"BLOCKED: {name}")
         return None
 sys.meta_path.insert(0, Block())
 ```
 
-**Baseline medido hoje (pré-mudança, com o browser instalado):** `257 passed, 3 skipped in 6.44s`.
-**Medido com o browser bloqueado:** `257 passed, 3 skipped` — idêntico. É a rara fase cujo aceite **já passa antes** da mudança.
+**Baseline medido com o browser instalado:** `257 passed, 3 skipped in 6.44s`. **Com o browser bloqueado:** idêntico. O aceite **já passa hoje** — a fase só o torna o estado normal do repo.
 
-**Gate:** é a base de onboarding e o que torna T3 (1.4) executável. Sem ela, "o núcleo não precisa do browser" é afirmação, não fato.
+**Gate:** é o que produz o artefato REST-only. Sem ela, "não subir frontend" é intenção.
 
-**Reversão:** `git revert` — uma linha.
-
----
-
-## Fase 1.1 — Descriptor de projeto
-
-**Objetivo:** URL, auth, rotas, budgets, trace e fontes de log saem do núcleo e passam a ser um arquivo **do alvo**, versionado no repo do alvo (ADR-01).
-
-**Arquivos:** `src/nokr_qa/config.py` (vira o carregador), `src/nokr_qa/schema/` (modelo Pydantic do descriptor), `config.yaml` → `qa/project.yaml`, `tests/fixtures/descriptors/` (3 exemplos), `tests/test_descriptor.py`.
-
-**Não fazer:** implementar o adapter HTTP (é 1.2); mover casos ou contratos (é 1.3); resolver a precedência por `importlib` — dois níveis, produto vence, nada mais.
-
-**Aceite:** o descriptor do **provider de brinquedo** (uma API que não é a Nokr) resolve base_url, auth e rotas; `validate` recusa um descriptor sem `base_url` e recusa dois descriptors que declarariam a mesma rota com auth diferente.
-
-**Verificar:** os 3 exemplos preenchidos de F2 §4 (Nokr, o Node/Express do F2, e o brinquedo) carregam; um teste por campo obrigatório ausente.
-
-**Gate:** sem descriptor, 1.2 não tem o que consumir. É o pré-requisito lógico da Etapa 1 inteira.
-
-**Risco:** `log_files.web` tem default `../NokrAPI/logs/nokr-web.log` — um caminho **fora do repo** (`config.py:49-54`). Default de produto morre aqui.
+**Reversão:** `git checkout e3-freeze -- <paths>`.
 
 ---
 
-## Fase 1.2 — Adapter HTTP sobre o descriptor
+## Fase 1.2 — Rename mecânico
 
-**Objetivo:** os vazamentos V1, V2, V3, V6, V7, V9, V10 e V11 de F1 §2.1 deixam de existir em código e passam a ser dado no descriptor.
+**Objetivo:** `nokr_qa` → `heimdall_qa` (ADR-05, ADR-07), em commit isolado e puramente mecânico.
 
-**Arquivos:** um por vazamento. A tabela é a lista de arquivos e o que sai de cada um.
+**Arquivos:** `src/nokr_qa/` → `src/heimdall_qa/`, `bin/nokr-qa` → `bin/heimdall-qa`, `pyproject.toml` (`name`, `[project.scripts]`, `package-data`, o marker `slow` do pytest), `tests/` (imports), `src/heimdall_qa/serve/templates/base.html` (chave de `localStorage` `nokr-qa-queue-width` — identidade **do harness**, não do produto).
 
-| Arquivo | O que sai | Item |
-|---|---|---|
-| `packs/__init__.py:15` | regex com `com\.nokr`, `nk_test_`, `nk_live_` | V6, V9 |
-| `packs/__init__.py:478-483` | `X-Nokr-Environment`, exigência de `/platform` + JWT | V1, V2 |
-| `session_validate.py:30-35` | as seis rotas `/platform/*` | V2 |
-| `logs/collector.py` | os dois arquivos fixos (`web_log`, `worker_log`) | V10 |
-| `bru_parser.py`, `collection.py` | Bruno como fonte única | V11 |
-| `runner.py` | resolução de rota e budget a partir de prefixo | V3, V7 |
-| `http_client.py` | budgets por constante | V3 |
+**Não fazer:** **nenhuma** mudança semântica neste commit — o objetivo é que um erro de digitação apareça no diff; mexer nas referências de produto (isso é 1.3/1.4, e elas não casam `nokr_qa`); renomear `providers/nokr/` (não existe ainda, e o nome é legítimo — o produto testado é o Nokr).
 
-**Não fazer:** **tocar no oráculo** (`oracle/money.py`, `oracle/book.py`, `packs/values.py`) — V4 é da Etapa 2, quando `checks` plugáveis existirem; nada de browser; mudar o comportamento observável de nenhum case.
-
-**Aceite:** nenhum literal de produto nos arquivos acima; **os 539 cases rodam pelo caminho novo com resultado idêntico**; `validate` recusa uma rota sem `auth` declarado.
+**Aceite:** suíte verde sem mudança de comportamento; `git diff --color-moved` legível; nenhum `nokr_qa` remanescente.
 
 **Verificar:**
 ```
-rg -i 'com\.nokr|nk_test_|X-Nokr-Environment|/platform|nokr-web|nokr-worker' \
-   src/nokr_qa/runner.py src/nokr_qa/packs/__init__.py \
-   src/nokr_qa/session_validate.py src/nokr_qa/logs/collector.py \
-   src/nokr_qa/bru_parser.py src/nokr_qa/collection.py        # => vazio
-python -m pytest -q --ignore=tests/test_ui_*.py
+rg -n 'nokr_qa|nokr-qa|NOKR_QA' src/ tests/ pyproject.toml bin/    # => vazio
+PYTHONPATH=/tmp:src python -m pytest -q
 ```
 
-**Gate:** é o corte de verdade. Depois dele, o único acoplamento de produto que resta em `src/` é o que 1.3 e 1.4 removem.
+**Gate:** libera 1.3–1.7. **O rename vem primeiro por uma razão que a versão anterior deste plano não considerava:** todas as fases seguintes escrevem **código novo** (o descriptor, o adapter, o provider). Se o rename vier depois, esse código nasce com o nome antigo e precisa ser renomeado também. Renomear antes faz o trabalho novo nascer certo — e o corte de 1.1 já reduziu a superfície em ~3.605 linhas.
 
-**Risco:** V11 não é descriptor, é **adapter** (F8 §2.1) — a capacidade de ler requests fica no núcleo, a escolha da fonte no descriptor. Não confundir os dois lados.
+**Superfície:** 761 ocorrências mecânicas em 25 arquivos de `src/` (medido em F8 §0). Nada de decisão.
 
 ---
 
-## Fase 1.3 — Migrar o provider Nokr
+## Fase 1.3 — Descriptor de projeto
 
-**Objetivo:** o conteúdo e o domínio viram provider. `cases/`, `contracts/`, `campaigns/`, `rounds/`, `suites/`, `baselines/` e `p-gaps.yaml` saem do núcleo.
+**Objetivo:** criar o **destino** das referências de configuração. URL, auth, rotas, budgets, trace e fontes de log deixam de ser campos do núcleo e passam a ser um arquivo **do alvo**, versionado no repo do alvo (ADR-01).
 
-**Arquivos:** `qa/project.yaml` (o ex-Nokr), `providers/nokr/` (novo destino), `oracle/money.py` + `oracle/book.py` (→ provider), `validate-docbr` (→ deps do provider, ADR-11), `tests/test_fixtures.py` (migra junto).
+**Arquivos:** `src/heimdall_qa/config.py` (vira o carregador), `src/heimdall_qa/schema/` (modelo Pydantic do descriptor), `config.yaml` → `qa/project.yaml`, `tests/fixtures/descriptors/` (3 exemplos, **novo**), `tests/test_descriptor.py` (**novo**).
 
-**Não fazer:** mexer em `browser.py` ou nos packs `ui.*` — são Etapa 3 (invariante I2/I3); alterar qualquer YAML do Trilho A (invariante I4).
+**Não fazer:** implementar o adapter HTTP (é 1.4); mover casos ou contratos (é 1.5); construir resolução genérica de N níveis — **dois níveis, o alvo vence**, nada mais.
 
-**Aceite:** os 539 cases rodam verdes **e** `git diff campaigns/` está vazio. Nenhum arquivo de conteúdo fica no diretório do núcleo.
+**Aceite:** o descriptor do **provider de brinquedo** (uma API que não é a Nokr) resolve base_url, auth e rotas; `validate` recusa descriptor sem `base_url` e recusa dois descriptores que declarariam a mesma rota com auth diferente.
+
+**Verificar:** os 3 exemplos de F2 §4 (Nokr, o Node/Express do F2, e o brinquedo) carregam; um teste por campo obrigatório ausente.
+
+**Gate:** sem o destino, 1.4 não tem para onde mover nada. É o pré-requisito lógico de 1.4 e 1.5.
+
+**Risco:** `log_files.web` aponta para **fora do repo** (`../NokrAPI/logs/nokr-web.log` — `config.py:49-54`). Default de produto morre aqui, e vira `log_sources[].path` relativo ao alvo.
+
+---
+
+## Fase 1.4 — Desacoplar o caminho HTTP
+
+**Objetivo:** as **53 referências de produto em 14 arquivos de `src/`** saem do núcleo. Cada uma vai para o descriptor, e o caminho de request passa a lê-las de lá.
+
+**Arquivos:** os 14, medidos um a um.
+
+| Arquivo | refs | O que sai |
+|---|---:|---|
+| `config.py` | 9 | `nokr_web`, `nokr_admin`, `nokr_dashboard`, `log_files.*`, `bruno_collection` |
+| `runner.py` | 9 | `nokr_web`, `nokr_admin`, `X-Nokr-Environment`, `X-Nokr-Admin-Secret`, prefixos de fase |
+| `packs/__init__.py` | 6 | regex com `com\.nokr`, `X-Nokr-Environment` (`:15`, `:478-483`) |
+| `suite_run.py` | 5 | `nokr_dashboard`, `nokr_web`, `X-Nokr-Environment` |
+| `http_client.py` | 4 | `nokr_web`, base URL da NokrAPI |
+| `session.py` | 2 | idem |
+| `session_validate.py` | — | as seis rotas `/platform/*` (`:30-35`) → `routes[]` |
+| `autofill.py` | 1 | `X-Nokr-Environment` |
+| `cli.py`, `fixtures.py`, `logs/__init__.py`, `serve/app.py`, `__init__.py` | 5 | rótulos e docs |
+| `bru_parser.py`, `collection.py` | — | Bruno como fonte única → adapter `request_source` (V11) |
+
+**Não fazer:** tocar no **oráculo** (`oracle/money.py`, `oracle/book.py`, `packs/values.py`) — V4 é de 1.5, quando `checks` plugáveis existirem; mudar comportamento observável de nenhum case; tocar em `serve/` além do rótulo de 1 linha.
+
+**Aceite:** zero referências de produto no núcleo; **os 539 cases rodam pelo caminho novo com resultado idêntico**; `validate` recusa rota sem `auth` declarado.
 
 **Verificar:**
 ```
-git diff --stat campaigns/            # => vazio
-git status --stat providers/nokr/     # => o conteúdo está lá
-python -m pytest -q --ignore=tests/test_ui_*.py
+rg -i 'nokr' src/heimdall_qa/                              # => vazio
+PYTHONPATH=/tmp:src python -m pytest -q
+git diff --stat campaigns/                                 # => vazio (I3)
 ```
 
-**Gate:** é a metade "o Nokr roda sobre o núcleo" do gate de saída da Etapa 1 — a outra metade é 1.4.
+**Gate:** é o corte de verdade. Depois dele o núcleo não sabe o que é Nokr quando faz um request — que é metade de I8 (a outra metade é o conteúdo, em 1.5).
+
+**Risco:** V11 não é descriptor, é **adapter** — a capacidade de ler requests fica no núcleo, a escolha da fonte no descriptor. Não confundir os dois lados.
 
 ---
 
-## Fase 1.4 — Partir o pacote
+## Fase 1.5 — Extrair o provider
 
-**Objetivo:** `providers/nokr/` deixa de estar sob o `src/` do núcleo e vira **distribuição própria** (`heimdall-qa-nokr`), ADR-05.
+**Objetivo:** o conteúdo e o domínio saem do núcleo e viram provider. `cases/`, `contracts/`, `campaigns/`, `rounds/`, `suites/`, `baselines/`, `p-gaps.yaml` e `oracle/` deixam de ser do núcleo (ADR-02 para o `dto`, ADR-10 para o `validate-docbr`).
 
-**Arquivos:** `pyproject.toml` (núcleo), `providers/nokr/pyproject.toml` (novo), `providers/nokr/src/heimdall_qa_nokr/`
+**Arquivos:** `qa/project.yaml`, `providers/nokr/` (**novo**), `providers/nokr/cases/`, `.../contracts/`, `.../campaigns/`, `oracle/money.py` + `oracle/book.py` → provider, `tests/test_fixtures.py` migra junto com `validate-docbr`.
 
-**Não fazer:** manter o provider dentro do `src/` do núcleo — sem a separação física, T3 não prova nada e o ADR-05 fica decorativo.
+**Não fazer:** mexer em `browser.py` ou packs `ui.*` — **não existem mais** (1.1); alterar qualquer YAML do Trilho A (I3); criar `checks` plugáveis genéricos — é Etapa 2, quando houver segundo consumidor.
+
+**Aceite:** os 539 cases rodam verdes; `git diff campaigns/` vazio; nenhum arquivo de conteúdo ou domínio fica no diretório do núcleo.
+
+**Verificar:**
+```
+git diff --stat campaigns/                 # => vazio
+ls providers/nokr/                         # => cases, contracts, campaigns, oracle
+ls src/heimdall_qa/oracle 2>/dev/null      # => não existe (foi para o provider)
+PYTHONPATH=/tmp:src python -m pytest -q
+```
+
+**Gate:** é a metade "o Nokr roda sobre o núcleo" do gate de saída da Etapa 1. A outra é 1.6.
+
+---
+
+## Fase 1.6 — Partir a distribuição e provar o genérico
+
+**Objetivo:** `providers/nokr/` deixa de estar sob o `src/` do núcleo e vira **distribuição própria** (`heimdall-qa-nokr`), ADR-05. Mais o **provider de brinquedo**, que é o gate do desenho.
+
+**Arquivos:** `pyproject.toml` (núcleo), `providers/nokr/pyproject.toml` (**novo**), `providers/nokr/src/heimdall_qa_nokr/`, `examples/toy-provider/` (**novo**: descriptor de 12 linhas + mock FastAPI de 3 rotas + 3 casos).
+
+**Não fazer:** manter o provider dentro do `src/` do núcleo — sem separação física, T3 não prova nada e ADR-05 vira decorativo; fazer do brinquedo um segundo produto real (é deliberadamente barato).
 
 **Aceite:** T3, o gate de genericidade do ADR-06 — três blocos, todos verdes.
 ```
@@ -184,56 +307,34 @@ test -f examples/toy-provider/runs/latest/run.json
 /tmp/gate/bin/heimdall-qa last-run
 ```
 
-**Verificar:** os três blocos acima. O passo 1 falhando = o núcleo depende do provider; o passo 2 falhando = o núcleo não é utilizável sozinho.
+**Verificar:** os três blocos. O passo 1 falhando = o núcleo depende do provider; o passo 2 falhando = o núcleo não é utilizável sozinho.
 
-**Status:** **vermelho por construção hoje** — `config.py:50-51` ainda tem `nokr_web`/`nokr_admin`, e o descriptor de 1.1 não existe. É o gate que mede o trabalho da Etapa 1.
+**Status:** **vermelho por construção hoje** — `config.py:50-51` ainda tem `nokr_web`/`nokr_admin` e o descriptor de 1.3 não existe.
 
-**Gate:** é o que dá dentes ao ADR-05 e fecha o gate de saída da Etapa 1.
-
-**Requisito:** precisa do **provider de brinquedo** (`examples/toy-provider/`: descriptor de 12 linhas + mock FastAPI de 3 rotas + 3 casos). Ele serve três papéis ao mesmo tempo: exemplo canônico, provider mínimo do teste de contrato, e alvo de T3.
+**Gate:** fecha a Etapa 1. O brinquedo serve três papéis ao mesmo tempo: exemplo canônico, provider mínimo do teste de contrato, e alvo de T3.
 
 ---
 
-## Fase 1.5 — Rename por último
-
-**Objetivo:** `nokr_qa` → `heimdall_qa`, em commit isolado e puramente mecânico.
-
-**Arquivos:** `src/nokr_qa/` → `src/heimdall_qa/` (25 arquivos), `bin/nokr-qa`, `pyproject.toml` (`name`, `[project.scripts]`, `package-data`), `tests/`, `src/nokr_qa/serve/templates/base.html` (chave de `localStorage` `nokr-qa-queue-width` — identidade **do harness**, não do produto).
-
-**Não fazer:** misturar **qualquer** mudança semântica neste commit. O objetivo é que um erro de digitação apareça no diff.
-
-**Aceite:** suíte verde sem mudança de comportamento; `git diff --color-moved` legível; nenhum `import nokr_qa` remanescente.
-
-**Verificar:**
-```
-rg -n 'nokr_qa|nokr-qa|NOKR_QA' src/ tests/ pyproject.toml bin/    # => vazio
-python -m pytest -q --ignore=tests/test_ui_*.py
-```
-
-**Gate:** o rename vem **depois** de 1.3/1.4 porque toca 1.432 ocorrências (F8 §0) — antes, obrigaria a revisar o mesmo diff duas vezes sobre arquivos que o provider também reescreve.
-
----
-
-## Fase 1.6 — Documentação do núcleo em inglês
+## Fase 1.7 — Documentação do núcleo em inglês
 
 **Objetivo:** o núcleo passa a ter documentação em inglês (ADR-08). ~500-600 linhas de prosa **nova**, não tradução de 1.271.
 
-**Arquivos:** `README.md`, `docs/README.md`, `AGENTS.md`, docstrings/comentários em `src/` (158 linhas), `.cursor/skills/` (fonte única + geração).
+**Arquivos:** `README.md`, `docs/README.md`, `AGENTS.md`, docstrings e comentários em `src/` (158 linhas), `.cursor/skills/` + `.agents/skills/` (fonte única + geração).
 
-**Não fazer:** traduzir `docs/nokr-qa.md` (1.271 linhas) — é a spec **do produto** e fica em português, no provider; traduzir a pasta `docs/estudo-heimdall/` (insumo descartável); traduzir 152 linhas de skill **antes** de consolidar as duas cópias divergentes (F8 §4.3).
+**Não fazer:** traduzir `docs/nokr-qa.md` (1.271 linhas) — é a spec **do produto** e fica em português, no provider (move-se em 1.5); traduzir `docs/estudo-heimdall/` (insumo descartável); traduzir as 152 linhas de skill **antes** de consolidar as duas cópias divergentes.
 
-**Aceite:** README + `docs/architecture.md` legíveis sem PT-BR; skill do núcleo em inglês, skill do provider em português; nenhuma regra duplicada entre as duas.
+**Aceite:** README + `docs/architecture.md` (**novo**) legíveis sem PT-BR; skill do núcleo em inglês, skill do provider em português; nenhuma regra duplicada entre as duas.
 
-**Verificar:** leitura por quem não fala português (o teste é humano, e é o único de toda a Etapa 1); `rg -l '[áéíóúãõç]' src/` para os docstrings.
+**Verificar:** leitura por quem não fala português — o único aceite humano de toda a Etapa 1, e por isso o último.
 
-**Gate:** fecha a Etapa 1. É o único aceite não automatizável da etapa — e por isso o último.
+**Gate:** fecha a Etapa 1.
 
 ---
 
 # Etapa 2 — As alavancas
 
-**Entrega:** auto-discovery (F3), storage e índice (F4), fontes de log (F5), contrato do agente (F6).
-**Gate de saída:** round gerado de OpenAPI roda sem o agente escrever YAML mecânico; busca em run é sub-segundo; **nenhum fallback por relógio local** existe.
+**Entrega:** auto-discovery (F3), storage e índice (F4), fontes de log (F5), contrato do agente (F6), saída como dado.
+**Gate de saída:** round gerado de OpenAPI roda sem o agente escrever YAML mecânico; busca em run sub-segundo; **nenhum fallback por relógio local**; partida de ~2.195 tokens.
 
 ---
 
@@ -241,13 +342,13 @@ python -m pytest -q --ignore=tests/test_ui_*.py
 
 **Objetivo:** o agente deixa de escrever YAML mecânico. `dto` deixa de ser obrigatório (ADR-02) e a fonte do contract passa a ser o schema.
 
-**Arquivos:** `src/nokr_qa/schema/` (campo `dto` opcional — hoje `str` obrigatório e decorativo, o que torna o formato impossível fora do Java), `scaffold.py` (o gerador), `session_validate.py` (trata `generate:`), `tests/fixtures/openapi/`.
+**Arquivos:** `src/heimdall_qa/schema/` (campo `dto` opcional — hoje `str` obrigatório e decorativo, o que torna o formato impossível fora do Java), `scaffold.py` (o gerador), `session_validate.py` e `runner.py` (tratam `generate:`), `tests/fixtures/openapi/` (**novo**).
 
-**Não fazer:** gerar exaustivamente — o teto é `rotas × eixos_deriváveis`; inventar caso a partir de schema (o não-derivável sai como `TODO` explícito e o `validate` recusa).
+**Não fazer:** gerar exaustivamente — o teto é `rotas × eixos_deriváveis`; inventar caso a partir de schema: o não-derivável sai como `TODO` explícito e o `validate` recusa.
 
 **Aceite:** um round gerado de `docs/estudo-heimdall/prototipos/openapi-ingest-3.1.yaml` roda **sem o agente escrever YAML mecânico**; todo campo não-derivável sai como `TODO` e o `validate` os aponta.
 
-**Verificar:** gerar, rodar, e conferir que o diff entre o gerado e o contract escrito à mão é só o não-derivável. **Número a bater: 48,8% derivável** (263 de 539 casos, F3 §4).
+**Verificar:** gerar, rodar, e conferir que o diff entre o gerado e o contract escrito à mão é só o não-derivável. **Número a bater: 48,8% derivável** (263 de 539, F3 §4).
 
 **Gate:** **o alvo numérico deste gate não está fixado** (aberto #3 de F9 §6.1). A medição de 48,8% é de uma rota no protótipo, não do corpus — fixar o número antes de fechar a fase.
 
@@ -257,17 +358,17 @@ python -m pytest -q --ignore=tests/test_ui_*.py
 
 **Objetivo:** a granularidade de arquivo deixa de ser 539 arquivos para 48 contracts.
 
-**Arquivos:** `cases/` (consolidação), `coverage.py`, `validate.py`
+**Arquivos:** `providers/nokr/cases/` (consolidação), `coverage.py`, `validate.py`
 
-**Não fazer:** **não ordenar os casos por ID dentro do arquivo consolidado** — a ordem do disco é preservada, senão todo arquivo vira diff churn a cada edição (F4); não commitar índice binário (invariante I7).
+**Não fazer:** **não ordenar os casos por ID** dentro do arquivo consolidado — a ordem do disco é preservada, senão todo arquivo vira diff churn a cada edição (F4); não commitar índice binário (I7).
 
-**Aceite:** 539 arquivos → **47**, com custo de 1,12× em bytes; a busca continua sub-segundo **sem índice**; editar um caso produz diff de poucas linhas.
+**Aceite:** 539 arquivos → **47**, com custo de 1,12× em bytes; busca continua sub-segundo **sem índice**; editar um caso produz diff de poucas linhas.
 
 **Verificar:**
 ```
-time rg -l 'kind: I-replay' cases/        # => sub-segundo (baseline: 7 ms)
-time rg -l 'MISSING_PROPERTY' cases/      # => sub-segundo (baseline: 8 ms)
-git diff --stat após editar 1 caso        # => poucas linhas, não o arquivo todo
+time rg -l 'kind: I-replay' providers/nokr/cases/     # => sub-segundo (baseline: 7 ms)
+time rg -l 'MISSING_PROPERTY' providers/nokr/cases/   # => sub-segundo (baseline: 8 ms)
+git diff --stat após editar 1 caso                    # => poucas linhas, não o arquivo todo
 ```
 
 **Gate:** o FTS5 foi **rejeitado por medição** (18,9 MB para salvar ~15 ms). O número existe para que a próxima discussão de "indexar para ficar rápido" comece por ele.
@@ -276,18 +377,18 @@ git diff --stat após editar 1 caso        # => poucas linhas, não o arquivo to
 
 ## Fase 2.3 — Fontes de log
 
-**Objetivo:** as fontes de log passam a ser declaradas, e o defeito de correlação assíncrona é corrigido (ADR-03).
+**Objetivo:** as fontes de log passam a ser declaradas e o defeito de correlação assíncrona é corrigido (ADR-03).
 
-**Arquivos:** `src/nokr_qa/logs/collector.py` (reescrito), descriptor (`log_sources[]`), `tests/test_logs_collector.py`, `tests/test_logs_async.py` (novo).
+**Arquivos:** `src/heimdall_qa/logs/collector.py` (reescrito), descriptor (`log_sources[]`), `tests/test_logs_collector.py`, `tests/test_logs_async.py` (**novo**).
 
 **Não fazer:** manter o fallback por janela de tempo; devolver `skipped` quando a causa é "não esperei o suficiente".
 
-**Aceite:** `logs/collector.py` sem fallback de relógio; o defeito do F5 coberto por teste: **o coletor não pode retornar ao achar a linha `sync` quando existe fonte `async` pendente**; `propagate: false` declarado ⇒ `skipped` de instrumento; `propagate: true` + linha ausente ⇒ **`fail` de produto**.
+**Aceite:** sem fallback de relógio; o defeito do F5 coberto por teste — **o coletor não pode retornar ao achar a linha `sync` quando existe fonte `async` pendente**; `propagate: false` declarado ⇒ `skipped` de instrumento; `propagate: true` + linha ausente ⇒ **`fail` de produto**.
 
 **Verificar:**
 ```
-rg -n 'datetime.now|monotonic' src/nokr_qa/logs/collector.py   # => só deadline, nunca janela de ±1s
-python -m pytest -q tests/test_logs_collector.py tests/test_logs_async.py
+rg -n 'datetime.now|monotonic' src/heimdall_qa/logs/collector.py   # => só deadline, nunca janela de ±1s
+PYTHONPATH=/tmp:src python -m pytest -q tests/test_logs_collector.py tests/test_logs_async.py
 ```
 
 **Gate:** hoje um endpoint assíncrono tem os packs de observabilidade **silenciosamente pulados**. É o único defeito funcional que o estudo encontrou.
@@ -296,34 +397,35 @@ python -m pytest -q tests/test_logs_collector.py tests/test_logs_async.py
 
 ## Fase 2.4 — Contrato do agente
 
-**Objetivo:** as 9 regras acionáveis que hoje só existem em prosa viram erro de `validate`; as 5 inúteis são apagadas (F6 §3).
+**Objetivo:** as 9 regras que hoje só existem em prosa viram erro de `validate`; as 5 inúteis são apagadas (F6 §3).
 
-**Arquivos:** `src/nokr_qa/validate.py` (as 9 regras), `src/nokr_qa/cli.py` (`validate --explain`, **novo**), `AGENTS.md`, `.cursor/skills/` + `.agents/skills/` (fonte única)
+**Arquivos:** `src/heimdall_qa/validate.py` (as 9 regras), `src/heimdall_qa/cli.py` (`validate --explain`, **novo**), `AGENTS.md`, `.cursor/skills/` + `.agents/skills/` (fonte única)
 
 **Não fazer:** apagar as 5 regras antes de as 9 estarem em código (o agente perde o contrato no meio); mover regra para o modelo em vez do código.
 
 **Aceite:** partida de **27.442 → ~2.195 tokens**; `validate --explain` aponta arquivo, linha e correção sugerida; o ponteiro "leia `docs/nokr-qa.md`" sai da skill.
 
-**Verificar:** medir a partida com a mesma heurística do F6 (4 chars/token) e comparar com a tabela de F6 §5.4; cada regra migrada tem um teste que a viola e espera o erro.
+**Verificar:** medir a partida com a mesma heurística do F6 (4 chars/token) contra a tabela de F6 §5.4; cada regra migrada tem um teste que a viola e espera o erro.
 
 **Gate:** 43% das regras acionáveis estão hoje no balde errado — são verificáveis por máquina e não são verificadas. É a maior alavanca isolada do estudo.
 
 ---
 
-## Fase 2.5 — `run.json`
+## Fase 2.5 — `run.json` e export
 
-**Objetivo:** a saída vira dado. `run.json` com `schema_version` é a fonte; `evidence.md` passa a ser renderização (ADR-10).
+**Objetivo:** a saída vira dado. `run.json` com `schema_version` é a fonte; `evidence.md` passa a ser renderização (ADR-10). Mais o export estático (ADR-04), que **passa a existir aqui** porque é a mesma função de render com outra saída — e é ele que permite arquivar um run para um PR.
 
-**Arquivos:** `src/nokr_qa/run_store.py`, `src/nokr_qa/workspace.py`, `src/nokr_qa/serve/app.py`, `src/nokr_qa/serve/templates/`
+**Arquivos:** `src/heimdall_qa/run_store.py`, `src/heimdall_qa/workspace.py`, `src/heimdall_qa/serve/app.py`, `src/heimdall_qa/serve/templates/`
 
-**Não fazer:** manter `summary.json` e `book.json` como autônomos — eles entram no `run.json`.
+**Não fazer:** manter `summary.json` e `book.json` como autônomos — entram no `run.json`; criar um **segundo** renderizador para o export.
 
-**Aceite:** o review UI lê `run.json`; `evidence.md` é gerado a partir dele; um `run.json` com `schema_version` desconhecida é **recusado** com mensagem acionável.
+**Aceite:** a review UI lê `run.json`; `evidence.md` é gerado a partir dele; `run.json` com `schema_version` desconhecida é **recusado** com mensagem acionável; `serve --export runs/latest` (**novo**) produz HTML que abre offline.
 
 **Verificar:**
 ```
 ls runs/latest/                      # => run.json presente, summary/book absorvidos
-python -m pytest -q tests/test_run_json.py
+PYTHONPATH=/tmp:src python -m pytest -q tests/test_run_json.py
+python -m pytest -q tests/test_export.py
 ```
 O teste escreve um `run.json` com `schema_version: 99` e afirma que o leitor **recusa** com mensagem acionável, em vez de tentar ler. (`last-run` hoje só aceita `--runs-dir` — a recusa por versão é do loader, e o teste é o lugar certo para ela. Não inventar uma flag `--from`.)
 
@@ -331,88 +433,31 @@ O teste escreve um `run.json` com `schema_version: 99` e afirma que o leitor **r
 
 ---
 
-# Etapa 3 — Superfície de navegador (por último)
-
-**Entrega:** portar `ui.*` e packs estruturais, depois o redesenho de UI/UX (F7).
-**Gate de saída:** `NOKR_QA_SLOW=1 pytest -m slow tests/test_ui_slow.py` com **7 verdes** sobre o núcleo novo.
-
----
-
-## Fase 3.1 — Portar o passo `ui`
-
-**Objetivo:** `browser.py` e os packs `ui.*` passam a rodar sobre o núcleo novo. O alvo é **portar**, não reescrever.
-
-**Arquivos:** `src/heimdall_qa/browser.py` (735 linhas), `ui_step.py` (383), `packs/__init__.py` (onde os packs `ui.*` moram — 649 linhas), `pyproject.toml` (extra `[browser]` reativado), `tests/test_ui_*.py`
-
-**Não fazer:** reescrever `browser.py`; deixar `ui` no caminho crítico de qualquer outra fase.
-
-**Aceite:** `NOKR_QA_SLOW=1 pytest -m slow tests/test_ui_slow.py` ⇒ **7 verdes**, com stack vivo. O review de HTTP **não regride**.
-
-**Verificar:** comando acima. Exige `NokrAPI` no ar — é o único gate que não roda em CI hermético.
-
-**Gate:** é o que libera 3.2. E é a metade "a tela funciona" do gate de saída da Etapa 3.
-
-**Risco:** o navegador apodrecer na fila e alguém decidir que reescrever é mais rápido. Os **7** testes são a âncora que impede isso.
-
----
-
-## Fase 3.2 — Redesenho de UI/UX
-
-**Objetivo:** o review de tela (ARIA, axe com nó apontado, diff de superfície, screenshot), com os 4 blocos que o E6 acrescenta (F7 §3).
-
-**Arquivos:** `src/nokr_qa/serve/app.py`, `src/nokr_qa/serve/templates/`, `src/nokr_qa/serve/static/`
-
-**Não fazer:** trocar por SPA (ADR-04); criar um segundo renderizador para o export estático — é a **mesma** função de render, outra saída.
-
-**Aceite:** review de tela renderizado; export estático do mesmo run abre offline; o review de HTTP não regride.
-
-**Verificar:** `serve --export runs/latest` (**novo**, ADR-04) produz HTML que abre sem servidor. **A própria UI passa em a11y** (aberto #8 de F9 §6.2 — nunca testado).
-
-**Gate:** fecha a Etapa 3 e libera 3.3. É o único gate cujo aceite tem uma parte humana (o desenho) e uma automática (o export abre offline).
-
----
-
-## Fase 3.3 — Retomada da emenda 11
-
-**Objetivo:** a emenda 11 sai da pausa, condicionada a 3.1.
-
-**Arquivos:** `docs/emenda-11-ui-browser.md` (documento), `rounds/ui-overview.yaml`, os itens E4/E6 que 3.2 não cobriu. Nada no núcleo.
-
-**Não fazer:** reabrir decisões que o estudo já fechou (ADR-04); retomar antes de 3.1 verde; tratar a emenda como se ela nunca tivesse sido pausada.
-
-**Aceite:** os itens do E4/E6 cobertos pelo redesenho de 3.2.
-
-**Verificar:** reler o registro de congelamento (F0 §4) e conferir, item a item, se ele basta para retomar sem reabrir arquivo por arquivo.
-
-**Gate:** é o único ponto do plano em que o **registro de congelamento do E3** (F0 §4) é testado pela realidade: se ao retomar for preciso reabrir arquivo por arquivo para entender o estado, o registro era genérico demais.
-
----
-
 # Ordem e PRs
 
 | Fase | PR típico | Repo | Etapa |
 |---|---|---|---|
-| 1.0 | `pyproject` — browser para extra | nokr-qa | 1 |
-| 1.1 | descriptor de projeto | nokr-qa | 1 |
-| 1.2 | adapter HTTP sobre o descriptor | nokr-qa | 1 |
-| 1.3 | migrar o conteúdo para provider | nokr-qa | 1 |
-| 1.4 | partir a distribuição + toy provider | nokr-qa | 1 |
-| 1.5 | rename mecânico | nokr-qa | 1 |
-| 1.6 | docs do núcleo em inglês | nokr-qa | 1 |
+| 1.1 | cortar o navegador + registro de tipos de passo | nokr-qa | 1 |
+| 1.2 | rename mecânico `nokr_qa` → `heimdall_qa` | nokr-qa | 1 |
+| 1.3 | descriptor de projeto | nokr-qa | 1 |
+| 1.4 | desacoplar o caminho HTTP (53 refs) | nokr-qa | 1 |
+| 1.5 | extrair o provider | nokr-qa | 1 |
+| 1.6 | partir a distribuição + toy provider + T3 | nokr-qa | 1 |
+| 1.7 | docs do núcleo em inglês | nokr-qa | 1 |
 | 2.1 | auto-discovery | nokr-qa | 2 |
 | 2.2 | consolidação de casos | nokr-qa | 2 |
 | 2.3 | fontes de log + defeito async | nokr-qa | 2 |
 | 2.4 | 9 regras para `validate` | nokr-qa | 2 |
-| 2.5 | `run.json` | nokr-qa | 2 |
-| 3.1 | portar passo `ui` | nokr-qa | 3 |
-| 3.2 | redesenho UI/UX + export | nokr-qa | 3 |
-| 3.3 | retomada da emenda 11 | nokr-qa (+ nokr-ui-lib) | 3 |
+| 2.5 | `run.json` + export | nokr-qa | 2 |
+| — | **navegador** | **fora deste plano** (§2) | — |
 
 **Um PR, uma fase. O aceite da fase anterior no corpo do PR seguinte.**
 
-**Comece por 1.0.** É a mudança de maior impacto de onboarding, de menor risco, e o aceite dela **já passa hoje**. Não depende de nenhuma decisão de desenho.
+**Comece por 1.1.** É o que produz o artefato REST-only, e o aceite dela **já passa hoje** (`257 passed, 3 skipped` com o browser bloqueado). Ela também encolhe as fases seguintes: ~3.605 linhas saem, e o rename de 1.2 passa a ter menos arquivos.
 
-**O gate que importa é o de 1.4** — o provider de brinquedo numa wheel limpa somado a `git diff campaigns/` vazio. Os dois juntos são a definição operacional de "genérico": o núcleo roda sem o Nokr, e o Nokr roda sobre o núcleo.
+**Depois 1.2, e só depois 1.3.** O rename vem cedo porque todo o código novo das fases seguintes nasce com o nome certo.
+
+**O gate que importa é o de 1.4** — `rg -i nokr src/heimdall_qa/` vazio —, e o segundo é o de 1.6 (T3 + `git diff campaigns/` vazio). Juntos: o núcleo não sabe o que é Nokr, roda sem o Nokr, e o Nokr roda sobre o núcleo.
 
 ---
 
@@ -426,10 +471,11 @@ O teste escreve um `run.json` com `schema_version: 99` e afirma que o leitor **r
 | retenção de runs | F9 §6.1 #4 | 2.2 |
 | `junit.xml` | F9 §6.1 #5 | 2.5 |
 | concorrência `run` × `serve` | F9 §6.1 #6 | 2.2, 2.5 |
-| o `serve/` antigo fica de pé na Etapa 2? | F9 §6.2 #7 | 2.5 |
-| a UI passa em a11y? | F9 §6.2 #8 | 3.2 |
-| W3C `traceparent` | F9 §6.2 #9 | 2.3 |
+| a UI de review passa em a11y? | F9 §6.2 #8 | 2.5 |
+| W3C `traceparent` vs header próprio | F9 §6.2 #9 | 2.3 |
 | **servidor MCP** como interface do agente | F9 §6.3 #10 | nada — frente própria |
 | fontes de log remotas (docker/k8s/ssh) | F9 §6.3 #11 | nada |
 
-**Onze abertos, nenhum bloqueia a Etapa 1.** O que mais merece uma frente própria é o servidor MCP: ataca a mesma alavanca do 2.4 aplicada à interface inteira.
+**Dez abertos, nenhum bloqueia a Etapa 1.** O que mais merece uma frente própria é o servidor MCP: ataca a mesma alavanca de 2.4 aplicada à interface inteira.
+
+**Sobre o retorno do navegador.** Ele não tem fase, não tem gate e não tem data neste plano. Quando voltar, o caminho já está preparado: a costura de tipos de passo de 1.1 e o registro de provider de 1.6 fazem dele um **provider** (`heimdall-qa-browser`), nunca código do núcleo. É por isso que a Etapa 3 não faz falta como plano — faz falta como *branch*.

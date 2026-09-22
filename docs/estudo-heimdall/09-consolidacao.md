@@ -62,8 +62,15 @@ Quatro raízes: 01, 04, 09 e 07. Nenhuma ADR depende de 04 — a UI é folha em 
 ## 2. As fases
 
 > **O plano executável é [`../plano-implementacao-heimdall.md`](../plano-implementacao-heimdall.md).** Esta seção é o resumo de origem — a tabela por onde as fases nasceram. O documento irmão expande cada passo no formato da casa (Objetivo / Arquivos / Não fazer / Aceite / Verificar / Gate), nomeia os arquivos que mudam em cada um e traz a tabela de PRs. **Para executar, use o irmão; para entender a decisão, use esta seção.**
+>
+> **Duas divergências, por decisão posterior de escopo.** Esta tabela é de 22/09 e **não** reflete a revisão do mesmo dia:
+>
+> 1. A **Etapa 3 (navegador) saiu** do plano. O escopo é REST; o código do E3 é preservado na tag `e3-freeze` e volta como provider, se voltar. As fases 3.1–3.3 abaixo não têm plano de execução.
+> 2. A **identidade virou a primeira etapa**. O rename e a remoção das referências ao Nokr, que aqui estão em 1.5–1.6, passam a abrir o plano (fases 1.1–1.2 do irmão), porque todo o código novo das fases seguintes deve nascer com o nome certo.
+>
+> O restante da ordem — descriptor, adapter, provider, alavancas — permanece. Onde as duas versões divergirem, **vale o irmão**.
 
-A ordem do plano é **REST primeiro, navegador por último**. As fases são aditivas e reversíveis; a coluna de gate é um comando.
+A ordem do plano era **REST primeiro, navegador por último**. As fases são aditivas e reversíveis; a coluna de gate é um comando.
 
 ### Fase 1 — Núcleo agnóstico HTTP
 

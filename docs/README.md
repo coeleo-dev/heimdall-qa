@@ -13,13 +13,15 @@ Não implemente duas fases no mesmo PR. Não comece código sem o aceite da fase
 
 ## Refatoração para Heimdall QA
 
-O harness vai ser aberto como projeto genérico, com o Nokr como implementação de referência. A ordem é **REST primeiro, navegador por último**.
+O harness vai ser aberto como projeto genérico, com o Nokr como implementação de referência. **O escopo é REST** — a identidade vem primeiro (§ fase 1.1) e o navegador fica fora deste plano.
 
 | Documento | O que é |
 |---|---|
-| **[plano-implementacao-heimdall.md](plano-implementacao-heimdall.md)** | **O plano de implementação da refatoração**: 15 fases em 3 etapas, no formato Objetivo / Arquivos / Não fazer / Aceite / Verificar / Gate, mais a tabela de PRs. **É a fila de execução.** |
+| **[plano-implementacao-heimdall.md](plano-implementacao-heimdall.md)** | **O plano de implementação da refatoração**: 12 fases em 2 etapas, no formato Objetivo / Arquivos / Não fazer / Aceite / Verificar / Gate, mais a tabela de PRs. **É a fila de execução.** |
 | [estudo-heimdall/](estudo-heimdall/) | O estudo que o produziu: 9 frentes, 11 ADRs e 48 edge cases. Insumo, não entrega. Comece por [09-consolidacao.md](estudo-heimdall/09-consolidacao.md). |
 | [estudo-harness-agnostico.md](estudo-harness-agnostico.md) | O estudo anterior (15/09) que originou a ideia. Vira a semente do `docs/architecture.md` em inglês. |
+
+**O escopo é REST.** O teste de navegador **não** está neste plano. O código do E3 sai de `main` na fase 1.1 e fica preservado na tag `e3-freeze`; quando voltar, volta como **provider** (`heimdall-qa-browser`), nunca como código do núcleo. A UI de review (`src/nokr_qa/serve/`) **fica** — ela é a tela onde um humano lê um run, não um teste de frontend.
 
 **Duas filas, não uma.** A Parte B de `nokr-qa.md` está **concluída** — foi o que construiu o harness até aqui, e o E3 fechou a última fase. A refatoração tem plano próprio, e a ordem interna dela é a que vale de agora em diante.
 
