@@ -1,0 +1,11 @@
+id: feature-keys-post-N-rule-DUPLICATE
+contract: contracts/platform-feature-keys-post.yaml
+kind: N-rule-DUPLICATE
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 409
+generate:
+  featureKey: captured.feature_key

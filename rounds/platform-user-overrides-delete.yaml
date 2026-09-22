@@ -1,0 +1,15 @@
+id: platform-user-overrides-delete
+suite: suites/platform-user-overrides-delete.yaml
+mode: review
+dimensions:
+- function
+environment: sandbox
+include:
+- cases/user-overrides-delete/user-overrides-delete-H01.yaml
+- cases/user-overrides-delete/user-overrides-delete-N-notfound.yaml
+- cases/user-overrides-delete/user-overrides-delete-S-bola.yaml
+- cases/user-overrides-delete/user-overrides-delete-N-auth.yaml
+- cases/user-overrides-delete/user-overrides-delete-I-replay.yaml
+- cases/user-overrides-delete/user-overrides-delete-I-new-key.yaml
+- cases/user-overrides-delete/user-overrides-delete-I-missing.yaml
+- cases/user-overrides-delete/user-overrides-delete-I-format.yaml

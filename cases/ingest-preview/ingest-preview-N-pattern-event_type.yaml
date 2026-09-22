@@ -1,0 +1,11 @@
+id: ingest-preview-N-pattern-event_type
+contract: contracts/api-ingest-preview.yaml
+kind: N-pattern-event_type
+gate: auto
+tags:
+- function
+diff:
+  set:
+    event_type: ABC
+expect:
+  status: 400

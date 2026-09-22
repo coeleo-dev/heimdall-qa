@@ -1,0 +1,16 @@
+id: ingest-I-format
+contract: contracts/api-ingest-post.yaml
+kind: I-format
+gate: auto
+tags:
+  - function
+diff: {}
+expect:
+  status: 400
+headers:
+  X-Idempotency-Key: abc
+generate:
+  timestamp: now_iso
+waive:
+  - pack: mutation
+    reason: POST /api/ingest requires UUID v4; this case sends an invalid idempotency key

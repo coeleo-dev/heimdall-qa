@@ -1,0 +1,9 @@
+id: tenants-settings-get-H01
+contract: contracts/platform-tenants-settings-get.yaml
+kind: H01
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 200

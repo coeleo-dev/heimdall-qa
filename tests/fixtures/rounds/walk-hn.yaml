@@ -1,0 +1,9 @@
+id: walk-hn
+suite: suites/unused.yaml
+mode: review
+dimensions:
+  - function
+environment: sandbox
+include:
+  - cases/note/note-H01.yaml
+  - cases/note/note-N-omit-note.yaml

@@ -1,0 +1,15 @@
+endpoint: POST /api/ingest
+dto: com.nokr.domain.metering.ingest.dto.IngestRequest
+auth: api_key
+idempotency: none
+baseline: baselines/ingest-sum.json
+fields:
+  transaction_id:
+    required: true
+    json: transaction_id
+  note:
+    required: false
+    json: note
+rules: []
+live_only_rules: []
+p_gaps: []

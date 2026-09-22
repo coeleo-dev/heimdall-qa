@@ -1,0 +1,16 @@
+id: tenants-activate-N-omit-mobile_phone
+contract: contracts/platform-tenants-activate.yaml
+kind: N-omit-mobile_phone
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - mobile_phone
+expect:
+  status: 400
+generate:
+  name: company_name
+  email: email
+  cpf_cnpj: cnpj
+  address: address

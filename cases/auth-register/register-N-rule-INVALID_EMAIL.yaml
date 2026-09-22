@@ -1,0 +1,15 @@
+id: register-N-rule-INVALID_EMAIL
+contract: contracts/auth-register.yaml
+kind: N-rule-INVALID_EMAIL
+gate: auto
+tags:
+- function
+diff:
+  set:
+    email: not-an-email
+expect:
+  status: 400
+generate:
+  company_name: company_name
+  document_number: cnpj
+  password: password

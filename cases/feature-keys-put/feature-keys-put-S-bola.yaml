@@ -1,0 +1,9 @@
+id: feature-keys-put-S-bola
+contract: contracts/platform-feature-keys-put.yaml
+kind: S-bola
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 404

@@ -1,0 +1,13 @@
+id: ingest-I-replay-transaction_id
+contract: contracts/api-ingest-post.yaml
+kind: I-replay-transaction_id
+gate: auto
+tags:
+  - function
+diff: {}
+expect:
+  status: 202
+generate:
+  timestamp: now_iso
+  idempotency_key: uuid_v4
+wait_logs_ms: 2000

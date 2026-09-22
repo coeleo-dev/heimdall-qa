@@ -1,0 +1,11 @@
+id: rate-cards-preview-N-rule-QUANTITY_NOT_DECIMAL
+contract: contracts/platform-rate-cards-preview.yaml
+kind: N-rule-QUANTITY_NOT_DECIMAL
+gate: auto
+tags:
+- function
+diff:
+  set:
+    quantity: abc
+expect:
+  status: 422

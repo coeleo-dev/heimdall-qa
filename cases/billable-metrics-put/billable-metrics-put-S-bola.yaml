@@ -1,0 +1,9 @@
+id: billable-metrics-put-S-bola
+contract: contracts/platform-billable-metrics-put.yaml
+kind: S-bola
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 404

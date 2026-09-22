@@ -1,0 +1,15 @@
+id: register-N-rule-INVALID_CNPJ
+contract: contracts/auth-register.yaml
+kind: N-rule-INVALID_CNPJ
+gate: auto
+tags:
+- function
+diff:
+  set:
+    document_number: '11222333000180'
+expect:
+  status: 400
+generate:
+  email: email
+  company_name: company_name
+  password: password

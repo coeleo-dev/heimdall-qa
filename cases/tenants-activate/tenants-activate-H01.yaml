@@ -1,0 +1,14 @@
+id: tenants-activate-H01
+contract: contracts/platform-tenants-activate.yaml
+kind: H01
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 200
+generate:
+  name: company_name
+  email: email
+  cpf_cnpj: cnpj
+  address: address

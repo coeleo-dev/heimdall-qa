@@ -1,0 +1,12 @@
+id: api-simulate-cash-out
+suite: suites/api-simulate-cash-out.yaml
+mode: review
+dimensions:
+- function
+environment: sandbox
+include:
+- cases/simulate-cash-out/simulate-cash-out-H01.yaml
+- cases/simulate-cash-out/simulate-cash-out-N-omit-nokr_user_id.yaml
+- cases/simulate-cash-out/simulate-cash-out-N-omit-amount.yaml
+- cases/simulate-cash-out/simulate-cash-out-N-auth.yaml
+- cases/simulate-cash-out/simulate-cash-out-N-rule-INSUFFICIENT.yaml

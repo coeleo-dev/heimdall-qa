@@ -1,0 +1,16 @@
+id: tenants-activate-O-set-birth_date
+contract: contracts/platform-tenants-activate.yaml
+kind: O-set-birth_date
+gate: auto
+tags:
+- function
+diff:
+  set:
+    birth_date: '2000-01-01'
+expect:
+  status: 200
+generate:
+  name: company_name
+  email: email
+  cpf_cnpj: cnpj
+  address: address

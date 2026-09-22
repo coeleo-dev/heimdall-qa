@@ -1,0 +1,16 @@
+id: api-users-post-N-omit-external_user_id
+contract: contracts/api-users-post.yaml
+kind: N-omit-external_user_id
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - external_user_id
+expect:
+  status: 400
+generate:
+  kyc_profile.name: person_name
+  kyc_profile.email: email
+  kyc_profile.cpf_cnpj: cpf
+  kyc_profile.address: address

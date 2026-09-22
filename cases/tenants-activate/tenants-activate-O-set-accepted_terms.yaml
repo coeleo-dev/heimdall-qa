@@ -1,0 +1,16 @@
+id: tenants-activate-O-set-accepted_terms
+contract: contracts/platform-tenants-activate.yaml
+kind: O-set-accepted_terms
+gate: auto
+tags:
+- function
+diff:
+  set:
+    accepted_terms: true
+expect:
+  status: 200
+generate:
+  name: company_name
+  email: email
+  cpf_cnpj: cnpj
+  address: address

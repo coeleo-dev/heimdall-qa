@@ -1,0 +1,12 @@
+endpoint: POST /qa/note
+dto: com.nokr.qa.NoteRequest
+auth: none
+idempotency: none
+baseline: baselines/note.json
+fields:
+  note:
+    required: true
+    json: note
+rules: []
+live_only_rules: []
+p_gaps: []

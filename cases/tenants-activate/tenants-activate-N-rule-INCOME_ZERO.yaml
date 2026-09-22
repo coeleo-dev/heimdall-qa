@@ -1,0 +1,16 @@
+id: tenants-activate-N-rule-INCOME_ZERO
+contract: contracts/platform-tenants-activate.yaml
+kind: N-rule-INCOME_ZERO
+gate: auto
+tags:
+- function
+diff:
+  set:
+    income_value: 0
+expect:
+  status: 400
+generate:
+  name: company_name
+  email: email
+  cpf_cnpj: cnpj
+  address: address

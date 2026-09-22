@@ -1,0 +1,11 @@
+id: users-plan-N-omit-plan_id
+contract: contracts/platform-users-plan.yaml
+kind: N-omit-plan_id
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - plan_id
+expect:
+  status: 400

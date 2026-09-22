@@ -1,0 +1,11 @@
+id: ingest-preview-N-omit-timestamp
+contract: contracts/api-ingest-preview.yaml
+kind: N-omit-timestamp
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - timestamp
+expect:
+  status: 400

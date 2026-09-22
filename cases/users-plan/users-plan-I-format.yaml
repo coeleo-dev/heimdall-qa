@@ -1,0 +1,11 @@
+id: users-plan-I-format
+contract: contracts/platform-users-plan.yaml
+kind: I-format
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 400
+headers:
+  X-Idempotency-Key: not-a-uuid-v4

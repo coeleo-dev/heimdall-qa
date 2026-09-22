@@ -1,0 +1,11 @@
+id: feature-keys-post-N-rule-RESERVED
+contract: contracts/platform-feature-keys-post.yaml
+kind: N-rule-RESERVED
+gate: auto
+tags:
+- function
+diff:
+  set:
+    featureKey: whitelabel
+expect:
+  status: 409

@@ -1,0 +1,9 @@
+id: user-overrides-delete-S-bola
+contract: contracts/platform-user-overrides-delete.yaml
+kind: S-bola
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 404

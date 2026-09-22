@@ -1,0 +1,49 @@
+endpoint: POST /api/users
+dto: com.nokr.domain.user.dto.CreateUserCommand
+auth: api_key
+area: api-users-post
+captures:
+  nokr_user_id: nokr_user_id
+unique_json: external_user_id
+baseline: baselines/api-users-post.json
+p_gaps:
+- P-GAP-5
+fields:
+  external_user_id:
+    required: false
+    json: external_user_id
+  kyc_profile:
+    required: true
+    json: kyc_profile
+  plan_id:
+    required: false
+    json: plan_id
+    example: '{{plan_id}}'
+  country:
+    required: false
+    json: kyc_profile.country
+    example: BRA
+rules:
+- id: KYC_NAME_OMIT
+  status: 400
+  error: name is mandatory
+  omit:
+  - kyc_profile.name
+- id: KYC_EMAIL_OMIT
+  status: 400
+  error: email is mandatory
+  omit:
+  - kyc_profile.email
+- id: BIRTH_DATE_FORMAT
+  status: 400
+  error: birthDate must be in yyyy-MM-dd format
+  set:
+    kyc_profile.birth_date: 01-01-1990
+- id: PLAN_NOT_FOUND
+  status: 404
+  error: Plan not found
+  set:
+    plan_id: 00000000-0000-4000-8000-000000000099
+idempotency: none
+async: sync
+live_only_rules: []

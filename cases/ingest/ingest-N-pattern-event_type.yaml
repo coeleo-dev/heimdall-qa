@@ -1,0 +1,13 @@
+id: ingest-N-pattern-event_type
+contract: contracts/api-ingest-post.yaml
+kind: N-pattern-event_type
+gate: auto
+tags:
+  - function
+diff:
+  set:
+    event_type: GPT4
+expect:
+  status: 400
+generate:
+  timestamp: now_iso

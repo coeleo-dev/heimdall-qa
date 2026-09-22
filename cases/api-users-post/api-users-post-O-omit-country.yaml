@@ -1,0 +1,16 @@
+id: api-users-post-O-omit-country
+contract: contracts/api-users-post.yaml
+kind: O-omit-country
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - kyc_profile.country
+expect:
+  status: 201
+generate:
+  kyc_profile.name: person_name
+  kyc_profile.email: email
+  kyc_profile.cpf_cnpj: cpf
+  kyc_profile.address: address

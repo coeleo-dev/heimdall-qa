@@ -1,0 +1,21 @@
+{
+  "billable_metric_id": "{{billable_metric_id}}",
+  "name": "flat gpt-4o",
+  "pricing_model": "FLAT",
+  "dimension_keys": [
+    "model"
+  ],
+  "cost_driver_note": "session flat",
+  "active_from": "2027-01-01T00:00:00Z",
+  "active_until": "2027-03-01T00:00:00Z",
+  "reason": "ta catalog",
+  "tiers": [
+    {
+      "unit_amount": "0.00003",
+      "priority": 0,
+      "dimensions": {
+        "model": "gpt-4o"
+      }
+    }
+  ]
+}

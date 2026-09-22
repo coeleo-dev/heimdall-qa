@@ -1,0 +1,11 @@
+id: plans-post-N-rule-DUPLICATE_NAME
+contract: contracts/platform-plans-post.yaml
+kind: N-rule-DUPLICATE_NAME
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 422
+generate:
+  name: captured.last_unique_json

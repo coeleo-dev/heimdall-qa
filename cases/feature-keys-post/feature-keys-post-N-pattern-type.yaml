@@ -1,0 +1,11 @@
+id: feature-keys-post-N-pattern-type
+contract: contracts/platform-feature-keys-post.yaml
+kind: N-pattern-type
+gate: auto
+tags:
+- function
+diff:
+  set:
+    type: '!!!'
+expect:
+  status: 400

@@ -1,0 +1,13 @@
+id: ingest-N-rule-UNKNOWN_CUSTOMER
+contract: contracts/api-ingest-post.yaml
+kind: N-rule-UNKNOWN_CUSTOMER
+gate: auto
+tags:
+  - function
+diff:
+  set:
+    customer_id: ext-qa-missing-customer
+expect:
+  status: 404
+generate:
+  timestamp: now_iso

@@ -1,0 +1,11 @@
+id: settlement-cash-in-N-omit-amount
+contract: contracts/api-settlement-cash-in.yaml
+kind: N-omit-amount
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - amount
+expect:
+  status: 400

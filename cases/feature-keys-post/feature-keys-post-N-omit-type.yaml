@@ -1,0 +1,11 @@
+id: feature-keys-post-N-omit-type
+contract: contracts/platform-feature-keys-post.yaml
+kind: N-omit-type
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - type
+expect:
+  status: 400

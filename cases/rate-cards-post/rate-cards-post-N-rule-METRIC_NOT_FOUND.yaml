@@ -1,0 +1,11 @@
+id: rate-cards-post-N-rule-METRIC_NOT_FOUND
+contract: contracts/platform-rate-cards-post.yaml
+kind: N-rule-METRIC_NOT_FOUND
+gate: auto
+tags:
+- function
+diff:
+  set:
+    billable_metric_id: 00000000-0000-4000-8000-000000000099
+expect:
+  status: 404

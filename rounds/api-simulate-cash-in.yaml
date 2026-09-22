@@ -1,0 +1,13 @@
+id: api-simulate-cash-in
+suite: suites/api-simulate-cash-in.yaml
+mode: review
+dimensions:
+- function
+environment: sandbox
+include:
+- cases/simulate-cash-in/simulate-cash-in-H01.yaml
+- cases/simulate-cash-in/simulate-cash-in-N-omit-nokr_user_id.yaml
+- cases/simulate-cash-in/simulate-cash-in-N-omit-amount.yaml
+- cases/simulate-cash-in/simulate-cash-in-N-auth.yaml
+- cases/simulate-cash-in/simulate-cash-in-N-rule-MIN_DEPOSIT.yaml
+- cases/simulate-cash-in/simulate-cash-in-N-rule-AMOUNT_NOT_NUMBER.yaml

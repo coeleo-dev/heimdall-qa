@@ -1,0 +1,12 @@
+endpoint: POST /platform/webhooks/{{webhook_id}}/rotate
+dto: com.nokr.domain.notification.outbound.controller.WebhookController
+auth: jwt
+area: webhooks-rotate
+resource_id_in_path: true
+baseline: baselines/empty.json
+fields: {}
+idempotency: none
+async: sync
+rules: []
+live_only_rules: []
+p_gaps: []

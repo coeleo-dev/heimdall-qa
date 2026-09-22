@@ -1,0 +1,11 @@
+id: feature-keys-put-N-auth
+contract: contracts/platform-feature-keys-put.yaml
+kind: N-auth
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 401
+omit_headers:
+- Authorization

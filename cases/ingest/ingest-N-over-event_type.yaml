@@ -1,0 +1,13 @@
+id: ingest-N-over-event_type
+contract: contracts/api-ingest-post.yaml
+kind: N-over-event_type
+gate: auto
+tags:
+  - function
+diff:
+  set:
+    event_type: exxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+expect:
+  status: 400
+generate:
+  timestamp: now_iso

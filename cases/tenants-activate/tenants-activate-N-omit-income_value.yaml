@@ -1,0 +1,16 @@
+id: tenants-activate-N-omit-income_value
+contract: contracts/platform-tenants-activate.yaml
+kind: N-omit-income_value
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - income_value
+expect:
+  status: 400
+generate:
+  name: company_name
+  email: email
+  cpf_cnpj: cnpj
+  address: address

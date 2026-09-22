@@ -1,0 +1,9 @@
+endpoint: POST /qa/echo
+dto: com.nokr.qa.EchoRequest
+auth: none
+idempotency: none
+baseline: baselines/empty.json
+fields: {}
+rules: []
+live_only_rules: []
+p_gaps: []

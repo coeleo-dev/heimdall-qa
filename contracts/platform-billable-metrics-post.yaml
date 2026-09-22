@@ -1,0 +1,95 @@
+endpoint: POST /platform/billable-metrics
+dto: com.nokr.domain.metering.catalog.dto.CreateBillableMetricRequest
+auth: jwt
+idempotency: header_uuid_v4
+area: billable-metrics-post
+captures:
+  billable_metric_id: id
+unique_json: name
+baseline: baselines/billable-metrics-post.json
+fields:
+  name:
+    required: true
+    json: name
+    max_length: 128
+    example: qa tokens
+  event_type:
+    required: false
+    json: event_type
+    max_length: 64
+    pattern: ^$|^[a-z][a-z0-9_]*$
+  aggregation_function:
+    required: true
+    json: aggregation_function
+    pattern: ^(COUNT|SUM|MAX|UNIQUE)$
+  aggregation_window:
+    required: false
+    json: aggregation_window
+    example: MONTH
+  property_path:
+    required: false
+    json: property_path
+    example: properties.tokens
+  filter_expression:
+    required: false
+    json: filter_expression
+    example:
+      op: eq
+      path: model
+      value: gpt-4o
+  allowed_properties:
+    required: false
+    json: allowed_properties
+    max_keys: 32
+    example:
+    - model
+    - tokens
+rules:
+- id: COUNT_WITH_PATH
+  status: 422
+  error: COUNT must not have property_path
+  set:
+    aggregation_function: COUNT
+    property_path: properties.tokens
+- id: SUM_WITHOUT_PATH
+  status: 422
+  error: property_path is required
+  set:
+    aggregation_function: SUM
+  omit:
+  - property_path
+- id: COUNT_WITH_WINDOW
+  status: 422
+  error: aggregation_window is not allowed for COUNT
+  set:
+    aggregation_function: COUNT
+    aggregation_window: DAY
+  omit:
+  - property_path
+- id: SUM_WITH_WINDOW
+  status: 422
+  error: aggregation_window is not allowed for SUM
+  set:
+    aggregation_window: DAY
+- id: DUPLICATE
+  status: 409
+  error: Billable metric already exists
+- id: FILTER_UNSUPPORTED_OP
+  status: 422
+  error: unsupported filter op
+  set:
+    filter_expression:
+      op: like
+      path: model
+      value: gpt
+- id: FILTER_PATH_NESTED
+  status: 422
+  error: path must be a single property name
+  set:
+    filter_expression:
+      op: eq
+      path: properties.model
+      value: gpt-4o
+async: sync
+live_only_rules: []
+p_gaps: []

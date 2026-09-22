@@ -1,0 +1,11 @@
+id: api-keys-post-N-over-name
+contract: contracts/platform-api-keys-post-live.yaml
+kind: N-over-name
+gate: auto
+tags:
+- function
+diff:
+  set:
+    name: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+expect:
+  status: 400

@@ -1,0 +1,11 @@
+id: webhooks-post-B-max-name
+contract: contracts/platform-webhooks-post.yaml
+kind: B-max-name
+gate: auto
+tags:
+- function
+diff:
+  set:
+    name: lab-hooklab-hooklab-hooklab-hooklab-hooklab-hooklab-hooklab-hooklab-hooklab-hooklab-hooklab-hooklab-
+expect:
+  status: 201

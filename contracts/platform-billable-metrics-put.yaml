@@ -1,0 +1,48 @@
+endpoint: PUT /platform/billable-metrics/{{billable_metric_id}}
+dto: com.nokr.domain.metering.catalog.dto.UpdateBillableMetricRequest
+auth: jwt
+idempotency: header_uuid_v4
+area: billable-metrics-put
+resource_id_in_path: true
+baseline: baselines/billable-metrics-put.json
+fields:
+  property_path:
+    required: false
+    json: property_path
+    example: properties.tokens
+  filter_expression:
+    required: false
+    json: filter_expression
+    example:
+      op: eq
+      path: model
+      value: gpt-4o
+  allowed_properties:
+    required: true
+    json: allowed_properties
+    max_keys: 32
+  aggregation_function:
+    required: false
+    json: aggregation_function
+    example: SUM
+  aggregation_window:
+    required: false
+    json: aggregation_window
+    example: DAY
+  event_type:
+    required: false
+    json: event_type
+    example: other
+rules:
+- id: IMMUTABLE_EVENT_TYPE
+  status: 422
+  error: event_type, aggregation_function and aggregation_window are immutable
+  set:
+    event_type: other
+    allowed_properties:
+    - model
+    - tokens
+    property_path: properties.tokens
+async: sync
+live_only_rules: []
+p_gaps: []

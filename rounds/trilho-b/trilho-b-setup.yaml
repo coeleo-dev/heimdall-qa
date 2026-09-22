@@ -1,0 +1,19 @@
+id: trilho-b-setup
+suite: suites/trilho-b/setup.yaml
+mode: review
+dimensions:
+  - function
+environment: sandbox
+include:
+  - cases/auth-register/register-H01.yaml
+  - cases/auth-register/register-H-setup-other.yaml
+  - cases/api-users-post/api-users-post-H01.yaml
+  - cases/api-users-post/api-users-post-H-setup-other.yaml
+  - cases/feature-keys-post/feature-keys-post-H01.yaml
+  - cases/billable-metrics-post/billable-metrics-post-H01.yaml
+  - cases/billable-metrics-post/billable-metrics-post-O-set-allowed_properties.yaml
+  - cases/rate-cards-post/rate-cards-post-H-setup-active.yaml
+  - cases/api-keys-post/api-keys-post-H-setup-revocable.yaml
+  - cases/trilho-b/setup-other-api-key.yaml
+  - cases/trilho-b/setup-other-webhook.yaml
+  - cases/simulate-cash-in/simulate-cash-in-H01.yaml

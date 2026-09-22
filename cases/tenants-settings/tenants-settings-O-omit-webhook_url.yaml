@@ -1,0 +1,11 @@
+id: tenants-settings-O-omit-webhook_url
+contract: contracts/platform-tenants-settings.yaml
+kind: O-omit-webhook_url
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - webhook_url
+expect:
+  status: 200

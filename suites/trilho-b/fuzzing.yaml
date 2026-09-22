@@ -1,0 +1,20 @@
+id: trilho-b-fuzzing
+steps:
+  - loop:
+      times: 1
+      case: cases/trilho-b/fuzz-sqli-user.yaml
+  - loop:
+      times: 1
+      case: cases/trilho-b/fuzz-xss-metering.yaml
+  - loop:
+      times: 1
+      case: cases/trilho-b/fuzz-huge-user-id.yaml
+  - loop:
+      times: 1
+      case: cases/trilho-b/fuzz-path-traversal.yaml
+  - loop:
+      times: 1
+      case: cases/trilho-b/fuzz-null-bytes.yaml
+  - loop:
+      times: 1
+      case: cases/ingest/ingest-N-denylist-cpf.yaml

@@ -1,0 +1,11 @@
+id: webhooks-post-N-rule-EVENTS_EMPTY
+contract: contracts/platform-webhooks-post.yaml
+kind: N-rule-EVENTS_EMPTY
+gate: auto
+tags:
+- function
+diff:
+  set:
+    events: []
+expect:
+  status: 400

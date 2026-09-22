@@ -1,0 +1,13 @@
+{
+  "name": "replace-with-generate",
+  "email": "replace-with-generate",
+  "cpf_cnpj": "replace-with-generate",
+  "mobile_phone": "11999999999",
+  "income_value": 5000000,
+  "address": "replace-with-generate",
+  "address_number": "1000",
+  "province": "Bela Vista",
+  "postal_code": "01310100",
+  "birth_date": "2000-01-01",
+  "company_type": "LIMITED"
+}

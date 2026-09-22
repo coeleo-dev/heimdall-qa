@@ -1,0 +1,11 @@
+id: feature-keys-post-N-over-featureKey
+contract: contracts/platform-feature-keys-post.yaml
+kind: N-over-featureKey
+gate: auto
+tags:
+- function
+diff:
+  set:
+    featureKey: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+expect:
+  status: 400

@@ -1,0 +1,14 @@
+id: billable-metrics-post-N-rule-FILTER_PATH_NESTED
+contract: contracts/platform-billable-metrics-post.yaml
+kind: N-rule-FILTER_PATH_NESTED
+gate: auto
+tags:
+- function
+diff:
+  set:
+    filter_expression:
+      op: eq
+      path: properties.model
+      value: gpt-4o
+expect:
+  status: 422

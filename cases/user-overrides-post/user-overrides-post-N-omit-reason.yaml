@@ -1,0 +1,11 @@
+id: user-overrides-post-N-omit-reason
+contract: contracts/platform-user-overrides-post.yaml
+kind: N-omit-reason
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - reason
+expect:
+  status: 400

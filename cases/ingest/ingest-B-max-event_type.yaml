@@ -1,0 +1,14 @@
+id: ingest-B-max-event_type
+contract: contracts/api-ingest-post.yaml
+kind: B-max-event_type
+gate: auto
+tags:
+  - function
+diff:
+  set:
+    event_type: exxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+expect:
+  status: 422
+  code: UNKNOWN_EVENT_TYPE
+generate:
+  timestamp: now_iso

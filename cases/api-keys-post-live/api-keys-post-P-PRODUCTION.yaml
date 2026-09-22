@@ -1,0 +1,12 @@
+id: api-keys-post-P-PRODUCTION
+contract: contracts/platform-api-keys-post-live.yaml
+kind: P-PRODUCTION
+gate: auto
+tags:
+- function
+diff:
+  set:
+    name: live-1
+    environment: PRODUCTION
+expect:
+  status: 201

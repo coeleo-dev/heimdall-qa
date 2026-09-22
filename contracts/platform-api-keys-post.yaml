@@ -1,0 +1,42 @@
+endpoint: POST /platform/api-keys
+dto: com.nokr.domain.auth.dto.CreateApiKeyRequest
+auth: jwt
+area: api-keys-post
+captures:
+  api_key: raw_key
+  api_key_id: id
+unique_json: name
+baseline: baselines/api-keys-post.json
+fields:
+  name:
+    required: true
+    json: name
+    max_length: 50
+    example: abc
+  environment:
+    required: true
+    json: environment
+    pattern: ^(SANDBOX|PRODUCTION)$
+rules:
+- id: NAME_TOO_SHORT
+  status: 400
+  error: size must be between
+  set:
+    name: ab
+- id: PRODUCTION_LOCKED
+  status: 403
+  error: Production keys are locked
+  set:
+    name: live
+    environment: PRODUCTION
+- id: SANDBOX_LIMIT
+  status: 409
+  error: already have
+  saturate:
+    until_status: 409
+    max: 6
+    unique_json: name
+idempotency: none
+async: sync
+live_only_rules: []
+p_gaps: []

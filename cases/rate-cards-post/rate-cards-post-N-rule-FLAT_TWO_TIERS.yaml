@@ -1,0 +1,19 @@
+id: rate-cards-post-N-rule-FLAT_TWO_TIERS
+contract: contracts/platform-rate-cards-post.yaml
+kind: N-rule-FLAT_TWO_TIERS
+gate: auto
+tags:
+- function
+diff:
+  set:
+    tiers:
+    - unit_amount: '0.00003'
+      priority: 0
+      dimensions:
+        model: gpt-4o
+    - unit_amount: '0.00004'
+      priority: 0
+      dimensions:
+        model: gpt-4o
+expect:
+  status: 422

@@ -1,0 +1,11 @@
+id: rate-cards-preview-O-set-previous_volume
+contract: contracts/platform-rate-cards-preview.yaml
+kind: O-set-previous_volume
+gate: auto
+tags:
+- function
+diff:
+  set:
+    previous_volume: '0'
+expect:
+  status: 200

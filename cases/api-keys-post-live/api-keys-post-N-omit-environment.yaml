@@ -1,0 +1,11 @@
+id: api-keys-post-N-omit-environment
+contract: contracts/platform-api-keys-post-live.yaml
+kind: N-omit-environment
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - environment
+expect:
+  status: 400

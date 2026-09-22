@@ -1,0 +1,11 @@
+id: simulate-cash-in-N-rule-MIN_DEPOSIT
+contract: contracts/api-simulate-cash-in.yaml
+kind: N-rule-MIN_DEPOSIT
+gate: auto
+tags:
+- function
+diff:
+  set:
+    amount: 0.99
+expect:
+  status: 422

@@ -1,0 +1,16 @@
+id: tenants-activate-N-omit-company_type
+contract: contracts/platform-tenants-activate.yaml
+kind: N-omit-company_type
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - company_type
+expect:
+  status: 400
+generate:
+  name: company_name
+  email: email
+  cpf_cnpj: cnpj
+  address: address

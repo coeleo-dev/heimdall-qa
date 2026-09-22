@@ -1,0 +1,11 @@
+id: feature-keys-put-O-set-archived
+contract: contracts/platform-feature-keys-put.yaml
+kind: O-set-archived
+gate: auto
+tags:
+- function
+diff:
+  set:
+    archived: false
+expect:
+  status: 200

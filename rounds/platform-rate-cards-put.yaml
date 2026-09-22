@@ -1,0 +1,22 @@
+id: platform-rate-cards-put
+suite: suites/platform-rate-cards-put.yaml
+mode: review
+dimensions:
+- function
+environment: sandbox
+include:
+- cases/rate-cards-put/rate-cards-put-H01.yaml
+- cases/rate-cards-put/rate-cards-put-O-omit-active_until.yaml
+- cases/rate-cards-put/rate-cards-put-O-set-active_until.yaml
+- cases/rate-cards-put/rate-cards-put-N-omit-cost_driver_note.yaml
+- cases/rate-cards-put/rate-cards-put-N-omit-active_from.yaml
+- cases/rate-cards-put/rate-cards-put-N-omit-reason.yaml
+- cases/rate-cards-put/rate-cards-put-N-omit-tiers.yaml
+- cases/rate-cards-put/rate-cards-put-N-notfound.yaml
+- cases/rate-cards-put/rate-cards-put-S-bola.yaml
+- cases/rate-cards-put/rate-cards-put-N-auth.yaml
+- cases/rate-cards-put/rate-cards-put-N-rule-ACTIVE_CARD.yaml
+- cases/rate-cards-put/rate-cards-put-I-replay.yaml
+- cases/rate-cards-put/rate-cards-put-I-new-key.yaml
+- cases/rate-cards-put/rate-cards-put-I-missing.yaml
+- cases/rate-cards-put/rate-cards-put-I-format.yaml

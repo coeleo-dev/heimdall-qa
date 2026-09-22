@@ -1,0 +1,13 @@
+id: live-api-users-get
+suite: suites/api-users-get.yaml
+mode: review
+dimensions:
+- function
+environment: production
+include:
+- cases/api-users-get/api-users-get-H01.yaml
+- cases/api-users-get/api-users-get-N-notfound.yaml
+- cases/api-users-get/api-users-get-S-bola.yaml
+- cases/api-users-get/api-users-get-N-auth.yaml
+- cases/api-users-get/api-users-get-E-conflict.yaml
+notes: Production replay of sandbox round. Use nk_live_ in secrets.local.yaml.

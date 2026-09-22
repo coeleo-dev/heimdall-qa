@@ -1,0 +1,51 @@
+# Baseline estrutural de `/overview` (A.19, E3).
+#
+# Fonte: `aria.yml` de um run real (`steps/001-ui-login/aria.yml`), região `main`,
+# com as folhas voláteis trocadas por `/.*/`. Dinheiro, contagem e percentual
+# mudam a cada movimento do ledger e não são estrutura — quem os confere é
+# `ui.value` (E4), contra o `book.json`, não este arquivo.
+#
+# O template é uma asserção de subconjunto: ele falha pelo que declara, não pelo
+# que omite. Por isso o que fica aqui é o *esqueleto* da tela — cada nó listado
+# abaixo é um gate. Ver a receita em `docs/nokr-qa.md` A.19.
+#
+# Regex tem de ser o valor inteiro (`- button /.*/`); regex embutida num literal
+# não casa. Nunca usar este arquivo como snapshot de valores: para isso existe
+# `ui-values.json`.
+
+- main:
+  - img
+  - textbox "Buscar telas, métricas, configurações..."
+  - button /.*/
+  - heading /.*/ [level=1]
+  - text: Online
+  - group "Selecionar período":
+    - button "Mês Atual"
+    - button "7 Dias"
+    - button "30 Dias"
+  - img
+  - text: /Volume Bruto \(Revenue\).*/
+  - img
+  - text: /Micro-Transações Processadas.*/
+  - img
+  - text: /Usuários Ativos \(B2C\).*/
+  - img
+  - text: /Latência Média.*/
+  - heading "Evolução do Negócio" [level=2]
+  - paragraph: /.*/
+  - text: Volume R$
+  - img
+  - text: /R\$.*/
+  - heading "Franquia Mínima Mensal" [level=3]
+  - text: /.*R\$ .*/
+  - paragraph:
+    - text: Faltam
+    - strong: /R\$.*/
+    - text: /.*/
+  - text: /dias restantes no ciclo/
+  - heading "Conversão Test-Drive" [level=3]
+  - paragraph: /.*/
+  - text: /.*/
+  - strong: /.*/
+  - text: /.*/
+  - paragraph: /.*/

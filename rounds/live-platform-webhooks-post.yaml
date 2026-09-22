@@ -1,0 +1,20 @@
+id: live-platform-webhooks-post
+suite: suites/platform-webhooks-post.yaml
+mode: review
+dimensions:
+- function
+environment: production
+include:
+- cases/webhooks-post/webhooks-post-H01.yaml
+- cases/webhooks-post/webhooks-post-O-omit-name.yaml
+- cases/webhooks-post/webhooks-post-O-set-name.yaml
+- cases/webhooks-post/webhooks-post-B-max-name.yaml
+- cases/webhooks-post/webhooks-post-N-omit-url.yaml
+- cases/webhooks-post/webhooks-post-N-omit-events.yaml
+- cases/webhooks-post/webhooks-post-N-pattern-url.yaml
+- cases/webhooks-post/webhooks-post-N-over-name.yaml
+- cases/webhooks-post/webhooks-post-N-auth.yaml
+- cases/webhooks-post/webhooks-post-N-rule-EVENTS_EMPTY.yaml
+- cases/webhooks-post/webhooks-post-N-rule-MAX_ACTIVE.yaml
+- cases/webhooks-post/webhooks-post-P-HTTP.yaml
+notes: Production replay of sandbox round. Use nk_live_ in secrets.local.yaml.

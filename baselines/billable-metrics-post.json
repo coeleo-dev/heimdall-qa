@@ -1,0 +1,10 @@
+{
+  "name": "llm tokens",
+  "event_type": "llm_tokens",
+  "aggregation_function": "SUM",
+  "property_path": "properties.tokens",
+  "allowed_properties": [
+    "model",
+    "tokens"
+  ]
+}

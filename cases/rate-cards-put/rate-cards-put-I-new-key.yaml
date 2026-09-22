@@ -1,0 +1,9 @@
+id: rate-cards-put-I-new-key
+contract: contracts/platform-rate-cards-put.yaml
+kind: I-new-key
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 200

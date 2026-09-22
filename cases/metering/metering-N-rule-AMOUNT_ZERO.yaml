@@ -1,0 +1,11 @@
+id: metering-N-rule-AMOUNT_ZERO
+contract: contracts/api-metering-post.yaml
+kind: N-rule-AMOUNT_ZERO
+gate: auto
+tags:
+- function
+diff:
+  set:
+    amount: 0
+expect:
+  status: 400

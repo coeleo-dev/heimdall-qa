@@ -1,0 +1,17 @@
+id: login-N-rule-LOCKED
+contract: contracts/auth-login.yaml
+kind: N-rule-LOCKED
+gate: auto
+tags:
+- function
+diff:
+  set:
+    password: wrong-password
+expect:
+  status: 401
+generate:
+  email: secret.email
+burst: 5
+waive:
+- pack: business.rule
+  p_gap: P-GAP-8

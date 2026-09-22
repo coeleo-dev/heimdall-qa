@@ -1,0 +1,224 @@
+id: trilho-a-http
+environment: sandbox
+exclude:
+  kinds:
+    - D
+  sections:
+    - A5
+    - A6
+  notes: >-
+    Kind D, A5 dashboard observe, and A6 Chrome visual stay out.
+    Go-Live / P-live live in campaigns/trilho-a-live.yaml.
+    Do not mix rounds/values-10m-7i.yaml into this campaign.
+    Destructive rounds (metric archive, rate-card archive, API-key delete)
+    run after A4 so the session api_key and ACTIVE metric stay intact.
+    API-key delete revokes revocable_api_key_id from api-keys-post-H-setup-revocable,
+    never the session api_key captured by api-keys-post-H01.
+rounds:
+  - round: rounds/auth-register.yaml
+    endpoint: POST /auth/register
+    dto: com.nokr.domain.auth.dto.RegisterRequest
+    matrix: A0
+    auth: none
+  - round: rounds/auth-login.yaml
+    endpoint: POST /auth/login
+    dto: com.nokr.domain.auth.dto.LoginRequest
+    matrix: A0
+    auth: none
+  - round: rounds/auth-refresh.yaml
+    endpoint: POST /auth/refresh
+    dto: com.nokr.domain.auth.dto.RefreshRequest
+    matrix: A0
+    auth: none
+  - round: rounds/platform-api-keys-post.yaml
+    endpoint: POST /platform/api-keys
+    dto: com.nokr.domain.auth.dto.CreateApiKeyRequest
+    matrix: A1
+    auth: jwt
+  - round: rounds/platform-api-keys-get.yaml
+    endpoint: GET /platform/api-keys
+    dto: com.nokr.domain.auth.controller.B2BApiKeyController
+    matrix: A1
+    auth: jwt
+  - round: rounds/platform-webhooks-post.yaml
+    endpoint: POST /platform/webhooks
+    dto: com.nokr.domain.notification.outbound.dto.CreateWebhookRequest
+    matrix: A1
+    auth: jwt
+  - round: rounds/platform-webhooks-patch.yaml
+    endpoint: PATCH /platform/webhooks/{webhookId}
+    dto: com.nokr.domain.notification.outbound.dto.UpdateWebhookRequest
+    matrix: A1
+    auth: jwt
+  - round: rounds/platform-webhooks-rotate.yaml
+    endpoint: POST /platform/webhooks/{webhookId}/rotate
+    dto: com.nokr.domain.notification.outbound.controller.WebhookController
+    matrix: A1
+    auth: jwt
+  - round: rounds/platform-webhooks-get.yaml
+    endpoint: GET /platform/webhooks
+    dto: com.nokr.domain.notification.outbound.controller.WebhookController
+    matrix: A1
+    auth: jwt
+  - round: rounds/platform-tenants-settings.yaml
+    endpoint: PATCH /platform/tenants/settings
+    dto: com.nokr.domain.tenant.dto.TenantSettingsRequest
+    matrix: A1
+    auth: jwt
+  - round: rounds/platform-tenants-settings-get.yaml
+    endpoint: GET /platform/tenants/settings
+    dto: com.nokr.domain.tenant.controller.ClientActivationController
+    matrix: A1
+    auth: jwt
+  - round: rounds/platform-billable-metrics-post.yaml
+    endpoint: POST /platform/billable-metrics
+    dto: com.nokr.domain.metering.catalog.dto.CreateBillableMetricRequest
+    matrix: A2
+    auth: jwt
+  - round: rounds/platform-billable-metrics-put.yaml
+    endpoint: PUT /platform/billable-metrics/{id}
+    dto: com.nokr.domain.metering.catalog.dto.UpdateBillableMetricRequest
+    matrix: A2
+    auth: jwt
+  - round: rounds/platform-billable-metrics-get.yaml
+    endpoint: GET /platform/billable-metrics
+    dto: com.nokr.domain.metering.catalog.controller.PlatformBillableMetricController
+    matrix: A2
+    auth: jwt
+  - round: rounds/platform-billable-metrics-archive-inactive.yaml
+    endpoint: POST /platform/billable-metrics/{archived_metric_id}/archive
+    dto: com.nokr.domain.metering.catalog.controller.PlatformBillableMetricController
+    matrix: A2
+    auth: jwt
+  - round: rounds/platform-rate-cards-post.yaml
+    endpoint: POST /platform/rate-cards
+    dto: com.nokr.domain.metering.rating.dto.CreateRateCardRequest
+    matrix: A2
+    auth: jwt
+  - round: rounds/platform-rate-cards-put.yaml
+    endpoint: PUT /platform/rate-cards/{id}
+    dto: com.nokr.domain.metering.rating.dto.UpdateRateCardRequest
+    matrix: A2
+    auth: jwt
+  - round: rounds/platform-rate-cards-preview.yaml
+    endpoint: POST /platform/rate-cards/preview
+    dto: com.nokr.domain.metering.rating.dto.PreviewRateCardRequest
+    matrix: A2
+    auth: jwt
+  - round: rounds/platform-feature-keys-post.yaml
+    endpoint: POST /platform/entitlements/feature-keys
+    dto: com.nokr.domain.entitlements.dto.CreateFeatureKeyRequest
+    matrix: A3
+    auth: jwt
+  - round: rounds/platform-feature-keys-put.yaml
+    endpoint: PUT /platform/entitlements/feature-keys/{featureKey}
+    dto: com.nokr.domain.entitlements.dto.UpdateFeatureKeyRequest
+    matrix: A3
+    auth: jwt
+  - round: rounds/platform-plans-post.yaml
+    endpoint: POST /platform/entitlements/plans
+    dto: com.nokr.domain.entitlements.dto.B2BPlanRequest
+    matrix: A3
+    auth: jwt
+  - round: rounds/platform-plans-get.yaml
+    endpoint: GET /platform/entitlements/plans
+    dto: com.nokr.domain.entitlements.controller.PlatformEntitlementController
+    matrix: A3
+    auth: jwt
+  - round: rounds/platform-enroll-unenrolled.yaml
+    endpoint: POST /platform/entitlements/plans/default/enroll-unenrolled
+    dto: com.nokr.domain.entitlements.dto.EnrollUnenrolledRequest
+    matrix: A3
+    auth: jwt
+  - round: rounds/api-users-post.yaml
+    endpoint: POST /api/users
+    dto: com.nokr.domain.user.dto.CreateUserCommand
+    matrix: A4
+    auth: api_key
+  - round: rounds/platform-users-plan.yaml
+    endpoint: PUT /platform/tenants/users/{nokrUserId}/plan
+    dto: com.nokr.domain.user.dto.UpdateUserPlanRequest
+    matrix: A4
+    auth: jwt
+  - round: rounds/platform-user-overrides-post.yaml
+    endpoint: POST /platform/entitlements/users/{userId}
+    dto: com.nokr.domain.entitlements.dto.B2BUserEntitlementRequest
+    matrix: A4
+    auth: jwt
+  - round: rounds/platform-user-overrides-delete.yaml
+    endpoint: DELETE /platform/entitlements/users/{userId}/{featureKey}
+    dto: com.nokr.domain.entitlements.controller.PlatformEntitlementController
+    matrix: A4
+    auth: jwt
+  - round: rounds/api-users-get.yaml
+    endpoint: GET /api/users/{externalUserId}
+    dto: com.nokr.domain.user.controller.UserController
+    matrix: A4
+    auth: api_key
+  - round: rounds/api-users-balance.yaml
+    endpoint: GET /api/users/{externalUserId}/balance
+    dto: com.nokr.domain.user.controller.UserController
+    matrix: A4
+    auth: api_key
+  - round: rounds/api-entitlements-check.yaml
+    endpoint: POST /api/entitlements/check
+    dto: com.nokr.domain.entitlements.dto.EntitlementCheckRequest
+    matrix: A4
+    auth: api_key
+  - round: rounds/api-entitlements-check-bulk.yaml
+    endpoint: POST /api/entitlements/check/bulk
+    dto: com.nokr.domain.entitlements.dto.EntitlementBulkCheckRequest
+    matrix: A4
+    auth: api_key
+  - round: rounds/api-metering.yaml
+    endpoint: POST /api/metering
+    dto: com.nokr.domain.metering.human.dto.MeteringRequest
+    matrix: A4
+    auth: api_key
+    notes: Contract coverage of POST /api/metering. Not rounds/values-10m-7i.yaml.
+  - round: rounds/piloto-ingest.yaml
+    endpoint: POST /api/ingest
+    dto: com.nokr.domain.metering.ingest.dto.IngestRequest
+    matrix: A4
+    auth: api_key
+    notes: Reuse the existing piloto. Do not regenerate the 43 ingest cases.
+  - round: rounds/api-ingest-get.yaml
+    endpoint: GET /api/ingest/{transactionId}
+    dto: com.nokr.domain.metering.ingest.controller.IngestController
+    matrix: A4
+    auth: api_key
+  - round: rounds/api-ingest-preview.yaml
+    endpoint: POST /api/ingest/preview
+    dto: com.nokr.domain.metering.ingest.dto.IngestRequest
+    matrix: A4
+    auth: api_key
+  - round: rounds/api-simulate-cash-in.yaml
+    endpoint: POST /api/sandbox/simulate-cash-in
+    dto: com.nokr.domain.sandbox.simulation.controller.SandboxSimulationController
+    matrix: A4
+    auth: api_key
+  - round: rounds/api-simulate-cash-out.yaml
+    endpoint: POST /api/sandbox/simulate-cash-out
+    dto: com.nokr.domain.sandbox.simulation.controller.SandboxSimulationController
+    matrix: A4
+    auth: api_key
+  - round: rounds/api-settlement-cash-in.yaml
+    endpoint: POST /api/settlement/cash-in
+    dto: com.nokr.domain.settlement.cashin.dto.DepositIntentRequest
+    matrix: A4
+    auth: api_key
+  - round: rounds/platform-billable-metrics-archive.yaml
+    endpoint: POST /platform/billable-metrics/{id}/archive
+    dto: com.nokr.domain.metering.catalog.controller.PlatformBillableMetricController
+    matrix: A2
+    auth: jwt
+  - round: rounds/platform-rate-cards-archive.yaml
+    endpoint: POST /platform/rate-cards/{id}/archive
+    dto: com.nokr.domain.metering.rating.dto.ArchiveRateCardRequest
+    matrix: A2
+    auth: jwt
+  - round: rounds/platform-api-keys-delete.yaml
+    endpoint: DELETE /platform/api-keys/{id}
+    dto: com.nokr.domain.auth.controller.B2BApiKeyController
+    matrix: A1
+    auth: jwt

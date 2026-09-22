@@ -1,0 +1,8 @@
+{
+  "url": "https://webhook.site/nokr-qa",
+  "name": "lab-hook",
+  "events": [
+    "rating.insufficient",
+    "rating.frozen"
+  ]
+}

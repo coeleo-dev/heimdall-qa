@@ -1,0 +1,29 @@
+id: live-platform-feature-keys-post
+suite: suites/platform-feature-keys-post.yaml
+mode: review
+dimensions:
+- function
+environment: production
+include:
+- cases/feature-keys-post/feature-keys-post-H01.yaml
+- cases/feature-keys-post/feature-keys-post-O-omit-description.yaml
+- cases/feature-keys-post/feature-keys-post-O-set-description.yaml
+- cases/feature-keys-post/feature-keys-post-B-max-featureKey.yaml
+- cases/feature-keys-post/feature-keys-post-B-max-name.yaml
+- cases/feature-keys-post/feature-keys-post-B-max-description.yaml
+- cases/feature-keys-post/feature-keys-post-N-omit-featureKey.yaml
+- cases/feature-keys-post/feature-keys-post-N-omit-type.yaml
+- cases/feature-keys-post/feature-keys-post-N-omit-name.yaml
+- cases/feature-keys-post/feature-keys-post-N-pattern-featureKey.yaml
+- cases/feature-keys-post/feature-keys-post-N-pattern-type.yaml
+- cases/feature-keys-post/feature-keys-post-N-over-featureKey.yaml
+- cases/feature-keys-post/feature-keys-post-N-over-name.yaml
+- cases/feature-keys-post/feature-keys-post-N-over-description.yaml
+- cases/feature-keys-post/feature-keys-post-N-auth.yaml
+- cases/feature-keys-post/feature-keys-post-N-rule-RESERVED.yaml
+- cases/feature-keys-post/feature-keys-post-N-rule-DUPLICATE.yaml
+- cases/feature-keys-post/feature-keys-post-I-replay.yaml
+- cases/feature-keys-post/feature-keys-post-I-new-key.yaml
+- cases/feature-keys-post/feature-keys-post-I-missing.yaml
+- cases/feature-keys-post/feature-keys-post-I-format.yaml
+notes: Production replay of sandbox round. Use nk_live_ in secrets.local.yaml.

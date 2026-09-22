@@ -1,0 +1,9 @@
+id: ingest-h01-only
+suite: suites/unused.yaml
+mode: review
+dimensions:
+  - function
+  - business
+environment: sandbox
+include:
+  - cases/ingest/ingest-H01.yaml

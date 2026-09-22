@@ -1,0 +1,17 @@
+endpoint: POST /auth/refresh
+dto: com.nokr.domain.auth.dto.RefreshRequest
+auth: none
+area: refresh
+baseline: baselines/auth-refresh.json
+fields:
+  refresh_token:
+    required: true
+    json: refresh_token
+rules:
+- id: REPLAY
+  status: 401
+  error: Invalid or expired refresh token
+idempotency: none
+async: sync
+live_only_rules: []
+p_gaps: []

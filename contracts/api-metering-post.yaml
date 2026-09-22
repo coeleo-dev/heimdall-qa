@@ -1,0 +1,48 @@
+endpoint: POST /api/metering
+dto: com.nokr.domain.metering.human.dto.MeteringRequest
+auth: api_key
+idempotency: header_uuid_v4
+async: sync
+area: metering
+baseline: baselines/metering.json
+fields:
+  nokr_user_id:
+    required: true
+    json: nokr_user_id
+  amount:
+    required: true
+    json: amount
+  description:
+    required: true
+    json: description
+  feature_key:
+    required: false
+    json: feature_key
+    example: '{{feature_key}}'
+  asset:
+    required: false
+    json: asset
+    example: BRL
+rules:
+- id: ENTITLEMENT_DENIED
+  status: 402
+  code: ENTITLEMENT_DENIED
+  set:
+    feature_key: not_granted_qa
+- id: INSUFFICIENT_BALANCE
+  status: 402
+  code: INSUFFICIENT_BALANCE
+  set:
+    amount: 999999.00
+- id: AMOUNT_ZERO
+  status: 400
+  error: amount must be
+  set:
+    amount: 0
+- id: FROZEN
+  status: 403
+  error: Account is frozen
+  set:
+    nokr_user_id: '{{frozen_user_id}}'
+live_only_rules: []
+p_gaps: []

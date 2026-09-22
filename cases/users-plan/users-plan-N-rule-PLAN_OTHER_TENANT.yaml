@@ -1,0 +1,11 @@
+id: users-plan-N-rule-PLAN_OTHER_TENANT
+contract: contracts/platform-users-plan.yaml
+kind: N-rule-PLAN_OTHER_TENANT
+gate: auto
+tags:
+- function
+diff:
+  set:
+    plan_id: 00000000-0000-4000-8000-000000000099
+expect:
+  status: 404

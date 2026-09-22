@@ -1,0 +1,11 @@
+id: rate-cards-post-N-omit-pricing_model
+contract: contracts/platform-rate-cards-post.yaml
+kind: N-omit-pricing_model
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - pricing_model
+expect:
+  status: 400

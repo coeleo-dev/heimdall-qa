@@ -1,0 +1,12 @@
+id: platform-api-keys-delete
+suite: suites/platform-api-keys-delete.yaml
+mode: review
+dimensions:
+- function
+environment: sandbox
+include:
+- cases/api-keys-delete/api-keys-delete-H01.yaml
+- cases/api-keys-delete/api-keys-delete-N-notfound.yaml
+- cases/api-keys-delete/api-keys-delete-S-bola.yaml
+- cases/api-keys-delete/api-keys-delete-N-auth.yaml
+- cases/api-keys-delete/api-keys-delete-N-rule-ALREADY_REVOKED.yaml

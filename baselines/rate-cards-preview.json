@@ -1,0 +1,16 @@
+{
+  "pricing_model": "FLAT",
+  "dimension_keys": [
+    "model"
+  ],
+  "tiers": [
+    {
+      "unit_amount": "0.00003",
+      "priority": 0,
+      "dimensions": {
+        "model": "gpt-4o"
+      }
+    }
+  ],
+  "quantity": "100"
+}

@@ -1,0 +1,31 @@
+endpoint: PUT /platform/rate-cards/{{rate_card_id}}
+dto: com.nokr.domain.metering.rating.dto.UpdateRateCardRequest
+auth: jwt
+idempotency: header_uuid_v4
+area: rate-cards-put
+resource_id_in_path: true
+baseline: baselines/rate-cards-put.json
+fields:
+  cost_driver_note:
+    required: true
+    json: cost_driver_note
+  active_from:
+    required: true
+    json: active_from
+  active_until:
+    required: false
+    json: active_until
+    example: '2027-09-01T00:00:00Z'
+  reason:
+    required: true
+    json: reason
+  tiers:
+    required: true
+    json: tiers
+rules:
+- id: ACTIVE_CARD
+  status: 422
+  error: PUT is only allowed before active_from
+async: sync
+live_only_rules: []
+p_gaps: []

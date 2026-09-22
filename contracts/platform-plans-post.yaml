@@ -1,0 +1,56 @@
+endpoint: POST /platform/entitlements/plans
+dto: com.nokr.domain.entitlements.dto.B2BPlanRequest
+auth: jwt
+idempotency: header_uuid_v4
+area: plans-post
+captures:
+  plan_id: id
+unique_json: name
+baseline: baselines/plans-post.json
+fields:
+  name:
+    required: true
+    json: name
+  price:
+    required: false
+    json: price
+    example: 0
+    json_alias: false
+  isDefault:
+    required: true
+    json: isDefault
+    json_alias: true
+  isPublic:
+    required: true
+    json: isPublic
+    json_alias: true
+  displayOrder:
+    required: true
+    json: displayOrder
+    json_alias: true
+  entitlements:
+    required: true
+    json: entitlements
+rules:
+- id: ENTITLEMENTS_EMPTY
+  status: 400
+  error: must not be empty
+  set:
+    entitlements: []
+- id: DUPLICATE_NAME
+  status: 422
+  error: Plan already exists
+- id: TYPE_MISMATCH
+  status: 422
+  error: Feature key type mismatch
+  set:
+    entitlements:
+    - featureKey: '{{feature_key}}'
+      entitlementType: NUMERIC
+      value: 'true'
+- id: MAX_ENTITLEMENTS
+  status: 422
+  error: Plan exceeds max entitlements
+async: sync
+live_only_rules: []
+p_gaps: []

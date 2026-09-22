@@ -1,0 +1,15 @@
+id: platform-billable-metrics-archive
+suite: suites/platform-billable-metrics-archive.yaml
+mode: review
+dimensions:
+- function
+environment: sandbox
+include:
+- cases/billable-metrics-archive/billable-metrics-archive-H01.yaml
+- cases/billable-metrics-archive/billable-metrics-archive-N-notfound.yaml
+- cases/billable-metrics-archive/billable-metrics-archive-S-bola.yaml
+- cases/billable-metrics-archive/billable-metrics-archive-N-auth.yaml
+- cases/billable-metrics-archive/billable-metrics-archive-I-replay.yaml
+- cases/billable-metrics-archive/billable-metrics-archive-I-new-key.yaml
+- cases/billable-metrics-archive/billable-metrics-archive-I-missing.yaml
+- cases/billable-metrics-archive/billable-metrics-archive-I-format.yaml

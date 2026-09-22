@@ -1,0 +1,9 @@
+id: users-plan-S-bola
+contract: contracts/platform-users-plan.yaml
+kind: S-bola
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 404

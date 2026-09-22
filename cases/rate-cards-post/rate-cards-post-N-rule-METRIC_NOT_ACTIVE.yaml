@@ -1,0 +1,12 @@
+id: rate-cards-post-N-rule-METRIC_NOT_ACTIVE
+contract: contracts/platform-rate-cards-post.yaml
+kind: N-rule-METRIC_NOT_ACTIVE
+gate: auto
+tags:
+- function
+diff:
+  set:
+    billable_metric_id: '{{archived_metric_id}}'
+expect:
+  status: 422
+  code: METRIC_NOT_ACTIVE

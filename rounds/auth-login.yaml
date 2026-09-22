@@ -1,0 +1,12 @@
+id: auth-login
+suite: suites/auth-login.yaml
+mode: review
+dimensions:
+- function
+environment: sandbox
+include:
+- cases/auth-login/login-H01.yaml
+- cases/auth-login/login-N-omit-email.yaml
+- cases/auth-login/login-N-omit-password.yaml
+- cases/auth-login/login-N-rule-INVALID_CREDENTIALS.yaml
+- cases/auth-login/login-N-rule-LOCKED.yaml

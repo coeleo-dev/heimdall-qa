@@ -1,0 +1,13 @@
+id: ingest-N-denylist-ssn
+contract: contracts/api-ingest-post.yaml
+kind: N-denylist-ssn
+gate: auto
+tags:
+  - function
+diff:
+  set:
+    properties.ssn: denied
+expect:
+  status: 400
+generate:
+  timestamp: now_iso

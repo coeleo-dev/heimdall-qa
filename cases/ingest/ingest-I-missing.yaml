@@ -1,0 +1,16 @@
+id: ingest-I-missing
+contract: contracts/api-ingest-post.yaml
+kind: I-missing
+gate: auto
+tags:
+  - function
+diff: {}
+expect:
+  status: 400
+omit_headers:
+  - X-Idempotency-Key
+generate:
+  timestamp: now_iso
+waive:
+  - pack: mutation
+    reason: POST /api/ingest requires X-Idempotency-Key; this case omits the header on purpose

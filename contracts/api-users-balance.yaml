@@ -1,0 +1,16 @@
+endpoint: GET /api/users/{{external_user_id}}/balance
+dto: com.nokr.domain.user.controller.UserController
+auth: api_key
+area: api-users-balance
+resource_id_in_path: true
+baseline: baselines/empty.json
+fields: {}
+rules:
+- id: FROZEN
+  status: 403
+  error: Account is frozen
+idempotency: none
+async: sync
+live_only_rules: []
+p_gaps:
+- P-GAP-6

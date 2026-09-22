@@ -1,0 +1,16 @@
+id: register-N-rule-INVALID_CPF
+contract: contracts/auth-register.yaml
+kind: N-rule-INVALID_CPF
+gate: auto
+tags:
+- function
+diff:
+  set:
+    document_type: CPF
+    document_number: '11111111111'
+expect:
+  status: 400
+generate:
+  email: email
+  company_name: company_name
+  password: password

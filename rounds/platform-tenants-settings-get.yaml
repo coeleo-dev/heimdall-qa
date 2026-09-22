@@ -1,0 +1,10 @@
+id: platform-tenants-settings-get
+suite: suites/platform-tenants-settings-get.yaml
+mode: review
+dimensions:
+- function
+environment: sandbox
+include:
+- cases/tenants-settings-get/tenants-settings-get-H01.yaml
+- cases/tenants-settings-get/tenants-settings-get-N-auth.yaml
+- cases/tenants-settings-get/tenants-settings-get-E-isolate.yaml

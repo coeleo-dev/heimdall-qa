@@ -1,0 +1,11 @@
+id: entitlements-check-N-rule-OTHER_TENANT
+contract: contracts/api-entitlements-check.yaml
+kind: N-rule-OTHER_TENANT
+gate: auto
+tags:
+- function
+diff:
+  set:
+    userId: '{{other_nokr_user_id}}'
+expect:
+  status: 403

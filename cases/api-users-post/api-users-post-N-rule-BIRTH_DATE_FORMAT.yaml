@@ -1,0 +1,16 @@
+id: api-users-post-N-rule-BIRTH_DATE_FORMAT
+contract: contracts/api-users-post.yaml
+kind: N-rule-BIRTH_DATE_FORMAT
+gate: auto
+tags:
+- function
+diff:
+  set:
+    kyc_profile.birth_date: 01-01-1990
+expect:
+  status: 400
+generate:
+  kyc_profile.name: person_name
+  kyc_profile.email: email
+  kyc_profile.cpf_cnpj: cpf
+  kyc_profile.address: address

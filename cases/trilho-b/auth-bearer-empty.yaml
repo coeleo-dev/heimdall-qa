@@ -1,0 +1,15 @@
+id: auth-bearer-empty
+contract: contracts/api-metering-post.yaml
+kind: N-auth
+gate: auto
+tags:
+  - security
+diff:
+  set:
+    amount: "0.01"
+headers:
+  Authorization: "Bearer"
+expect:
+  status: 401
+generate:
+  idempotency_key: uuid_v4

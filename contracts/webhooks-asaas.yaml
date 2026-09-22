@@ -1,0 +1,14 @@
+endpoint: POST /webhooks/asaas
+dto: com.nokr.infrastructure.baas.webhook.AsaasWebhookController
+auth: none
+idempotency: none
+async: sync
+area: webhooks-asaas
+baseline: baselines/webhooks-asaas.json
+fields:
+  event:
+    required: true
+    json: event
+rules: []
+live_only_rules: []
+p_gaps: []

@@ -1,0 +1,20 @@
+endpoint: POST /platform/tenants/kill-switch
+dto: com.nokr.domain.tenant.dto.KillSwitchRequest
+auth: jwt
+area: tenants-kill-switch
+baseline: baselines/tenants-kill-switch.json
+fields:
+  current_password:
+    required: true
+    json: current_password
+    example: Str0ng!Pass123
+  reason:
+    required: false
+    json: reason
+    max_length: 500
+    example: Emergency kill-switch test
+rules: []
+idempotency: none
+async: sync
+live_only_rules: []
+p_gaps: []

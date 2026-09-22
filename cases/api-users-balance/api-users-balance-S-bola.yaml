@@ -1,0 +1,9 @@
+id: api-users-balance-S-bola
+contract: contracts/api-users-balance.yaml
+kind: S-bola
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 404

@@ -1,0 +1,13 @@
+id: billable-metrics-post-O-omit-event_type
+contract: contracts/platform-billable-metrics-post.yaml
+kind: O-omit-event_type
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - event_type
+expect:
+  status: 201
+capture_response:
+  spare_metric_id: id

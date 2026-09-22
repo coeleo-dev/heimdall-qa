@@ -1,0 +1,17 @@
+endpoint: POST /platform/entitlements/plans/default/enroll-unenrolled
+dto: com.nokr.domain.entitlements.dto.EnrollUnenrolledRequest
+auth: jwt
+idempotency: header_uuid_v4
+area: enroll-unenrolled
+baseline: baselines/enroll-unenrolled.json
+fields:
+  reason:
+    required: true
+    json: reason
+rules:
+- id: NO_DEFAULT_PLAN
+  status: 422
+  error: No default plan
+async: sync
+live_only_rules: []
+p_gaps: []

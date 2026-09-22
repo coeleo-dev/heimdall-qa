@@ -1,0 +1,24 @@
+endpoint: POST /platform/entitlements/users/{{nokr_user_id}}
+dto: com.nokr.domain.entitlements.dto.B2BUserEntitlementRequest
+auth: jwt
+idempotency: header_uuid_v4
+area: user-overrides-post
+resource_id_in_path: true
+baseline: baselines/user-overrides-post.json
+fields:
+  featureKey:
+    required: true
+    json: featureKey
+  entitlementType:
+    required: true
+    json: entitlementType
+  value:
+    required: true
+    json: value
+  reason:
+    required: true
+    json: reason
+async: sync
+rules: []
+live_only_rules: []
+p_gaps: []

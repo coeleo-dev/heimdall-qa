@@ -1,0 +1,15 @@
+id: register-N-omit-document_number
+contract: contracts/auth-register.yaml
+kind: N-omit-document_number
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - document_number
+expect:
+  status: 400
+generate:
+  email: email
+  company_name: company_name
+  password: password

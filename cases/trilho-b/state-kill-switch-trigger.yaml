@@ -1,0 +1,14 @@
+id: state-kill-switch-trigger
+contract: contracts/platform-tenants-kill-switch.yaml
+kind: H-kill-switch
+gate: auto
+tags:
+  - state
+diff:
+  set:
+    current_password: "{{other_password}}"
+    reason: "Automated Trilho B Kill-Switch security test"
+headers:
+  Authorization: Bearer {{other_jwt}}
+expect:
+  status: 200

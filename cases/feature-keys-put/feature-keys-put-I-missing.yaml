@@ -1,0 +1,11 @@
+id: feature-keys-put-I-missing
+contract: contracts/platform-feature-keys-put.yaml
+kind: I-missing
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 400
+omit_headers:
+- X-Idempotency-Key

@@ -1,0 +1,11 @@
+id: tenants-settings-N-rule-CREDITS_ABOVE_TIER
+contract: contracts/platform-tenants-settings.yaml
+kind: N-rule-CREDITS_ABOVE_TIER
+gate: auto
+tags:
+- function
+diff:
+  set:
+    test_drive_credits: 5.00001
+expect:
+  status: 422

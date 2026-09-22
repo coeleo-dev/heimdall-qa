@@ -1,0 +1,13 @@
+id: ingest-N-denylist-cpf
+contract: contracts/api-ingest-post.yaml
+kind: N-denylist-cpf
+gate: auto
+tags:
+  - function
+diff:
+  set:
+    properties.cpf: denied
+expect:
+  status: 400
+generate:
+  timestamp: now_iso

@@ -1,0 +1,11 @@
+id: settlement-cash-in-N-omit-nokr_user_id
+contract: contracts/api-settlement-cash-in.yaml
+kind: N-omit-nokr_user_id
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - nokr_user_id
+expect:
+  status: 400

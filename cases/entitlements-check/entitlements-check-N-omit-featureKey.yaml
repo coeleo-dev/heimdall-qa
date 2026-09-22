@@ -1,0 +1,11 @@
+id: entitlements-check-N-omit-featureKey
+contract: contracts/api-entitlements-check.yaml
+kind: N-omit-featureKey
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - featureKey
+expect:
+  status: 400

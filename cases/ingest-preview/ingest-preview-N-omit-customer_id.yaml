@@ -1,0 +1,11 @@
+id: ingest-preview-N-omit-customer_id
+contract: contracts/api-ingest-preview.yaml
+kind: N-omit-customer_id
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - customer_id
+expect:
+  status: 400

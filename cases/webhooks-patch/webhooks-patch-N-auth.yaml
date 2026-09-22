@@ -1,0 +1,11 @@
+id: webhooks-patch-N-auth
+contract: contracts/platform-webhooks-patch.yaml
+kind: N-auth
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 401
+omit_headers:
+- Authorization

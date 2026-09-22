@@ -1,0 +1,65 @@
+endpoint: POST /auth/register
+dto: com.nokr.domain.auth.dto.RegisterRequest
+auth: none
+idempotency: none
+async: sync
+area: register
+baseline: baselines/auth-register.json
+fields:
+  email:
+    required: true
+    json: email
+  password:
+    required: true
+    json: password
+    max_length: 64
+    example: Aa1xxxxx
+  company_name:
+    required: true
+    json: company_name
+  document_number:
+    required: true
+    json: document_number
+  document_type:
+    required: true
+    json: document_type
+    pattern: CPF|CNPJ
+  accepted_tos:
+    required: true
+    json: accepted_tos
+rules:
+- id: INVALID_EMAIL
+  status: 400
+  error: Invalid email
+  set:
+    email: not-an-email
+- id: WEAK_PASSWORD
+  status: 400
+  error: Password must be at least 8 characters
+  set:
+    password: '123456'
+- id: TOS_FALSE
+  status: 400
+  error: Terms of Use must be accepted
+  set:
+    accepted_tos: false
+- id: INVALID_CPF
+  status: 400
+  error: Invalid CPF
+  set:
+    document_type: CPF
+    document_number: '11111111111'
+- id: INVALID_CNPJ
+  status: 400
+  error: Invalid CNPJ
+  set:
+    document_number: '11222333000180'
+- id: DUPLICATE_EMAIL
+  status: 422
+  error: Email already registered
+- id: RATE_LIMIT
+  status: 429
+  error: Too many requests
+  burst: 4
+live_only_rules: []
+p_gaps: []

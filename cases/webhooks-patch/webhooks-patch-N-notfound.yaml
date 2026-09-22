@@ -1,0 +1,9 @@
+id: webhooks-patch-N-notfound
+contract: contracts/platform-webhooks-patch.yaml
+kind: N-notfound
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 404

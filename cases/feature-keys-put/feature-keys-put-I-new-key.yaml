@@ -1,0 +1,9 @@
+id: feature-keys-put-I-new-key
+contract: contracts/platform-feature-keys-put.yaml
+kind: I-new-key
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 200

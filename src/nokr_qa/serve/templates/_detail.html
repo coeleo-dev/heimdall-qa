@@ -1,0 +1,127 @@
+<section class="detail">
+  <h1>{{ case_label }}</h1>
+  {% if pause_reason %}
+  <p class="pause-reason">{{ pause_reason }}</p>
+  {% endif %}
+
+  <h3>Packs</h3>
+  {% if pack_alerts %}
+  <ul class="packs">
+    {% for pack in pack_alerts %}
+    <li class="{{ pack.status }}">
+      {{ pack.pack_id }} — {{ pack.status }}{% if pack.detail %} ({{ pack.detail }}){% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% if pack_ok %}
+  <details class="pack-ok"{% if not pack_alerts %} open{% endif %}>
+    <summary>Packs que passaram ({{ pack_ok | length }})</summary>
+    <ul class="packs">
+      {% for pack in pack_ok %}
+      <li class="{{ pack.status }}">
+        {{ pack.pack_id }} — {{ pack.status }}{% if pack.detail %} ({{ pack.detail }}){% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+  {% if not packs %}
+  <p class="muted">Nenhum pack neste passo.</p>
+  {% endif %}
+
+  {% if probe_rows %}
+  <section class="probe">
+    <h3>esperado vs lido</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Superfície</th>
+          <th>Antes</th>
+          <th>Depois</th>
+          <th>Delta</th>
+          <th>Esperado</th>
+          <th>Lido</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in probe_rows %}
+        <tr class="{{ 'match' if row.matched else 'mismatch' }}">
+          <td>{{ row.id }}</td>
+          <td>{{ row.before }}</td>
+          <td>{{ row.after }}</td>
+          <td>{{ row.delta }}</td>
+          <td>
+            {% if row.money %}esperado R$ {{ row.esperado }}{% else %}esperado {{ row.esperado }}{% endif %}
+          </td>
+          <td>
+            {% if row.money %}lido R$ {{ row.lido }}{% else %}lido {{ row.lido }}{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  {% if is_probe and not has_http %}
+  <p class="muted">Este passo é conferência, não um POST.</p>
+  {% elif has_http %}
+  <p class="http-line">HTTP {{ http_status if http_status is not none else "—" }}{% if elapsed_ms %} · {{ elapsed_ms }} ms{% endif %}</p>
+  {% endif %}
+
+  {% if has_http %}
+  <details open>
+    <summary>Body da request</summary>
+    <pre>{{ request_body | pretty_json }}</pre>
+    <p class="muted">password, token e api_key gravados aparecem como [REDACTED]. O HTTP enviou o valor real.</p>
+  </details>
+  <details>
+    <summary>Headers da request</summary>
+    <pre>{{ request_headers | pretty_json }}</pre>
+  </details>
+  <details open>
+    <summary>Body da response</summary>
+    <pre>{{ response_body | pretty_json }}</pre>
+  </details>
+  {% endif %}
+
+  <details{% if logs_web %} open{% endif %}>
+    <summary>Logs web</summary>
+    {% if logs_web %}<pre>{{ logs_web }}</pre>{% else %}<p class="muted">nenhuma linha</p>{% endif %}
+  </details>
+  <details{% if logs_worker %} open{% endif %}>
+    <summary>Logs worker</summary>
+    {% if logs_worker %}<pre>{{ logs_worker }}</pre>{% else %}<p class="muted">nenhuma linha</p>{% endif %}
+  </details>
+</section>
+{% if view.awaiting_verdict %}
+<form method="post" action="/verdict" class="verdict">
+  <label{% if comment_required_error %} class="invalid"{% endif %}>
+    Comentário
+    <textarea name="comment" rows="2"{% if comment_required_error %} aria-invalid="true"{% endif %}></textarea>
+  </label>
+  {% if comment_required_error %}
+  <p class="field-error">Reprovar exige comentário.</p>
+  {% endif %}
+  <div class="verdict-actions">
+    <button type="submit" name="status" value="pass" class="primary">Aprovar</button>
+    <button type="submit" name="status" value="fail" class="danger">Reprovar e seguir</button>
+    <button type="submit" name="status" value="fail_stop" class="danger-ghost">Reprovar e parar</button>
+  </div>
+  <input type="hidden" name="continue_round" value="yes">
+</form>
+{% else %}
+<div class="verdict">
+  {% if recorded_verdict %}
+  <p>
+    Veredito:
+    {{ status_label.get(recorded_verdict.get("status"), recorded_verdict.get("status")) }}
+    {% if recorded_verdict.get("comment") %} — {{ recorded_verdict.comment }}{% endif %}
+  </p>
+  {% endif %}
+  {% if view.phase == "step" and view.focus_index != view.pending_index %}
+  <p><a href="/round?step={{ view.pending_index }}">Ir ao passo atual</a></p>
+  {% endif %}
+</div>
+{% endif %}

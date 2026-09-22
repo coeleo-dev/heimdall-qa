@@ -1,0 +1,11 @@
+id: feature-keys-put-N-omit-name
+contract: contracts/platform-feature-keys-put.yaml
+kind: N-omit-name
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - name
+expect:
+  status: 400

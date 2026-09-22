@@ -1,0 +1,10 @@
+id: platform-plans-get
+suite: suites/platform-plans-get.yaml
+mode: review
+dimensions:
+- function
+environment: sandbox
+include:
+- cases/plans-get/plans-get-H01.yaml
+- cases/plans-get/plans-get-N-auth.yaml
+- cases/plans-get/plans-get-E-isolate.yaml

@@ -1,0 +1,36 @@
+meta {
+  name: POST /api/ingest — Custom
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{base_url}}/api/ingest
+  body: json
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{api_key}}
+  X-Idempotency-Key: {{$guid}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "transaction_id": "{{ingest_transaction_id}}",
+    "event_type": "llm_tokens"
+  }
+}
+
+script:pre-request {
+  bru.setVar('ingest_transaction_id', 'evt-bruno-' + Date.now()+ '1');
+}
+
+script:post-response {
+  test('Status 202 Accepted', () => expect(res.getStatus()).to.equal(202));
+}
+
+settings {
+  encodeUrl: true
+}

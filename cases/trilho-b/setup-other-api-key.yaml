@@ -1,0 +1,15 @@
+id: setup-other-api-key
+contract: contracts/platform-api-keys-post.yaml
+kind: H-setup-other
+gate: auto
+tags:
+  - function
+diff:
+  set:
+    name: "tenant_b_key"
+headers:
+  Authorization: Bearer {{other_jwt}}
+expect:
+  status: 201
+capture_response:
+  other_api_key_id: id

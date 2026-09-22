@@ -1,0 +1,14 @@
+id: ingest-N-rule-MISSING_PROPERTY
+contract: contracts/api-ingest-post.yaml
+kind: N-rule-MISSING_PROPERTY
+gate: auto
+tags:
+  - function
+diff:
+  omit:
+    - properties.tokens
+expect:
+  status: 422
+  code: MISSING_PROPERTY
+generate:
+  timestamp: now_iso

@@ -1,0 +1,12 @@
+endpoint: PUT /platform/entitlements/plans/{{plan_id}}
+dto: com.nokr.domain.entitlements.dto.B2BPlanRequest
+auth: jwt
+idempotency: header_uuid_v4
+area: plans-put-default
+resource_id_in_path: false
+baseline: baselines/plans-put-default.json
+fields: {}
+async: sync
+rules: []
+live_only_rules: []
+p_gaps: []

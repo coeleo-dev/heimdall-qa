@@ -1,0 +1,9 @@
+id: enroll-unenrolled-I-replay
+contract: contracts/platform-enroll-unenrolled.yaml
+kind: I-replay
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 200

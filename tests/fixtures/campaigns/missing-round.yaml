@@ -1,0 +1,8 @@
+id: missing-round
+environment: sandbox
+rounds:
+  - round: rounds/does-not-exist.yaml
+    endpoint: POST /qa/echo
+    dto: com.nokr.qa.EchoRequest
+    matrix: A4
+    auth: none

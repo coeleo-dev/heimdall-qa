@@ -1,0 +1,13 @@
+id: bola-user-get
+contract: contracts/api-users-get.yaml
+kind: S-bola-other
+gate: auto
+tags:
+  - security
+diff: {}
+path_values:
+  external_user_id: "{{other_external_user_id}}"
+headers:
+  Authorization: Bearer {{api_key}}
+expect:
+  status: 404

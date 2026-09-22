@@ -1,0 +1,14 @@
+id: ingest-N-rule-UNKNOWN_EVENT_TYPE
+contract: contracts/api-ingest-post.yaml
+kind: N-rule-UNKNOWN_EVENT_TYPE
+gate: auto
+tags:
+  - function
+diff:
+  set:
+    event_type: no_such_event
+expect:
+  status: 422
+  code: UNKNOWN_EVENT_TYPE
+generate:
+  timestamp: now_iso

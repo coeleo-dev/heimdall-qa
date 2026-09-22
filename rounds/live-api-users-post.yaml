@@ -1,0 +1,25 @@
+id: live-api-users-post
+suite: suites/api-users-post.yaml
+mode: review
+dimensions:
+- function
+environment: production
+include:
+- cases/api-users-post/api-users-post-H01.yaml
+- cases/api-users-post/api-users-post-H-setup-other.yaml
+- cases/api-users-post/api-users-post-H-setup-frozen.yaml
+- cases/users-freeze/users-freeze-H01.yaml
+- cases/users-freeze/users-freeze-N-auth.yaml
+- cases/api-users-post/api-users-post-O-omit-external_user_id.yaml
+- cases/api-users-post/api-users-post-O-set-external_user_id.yaml
+- cases/api-users-post/api-users-post-O-omit-plan_id.yaml
+- cases/api-users-post/api-users-post-O-set-plan_id.yaml
+- cases/api-users-post/api-users-post-O-omit-country.yaml
+- cases/api-users-post/api-users-post-O-set-country.yaml
+- cases/api-users-post/api-users-post-N-omit-kyc_profile.yaml
+- cases/api-users-post/api-users-post-N-auth.yaml
+- cases/api-users-post/api-users-post-N-rule-KYC_NAME_OMIT.yaml
+- cases/api-users-post/api-users-post-N-rule-KYC_EMAIL_OMIT.yaml
+- cases/api-users-post/api-users-post-N-rule-BIRTH_DATE_FORMAT.yaml
+- cases/api-users-post/api-users-post-N-rule-PLAN_NOT_FOUND.yaml
+notes: Production replay of sandbox round. Use nk_live_ in secrets.local.yaml.

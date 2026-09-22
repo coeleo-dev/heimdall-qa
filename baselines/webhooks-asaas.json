@@ -1,0 +1,8 @@
+{
+  "event": "PAYMENT_RECEIVED",
+  "payment": {
+    "id": "pay_test_001",
+    "externalReference": "user_qa_001",
+    "value": 50.00
+  }
+}

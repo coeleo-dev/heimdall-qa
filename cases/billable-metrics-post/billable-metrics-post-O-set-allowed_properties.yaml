@@ -1,0 +1,15 @@
+id: billable-metrics-post-O-set-allowed_properties
+contract: contracts/platform-billable-metrics-post.yaml
+kind: O-set-allowed_properties
+gate: auto
+tags:
+- function
+diff:
+  set:
+    allowed_properties:
+    - model
+    - tokens
+expect:
+  status: 201
+capture_response:
+  active_metric_id: id

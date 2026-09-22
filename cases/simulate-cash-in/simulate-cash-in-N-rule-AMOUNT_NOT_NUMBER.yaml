@@ -1,0 +1,11 @@
+id: simulate-cash-in-N-rule-AMOUNT_NOT_NUMBER
+contract: contracts/api-simulate-cash-in.yaml
+kind: N-rule-AMOUNT_NOT_NUMBER
+gate: auto
+tags:
+- function
+diff:
+  set:
+    amount: x
+expect:
+  status: 422

@@ -1,0 +1,14 @@
+id: billable-metrics-post-N-rule-FILTER_UNSUPPORTED_OP
+contract: contracts/platform-billable-metrics-post.yaml
+kind: N-rule-FILTER_UNSUPPORTED_OP
+gate: auto
+tags:
+- function
+diff:
+  set:
+    filter_expression:
+      op: like
+      path: model
+      value: gpt
+expect:
+  status: 422

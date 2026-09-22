@@ -1,0 +1,15 @@
+id: fuzz-huge-user-id
+contract: contracts/api-ingest-post.yaml
+kind: S-fuzz-length
+gate: auto
+tags:
+  - security
+diff:
+  set:
+    customer_id: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+headers:
+  Authorization: Bearer {{api_key}}
+generate:
+  timestamp: now_iso
+expect:
+  status: 400

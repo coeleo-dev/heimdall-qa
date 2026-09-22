@@ -1,0 +1,13 @@
+id: ingest-N-denylist-precise_location
+contract: contracts/api-ingest-post.yaml
+kind: N-denylist-precise_location
+gate: auto
+tags:
+  - function
+diff:
+  set:
+    properties.precise_location: denied
+expect:
+  status: 400
+generate:
+  timestamp: now_iso

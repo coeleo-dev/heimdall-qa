@@ -1,0 +1,14 @@
+id: tenants-activate-N-rule-CPF_FORBIDDEN
+contract: contracts/platform-tenants-activate.yaml
+kind: N-rule-CPF_FORBIDDEN
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 400
+generate:
+  name: company_name
+  email: email
+  cpf_cnpj: cpf
+  address: address

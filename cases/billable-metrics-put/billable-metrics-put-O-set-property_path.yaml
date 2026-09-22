@@ -1,0 +1,11 @@
+id: billable-metrics-put-O-set-property_path
+contract: contracts/platform-billable-metrics-put.yaml
+kind: O-set-property_path
+gate: auto
+tags:
+- function
+diff:
+  set:
+    property_path: properties.tokens
+expect:
+  status: 200

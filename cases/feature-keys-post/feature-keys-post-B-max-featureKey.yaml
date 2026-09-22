@@ -1,0 +1,11 @@
+id: feature-keys-post-B-max-featureKey
+contract: contracts/platform-feature-keys-post.yaml
+kind: B-max-featureKey
+gate: auto
+tags:
+- function
+diff:
+  set:
+    featureKey: ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab3ab
+expect:
+  status: 201

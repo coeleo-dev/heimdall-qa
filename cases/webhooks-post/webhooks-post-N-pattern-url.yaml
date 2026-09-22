@@ -1,0 +1,11 @@
+id: webhooks-post-N-pattern-url
+contract: contracts/platform-webhooks-post.yaml
+kind: N-pattern-url
+gate: auto
+tags:
+- function
+diff:
+  set:
+    url: '!!!'
+expect:
+  status: 400

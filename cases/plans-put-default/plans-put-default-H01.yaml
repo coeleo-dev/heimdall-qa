@@ -1,0 +1,9 @@
+id: plans-put-default-H01
+contract: contracts/platform-plans-put-default.yaml
+kind: H01
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 200

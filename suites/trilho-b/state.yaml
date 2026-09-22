@@ -1,0 +1,14 @@
+id: trilho-b-state
+steps:
+  - loop:
+      times: 1
+      case: cases/trilho-b/state-idempotency-replay.yaml
+  - loop:
+      times: 1
+      case: cases/trilho-b/state-idempotency-conflict.yaml
+  - loop:
+      times: 1
+      case: cases/trilho-b/state-kill-switch-trigger.yaml
+  - loop:
+      times: 1
+      case: cases/trilho-b/state-kill-switch-blocked.yaml

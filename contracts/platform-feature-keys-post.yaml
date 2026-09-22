@@ -1,0 +1,41 @@
+endpoint: POST /platform/entitlements/feature-keys
+dto: com.nokr.domain.entitlements.dto.CreateFeatureKeyRequest
+auth: jwt
+idempotency: header_uuid_v4
+area: feature-keys-post
+captures:
+  feature_key: featureKey
+unique_json: featureKey
+baseline: baselines/feature-keys-post.json
+fields:
+  featureKey:
+    required: true
+    json: featureKey
+    pattern: ^[a-z0-9_]{3,128}$
+    max_length: 128
+    example: ab3
+  type:
+    required: true
+    json: type
+    pattern: ^(BOOLEAN|CONFIG|METRIC)$
+  name:
+    required: true
+    json: name
+    max_length: 256
+  description:
+    required: false
+    json: description
+    max_length: 2000
+    example: lab description
+rules:
+- id: RESERVED
+  status: 409
+  error: reserved by Nokr
+  set:
+    featureKey: whitelabel
+- id: DUPLICATE
+  status: 409
+  error: Feature key already exists
+async: sync
+live_only_rules: []
+p_gaps: []

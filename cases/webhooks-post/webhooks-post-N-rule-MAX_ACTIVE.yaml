@@ -1,0 +1,13 @@
+id: webhooks-post-N-rule-MAX_ACTIVE
+contract: contracts/platform-webhooks-post.yaml
+kind: N-rule-MAX_ACTIVE
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 409
+saturate:
+  until_status: 409
+  max: 6
+  unique_json: name

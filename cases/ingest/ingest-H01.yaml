@@ -1,0 +1,19 @@
+id: ingest-H01
+contract: contracts/api-ingest-post.yaml
+kind: H01
+gate: auto
+tags:
+  - function
+  - business
+diff: {}
+expect:
+  status: 202
+  jsonpath:
+    $.status: ACCEPTED
+capture_response:
+  ingest_transaction_id: transaction_id
+headers:
+  X-Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000
+generate:
+  timestamp: now_iso
+wait_logs_ms: 2000

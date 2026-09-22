@@ -1,0 +1,164 @@
+id: plans-post-N-rule-MAX_ENTITLEMENTS
+contract: contracts/platform-plans-post.yaml
+kind: N-rule-MAX_ENTITLEMENTS
+gate: auto
+tags:
+- function
+diff:
+  set:
+    entitlements:
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+    - featureKey: '{{feature_key}}'
+      entitlementType: BOOLEAN
+      value: 'true'
+expect:
+  status: 422

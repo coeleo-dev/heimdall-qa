@@ -1,0 +1,11 @@
+id: billable-metrics-archive-inactive-I-missing
+contract: contracts/platform-billable-metrics-archive-inactive.yaml
+kind: I-missing
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 400
+omit_headers:
+- X-Idempotency-Key

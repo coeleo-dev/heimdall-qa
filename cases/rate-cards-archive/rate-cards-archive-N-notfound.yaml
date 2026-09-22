@@ -1,0 +1,9 @@
+id: rate-cards-archive-N-notfound
+contract: contracts/platform-rate-cards-archive.yaml
+kind: N-notfound
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 404

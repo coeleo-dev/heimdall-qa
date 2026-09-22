@@ -1,0 +1,12 @@
+id: metering-N-rule-ENTITLEMENT_DENIED
+contract: contracts/api-metering-post.yaml
+kind: N-rule-ENTITLEMENT_DENIED
+gate: auto
+tags:
+- function
+diff:
+  set:
+    feature_key: not_granted_qa
+expect:
+  status: 402
+  code: ENTITLEMENT_DENIED

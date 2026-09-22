@@ -1,0 +1,9 @@
+id: api-keys-delete-N-rule-ALREADY_REVOKED
+contract: contracts/platform-api-keys-delete.yaml
+kind: N-rule-ALREADY_REVOKED
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 409

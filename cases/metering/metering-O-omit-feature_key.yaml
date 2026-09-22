@@ -1,0 +1,11 @@
+id: metering-O-omit-feature_key
+contract: contracts/api-metering-post.yaml
+kind: O-omit-feature_key
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - feature_key
+expect:
+  status: 202

@@ -1,0 +1,11 @@
+id: tenants-settings-O-set-test_drive_credits
+contract: contracts/platform-tenants-settings.yaml
+kind: O-set-test_drive_credits
+gate: auto
+tags:
+- function
+diff:
+  set:
+    test_drive_credits: 4.0
+expect:
+  status: 200

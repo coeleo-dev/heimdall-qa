@@ -1,0 +1,22 @@
+# Python (future phases)
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+
+# Secrets and run artifacts (never commit)
+secrets.local.yaml
+runs/
+*.local.yaml
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp

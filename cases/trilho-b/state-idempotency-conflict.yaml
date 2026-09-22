@@ -1,0 +1,15 @@
+id: state-idempotency-conflict
+contract: contracts/api-metering-post.yaml
+kind: I-conflict
+gate: auto
+tags:
+  - state
+diff:
+  set:
+    amount: "0.05"
+    description: "Conflicting payload with same idempotency key"
+headers:
+  Authorization: Bearer {{api_key}}
+  X-Idempotency-Key: "99999999-9999-4999-8999-999999999999"
+expect:
+  status: 202

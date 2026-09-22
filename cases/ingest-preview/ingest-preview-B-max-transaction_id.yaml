@@ -1,0 +1,11 @@
+id: ingest-preview-B-max-transaction_id
+contract: contracts/api-ingest-preview.yaml
+kind: B-max-transaction_id
+gate: auto
+tags:
+- function
+diff:
+  set:
+    transaction_id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+expect:
+  status: 200

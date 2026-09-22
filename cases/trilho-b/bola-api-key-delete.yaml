@@ -1,0 +1,13 @@
+id: bola-api-key-delete
+contract: contracts/platform-api-keys-delete.yaml
+kind: S-bola-other
+gate: auto
+tags:
+  - security
+diff: {}
+path_values:
+  revocable_api_key_id: "{{other_api_key_id}}"
+headers:
+  Authorization: Bearer {{jwt}}
+expect:
+  status: 404

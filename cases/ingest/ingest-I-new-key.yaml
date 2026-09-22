@@ -1,0 +1,14 @@
+id: ingest-I-new-key
+contract: contracts/api-ingest-post.yaml
+kind: I-new-key
+gate: auto
+tags:
+  - function
+diff: {}
+expect:
+  status: 202
+generate:
+  transaction_id: uuid
+  idempotency_key: uuid_v4
+  timestamp: now_iso
+wait_logs_ms: 2000

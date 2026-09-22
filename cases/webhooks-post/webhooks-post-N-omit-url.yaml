@@ -1,0 +1,11 @@
+id: webhooks-post-N-omit-url
+contract: contracts/platform-webhooks-post.yaml
+kind: N-omit-url
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - url
+expect:
+  status: 400

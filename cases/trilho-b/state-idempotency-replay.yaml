@@ -1,0 +1,15 @@
+id: state-idempotency-replay
+contract: contracts/api-metering-post.yaml
+kind: I-replay
+gate: auto
+tags:
+  - state
+diff:
+  set:
+    amount: "0.01"
+    description: "Idempotency replay test"
+headers:
+  Authorization: Bearer {{api_key}}
+  X-Idempotency-Key: "99999999-9999-4999-8999-999999999999"
+expect:
+  status: 202

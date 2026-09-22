@@ -1,0 +1,11 @@
+id: tenants-settings-get-N-auth
+contract: contracts/platform-tenants-settings-get.yaml
+kind: N-auth
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 401
+omit_headers:
+- Authorization

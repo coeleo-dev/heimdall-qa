@@ -1,0 +1,9 @@
+id: billable-metrics-archive-N-notfound
+contract: contracts/platform-billable-metrics-archive.yaml
+kind: N-notfound
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 404

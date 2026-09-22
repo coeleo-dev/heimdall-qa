@@ -1,0 +1,21 @@
+id: live-platform-tenants-settings
+suite: suites/platform-tenants-settings.yaml
+mode: review
+dimensions:
+- function
+environment: production
+include:
+- cases/tenants-settings/tenants-settings-H01.yaml
+- cases/tenants-settings/tenants-settings-O-omit-webhook_url.yaml
+- cases/tenants-settings/tenants-settings-O-set-webhook_url.yaml
+- cases/tenants-settings/tenants-settings-O-omit-test_drive_enabled.yaml
+- cases/tenants-settings/tenants-settings-O-set-test_drive_enabled.yaml
+- cases/tenants-settings/tenants-settings-O-omit-test_drive_credits.yaml
+- cases/tenants-settings/tenants-settings-O-set-test_drive_credits.yaml
+- cases/tenants-settings/tenants-settings-N-pattern-webhook_url.yaml
+- cases/tenants-settings/tenants-settings-N-auth.yaml
+- cases/tenants-settings/tenants-settings-N-rule-CREDITS_BELOW_MIN.yaml
+- cases/tenants-settings/tenants-settings-N-rule-CREDITS_ABOVE_BV.yaml
+- cases/tenants-settings/tenants-settings-N-rule-CREDITS_ABOVE_TIER.yaml
+- cases/tenants-settings/tenants-settings-N-rule-WEBHOOK_HTTP.yaml
+notes: Production replay of sandbox round. Use nk_live_ in secrets.local.yaml.

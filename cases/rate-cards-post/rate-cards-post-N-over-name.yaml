@@ -1,0 +1,11 @@
+id: rate-cards-post-N-over-name
+contract: contracts/platform-rate-cards-post.yaml
+kind: N-over-name
+gate: auto
+tags:
+- function
+diff:
+  set:
+    name: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+expect:
+  status: 400

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Nokr QA{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("nokr-qa-queue-width");
+        if (stored) {
+          document.documentElement.style.setProperty("--queue-width", stored + "px");
+        }
+      } catch (ignore) {}
+    })();
+  </script>
+</head>
+<body>
+  <header class="top">
+    <strong class="top-brand">Nokr QA</strong>
+    {% if view.round_id %}<span class="top-id">{{ view.round_id }}</span>{% endif %}
+    {% if view.mode == "walk" %}
+    <span class="top-meta">walk — para em todo passo</span>
+    {% elif view.mode == "review" %}
+    <span class="top-meta">review — auto-avança se packs passam</span>
+    {% endif %}
+    {% if view.environment %}
+    <span class="badge {% if view.environment == 'production' %}badge-danger{% else %}badge-warning{% endif %}">{{ view.environment }}</span>
+    {% endif %}
+    {% if view.phase == "step" %}
+    <span class="badge badge-accent">À espera de veredito</span>
+    {% endif %}
+    {% if view.progress[1] %}
+    <span class="top-progress">{{ view.progress[0] }} de {{ view.progress[1] }}</span>
+    {% endif %}
+  </header>
+  {% if error %}
+  {% set error_title = {
+    "ROUND_INVALID": "Não foi possível iniciar",
+    "ROUND_BUSY": "Uma rodada espera veredito",
+    "VERDICT_INVALID": "Não foi possível gravar o veredito",
+  } %}
+  <aside class="banner">
+    <strong>{{ error_title.get(error.code, "Não foi possível concluir") }}</strong>
+    error[{{ error.code }}] {{ error.message }}
+    {% if error.hint %}<p>hint: {{ error.hint }}</p>{% endif %}
+  </aside>
+  {% endif %}
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <script>
+    document.addEventListener("click", function (event) {
+      var toggle = event.target.closest("[data-tree-toggle]");
+      if (toggle) {
+        event.preventDefault();
+        var item = toggle.closest("li");
+        if (!item) return;
+        item.classList.toggle("collapsed");
+        toggle.setAttribute(
+          "aria-expanded",
+          item.classList.contains("collapsed") ? "false" : "true"
+        );
+        return;
+      }
+      var copy = event.target.closest("[data-copy]");
+      if (!copy) return;
+      var value = copy.getAttribute("data-copy") || "";
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(value).then(function () {
+          copy.textContent = "Copiado";
+          setTimeout(function () { copy.textContent = "Copiar"; }, 1200);
+        });
+      }
+    });
+
+    (function () {
+      var resizer = document.querySelector("[data-queue-resizer]");
+      var root = document.documentElement;
+      if (!resizer) return;
+      var minWidth = 320;
+      var maxWidth = 720;
+      function currentWidth() {
+        var raw = getComputedStyle(root).getPropertyValue("--queue-width");
+        var parsed = parseInt(raw, 10);
+        return isNaN(parsed) ? 420 : parsed;
+      }
+      function applyWidth(width) {
+        var capped = Math.min(maxWidth, Math.max(minWidth, Math.round(width)));
+        var limit = Math.floor(window.innerWidth * 0.7);
+        if (limit >= minWidth) {
+          capped = Math.min(capped, limit);
+        }
+        root.style.setProperty("--queue-width", capped + "px");
+        resizer.setAttribute("aria-valuenow", String(capped));
+        try {
+          localStorage.setItem("nokr-qa-queue-width", String(capped));
+        } catch (ignore) {}
+        return capped;
+      }
+      applyWidth(currentWidth());
+      var drag = null;
+      resizer.addEventListener("pointerdown", function (event) {
+        event.preventDefault();
+        drag = { startX: event.clientX, startWidth: currentWidth() };
+        document.body.classList.add("is-resizing");
+        resizer.setPointerCapture(event.pointerId);
+      });
+      resizer.addEventListener("pointermove", function (event) {
+        if (!drag) return;
+        applyWidth(drag.startWidth + (event.clientX - drag.startX));
+      });
+      function stopDrag() {
+        drag = null;
+        document.body.classList.remove("is-resizing");
+      }
+      resizer.addEventListener("pointerup", stopDrag);
+      resizer.addEventListener("pointercancel", stopDrag);
+      resizer.addEventListener("keydown", function (event) {
+        var step = event.shiftKey ? 48 : 16;
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          applyWidth(currentWidth() - step);
+        } else if (event.key === "ArrowRight") {
+          event.preventDefault();
+          applyWidth(currentWidth() + step);
+        } else if (event.key === "Home") {
+          event.preventDefault();
+          applyWidth(minWidth);
+        } else if (event.key === "End") {
+          event.preventDefault();
+          applyWidth(maxWidth);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

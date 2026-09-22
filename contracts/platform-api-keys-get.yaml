@@ -1,0 +1,11 @@
+endpoint: GET /platform/api-keys
+dto: com.nokr.domain.auth.controller.B2BApiKeyController
+auth: jwt
+area: api-keys-get
+baseline: baselines/empty.json
+fields: {}
+idempotency: none
+async: sync
+rules: []
+live_only_rules: []
+p_gaps: []

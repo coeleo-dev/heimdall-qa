@@ -1,0 +1,12 @@
+id: metering-N-rule-INSUFFICIENT_BALANCE
+contract: contracts/api-metering-post.yaml
+kind: N-rule-INSUFFICIENT_BALANCE
+gate: auto
+tags:
+- function
+diff:
+  set:
+    amount: 999999.00
+expect:
+  status: 402
+  code: INSUFFICIENT_BALANCE

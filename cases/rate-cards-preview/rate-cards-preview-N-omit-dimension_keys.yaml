@@ -1,0 +1,11 @@
+id: rate-cards-preview-N-omit-dimension_keys
+contract: contracts/platform-rate-cards-preview.yaml
+kind: N-omit-dimension_keys
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - dimension_keys
+expect:
+  status: 400

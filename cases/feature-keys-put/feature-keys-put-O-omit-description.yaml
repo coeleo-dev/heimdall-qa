@@ -1,0 +1,11 @@
+id: feature-keys-put-O-omit-description
+contract: contracts/platform-feature-keys-put.yaml
+kind: O-omit-description
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - description
+expect:
+  status: 200

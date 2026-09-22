@@ -1,0 +1,11 @@
+id: ingest-N-over-timestamp-past
+contract: contracts/api-ingest-post.yaml
+kind: N-over-timestamp-past
+gate: auto
+tags:
+  - function
+diff: {}
+expect:
+  status: 400
+generate:
+  timestamp: now_iso_minus_49h

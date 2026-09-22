@@ -1,0 +1,10 @@
+id: platform-billable-metrics-get
+suite: suites/platform-billable-metrics-get.yaml
+mode: review
+dimensions:
+- function
+environment: sandbox
+include:
+- cases/billable-metrics-get/billable-metrics-get-H01.yaml
+- cases/billable-metrics-get/billable-metrics-get-N-auth.yaml
+- cases/billable-metrics-get/billable-metrics-get-E-isolate.yaml

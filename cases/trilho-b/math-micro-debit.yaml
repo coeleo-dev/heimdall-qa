@@ -1,0 +1,16 @@
+id: math-micro-debit
+contract: contracts/api-metering-post.yaml
+kind: S-math-micro
+gate: auto
+tags:
+  - math
+diff:
+  set:
+    amount: "0.00001"
+    description: "Micro-debit test 5 decimal places"
+headers:
+  Authorization: Bearer {{api_key}}
+expect:
+  status: 202
+generate:
+  idempotency_key: uuid_v4

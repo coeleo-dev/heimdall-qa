@@ -1,0 +1,11 @@
+id: api-keys-post-N-rule-NAME_TOO_SHORT
+contract: contracts/platform-api-keys-post-live.yaml
+kind: N-rule-NAME_TOO_SHORT
+gate: auto
+tags:
+- function
+diff:
+  set:
+    name: ab
+expect:
+  status: 400

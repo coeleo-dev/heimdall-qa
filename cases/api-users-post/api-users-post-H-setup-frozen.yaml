@@ -1,0 +1,19 @@
+id: api-users-post-H-setup-frozen
+contract: contracts/api-users-post.yaml
+kind: H-setup-frozen
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 201
+generate:
+  external_user_id: uuid
+  kyc_profile.name: person_name
+  kyc_profile.email: email
+  kyc_profile.cpf_cnpj: cpf
+  kyc_profile.address: address
+capture:
+  frozen_external_user_id: external_user_id
+capture_response:
+  frozen_user_id: nokr_user_id

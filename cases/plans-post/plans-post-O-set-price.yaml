@@ -1,0 +1,11 @@
+id: plans-post-O-set-price
+contract: contracts/platform-plans-post.yaml
+kind: O-set-price
+gate: auto
+tags:
+- function
+diff:
+  set:
+    price: 0
+expect:
+  status: 201

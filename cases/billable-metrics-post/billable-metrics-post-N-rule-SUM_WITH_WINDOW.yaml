@@ -1,0 +1,11 @@
+id: billable-metrics-post-N-rule-SUM_WITH_WINDOW
+contract: contracts/platform-billable-metrics-post.yaml
+kind: N-rule-SUM_WITH_WINDOW
+gate: auto
+tags:
+- function
+diff:
+  set:
+    aggregation_window: DAY
+expect:
+  status: 422

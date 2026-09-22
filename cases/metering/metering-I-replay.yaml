@@ -1,0 +1,9 @@
+id: metering-I-replay
+contract: contracts/api-metering-post.yaml
+kind: I-replay
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 202

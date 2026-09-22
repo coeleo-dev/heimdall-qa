@@ -1,0 +1,25 @@
+gaps:
+  - id: P-GAP-1
+    playbook: "simulate-* with nk_live_ must fail"
+    current: "Stores nk_test_ prefix without rejecting the live key"
+  - id: P-GAP-2
+    playbook: "Cash-in body with description"
+    current: "DepositIntentRequest has no such field (ignored)"
+  - id: P-GAP-3
+    playbook: "Check in snake_case"
+    current: "userId / featureKey / context in camelCase"
+  - id: P-GAP-4
+    playbook: "Ingest A2 ai_inference + tokens_output"
+    current: "Lock the session catalog (llm_tokens + tokens)"
+  - id: P-GAP-5
+    playbook: "POST /api/users + X-Idempotency-Key"
+    current: "Header is not required; upsert by external_user_id"
+  - id: P-GAP-6
+    playbook: "X-Nokr-Environment conflict on every /api route"
+    current: "Only POST /api/ingest"
+  - id: P-GAP-7
+    playbook: "Preview uses the same rules as POST"
+    current: "Preview skips denylist, properties size, and timestamp window"
+  - id: P-GAP-8
+    playbook: "Login lockout returns a distinct LOCKED error"
+    current: "Five failed attempts lock the tenant; HTTP still returns Invalid credentials (timing-attack defense)"

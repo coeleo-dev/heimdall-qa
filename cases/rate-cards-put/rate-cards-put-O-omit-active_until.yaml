@@ -1,0 +1,11 @@
+id: rate-cards-put-O-omit-active_until
+contract: contracts/platform-rate-cards-put.yaml
+kind: O-omit-active_until
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - active_until
+expect:
+  status: 200

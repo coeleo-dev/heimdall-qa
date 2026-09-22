@@ -1,0 +1,11 @@
+id: tenants-settings-O-set-webhook_url
+contract: contracts/platform-tenants-settings.yaml
+kind: O-set-webhook_url
+gate: auto
+tags:
+- function
+diff:
+  set:
+    webhook_url: https://example.com/h
+expect:
+  status: 200

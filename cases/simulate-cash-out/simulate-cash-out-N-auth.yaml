@@ -1,0 +1,11 @@
+id: simulate-cash-out-N-auth
+contract: contracts/api-simulate-cash-out.yaml
+kind: N-auth
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 401
+omit_headers:
+- Authorization

@@ -1,0 +1,11 @@
+id: rate-cards-post-N-omit-reason
+contract: contracts/platform-rate-cards-post.yaml
+kind: N-omit-reason
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - reason
+expect:
+  status: 400

@@ -1,0 +1,12 @@
+id: api-keys-post-P-PRODUCTION_LIMIT
+contract: contracts/platform-api-keys-post-live.yaml
+kind: P-PRODUCTION_LIMIT
+gate: auto
+tags:
+- function
+diff:
+  set:
+    name: live-11
+    environment: PRODUCTION
+expect:
+  status: 409

@@ -1,0 +1,11 @@
+id: ingest-preview-N-over-customer_id
+contract: contracts/api-ingest-preview.yaml
+kind: N-over-customer_id
+gate: auto
+tags:
+- function
+diff:
+  set:
+    customer_id: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+expect:
+  status: 400

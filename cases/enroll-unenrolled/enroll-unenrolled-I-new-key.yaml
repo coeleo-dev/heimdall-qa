@@ -1,0 +1,9 @@
+id: enroll-unenrolled-I-new-key
+contract: contracts/platform-enroll-unenrolled.yaml
+kind: I-new-key
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 200

@@ -1,0 +1,13 @@
+id: state-kill-switch-blocked
+contract: contracts/api-users-get.yaml
+kind: N-auth-suspended
+gate: auto
+tags:
+  - state
+diff: {}
+path_values:
+  external_user_id: "{{other_external_user_id}}"
+headers:
+  Authorization: Bearer {{other_api_key}}
+expect:
+  status: 401

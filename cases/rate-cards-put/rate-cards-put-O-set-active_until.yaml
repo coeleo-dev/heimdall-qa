@@ -1,0 +1,11 @@
+id: rate-cards-put-O-set-active_until
+contract: contracts/platform-rate-cards-put.yaml
+kind: O-set-active_until
+gate: auto
+tags:
+- function
+diff:
+  set:
+    active_until: '2027-09-01T00:00:00Z'
+expect:
+  status: 200

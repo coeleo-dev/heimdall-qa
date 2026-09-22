@@ -1,0 +1,15 @@
+id: api-entitlements-check
+suite: suites/api-entitlements-check.yaml
+mode: review
+dimensions:
+- function
+environment: sandbox
+include:
+- cases/entitlements-check/entitlements-check-H01.yaml
+- cases/entitlements-check/entitlements-check-O-omit-context.yaml
+- cases/entitlements-check/entitlements-check-O-set-context.yaml
+- cases/entitlements-check/entitlements-check-N-omit-userId.yaml
+- cases/entitlements-check/entitlements-check-N-omit-featureKey.yaml
+- cases/entitlements-check/entitlements-check-N-auth.yaml
+- cases/entitlements-check/entitlements-check-N-rule-SNAKE_CASE.yaml
+- cases/entitlements-check/entitlements-check-N-rule-OTHER_TENANT.yaml

@@ -1,0 +1,25 @@
+id: auth-register
+suite: suites/auth-register.yaml
+mode: review
+dimensions:
+- function
+environment: sandbox
+include:
+- cases/auth-register/register-H01.yaml
+- cases/auth-register/register-H-setup-other.yaml
+- cases/auth-register/register-B-max-password.yaml
+- cases/auth-register/register-N-omit-email.yaml
+- cases/auth-register/register-N-omit-password.yaml
+- cases/auth-register/register-N-omit-company_name.yaml
+- cases/auth-register/register-N-omit-document_number.yaml
+- cases/auth-register/register-N-omit-document_type.yaml
+- cases/auth-register/register-N-omit-accepted_tos.yaml
+- cases/auth-register/register-N-pattern-document_type.yaml
+- cases/auth-register/register-N-over-password.yaml
+- cases/auth-register/register-N-rule-INVALID_EMAIL.yaml
+- cases/auth-register/register-N-rule-WEAK_PASSWORD.yaml
+- cases/auth-register/register-N-rule-TOS_FALSE.yaml
+- cases/auth-register/register-N-rule-INVALID_CPF.yaml
+- cases/auth-register/register-N-rule-INVALID_CNPJ.yaml
+- cases/auth-register/register-N-rule-DUPLICATE_EMAIL.yaml
+- cases/auth-register/register-N-rule-RATE_LIMIT.yaml

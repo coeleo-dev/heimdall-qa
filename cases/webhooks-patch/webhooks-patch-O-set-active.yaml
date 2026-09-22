@@ -1,0 +1,11 @@
+id: webhooks-patch-O-set-active
+contract: contracts/platform-webhooks-patch.yaml
+kind: O-set-active
+gate: auto
+tags:
+- function
+diff:
+  set:
+    active: true
+expect:
+  status: 200

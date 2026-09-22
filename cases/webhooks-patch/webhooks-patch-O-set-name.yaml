@@ -1,0 +1,11 @@
+id: webhooks-patch-O-set-name
+contract: contracts/platform-webhooks-patch.yaml
+kind: O-set-name
+gate: auto
+tags:
+- function
+diff:
+  set:
+    name: renamed
+expect:
+  status: 200

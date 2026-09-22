@@ -1,0 +1,11 @@
+id: entitlements-check-N-omit-userId
+contract: contracts/api-entitlements-check.yaml
+kind: N-omit-userId
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - userId
+expect:
+  status: 400

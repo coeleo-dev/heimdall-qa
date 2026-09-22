@@ -1,0 +1,12 @@
+endpoint: POST /platform/billable-metrics/{{archived_metric_id}}/archive
+dto: com.nokr.domain.metering.catalog.controller.PlatformBillableMetricController
+auth: jwt
+resource_id_in_path: false
+idempotency: header_uuid_v4
+area: billable-metrics-archive-inactive
+baseline: baselines/empty.json
+fields: {}
+async: sync
+rules: []
+live_only_rules: []
+p_gaps: []

@@ -1,0 +1,10 @@
+id: auth-refresh
+suite: suites/auth-refresh.yaml
+mode: review
+dimensions:
+- function
+environment: sandbox
+include:
+- cases/auth-refresh/refresh-H01.yaml
+- cases/auth-refresh/refresh-N-omit-refresh_token.yaml
+- cases/auth-refresh/refresh-N-rule-REPLAY.yaml

@@ -1,0 +1,11 @@
+id: refresh-N-omit-refresh_token
+contract: contracts/auth-refresh.yaml
+kind: N-omit-refresh_token
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - refresh_token
+expect:
+  status: 400

@@ -1,0 +1,15 @@
+id: rate-cards-post-H-setup-active
+contract: contracts/platform-rate-cards-post.yaml
+kind: H-setup-active
+gate: auto
+tags:
+- function
+diff:
+  set:
+    billable_metric_id: '{{active_metric_id}}'
+    active_from: '2020-01-01T00:00:00Z'
+    active_until: '2026-12-31T00:00:00Z'
+expect:
+  status: 201
+capture_response:
+  active_rate_card_id: id

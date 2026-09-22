@@ -1,0 +1,44 @@
+<section class="panel start">
+  <h1>{{ "Reexecutar rodada" if workspace.selected.status in ["pass", "fail", "skip", "http_5xx"] else "Iniciar rodada" }}</h1>
+  <div class="card">
+    <dl class="meta">
+      <dt>Round</dt>
+      <dd><code>{{ view.round_id }}</code></dd>
+      {% if workspace.selected.endpoint %}
+      <dt>Endpoint</dt>
+      <dd><code>{{ workspace.selected.endpoint }}</code></dd>
+      {% endif %}
+      {% if view.environment %}
+      <dt>Ambiente</dt>
+      <dd>{{ view.environment }}</dd>
+      {% endif %}
+      {% if view.dimensions %}
+      <dt>Dimensões</dt>
+      <dd>{{ view.dimensions | join(", ") }}</dd>
+      {% endif %}
+      <dt>Passos na fila</dt>
+      <dd class="mono">{{ view.progress[1] }}</dd>
+      <dt>Estado</dt>
+      <dd>{{ status_label.get(workspace.selected.status, workspace.selected.status) }}</dd>
+    </dl>
+  </div>
+  {% if workspace.selected.reason and not workspace.selected.startable %}
+  <p class="pause-reason warning">{{ workspace.selected.reason }}</p>
+  {% elif workspace.selected.startable %}
+  <form method="post" action="/start">
+    <fieldset class="mode-selector">
+      <legend>Modo</legend>
+      <label class="mode-option">
+        <input type="radio" name="mode" value="walk" checked>
+        walk — para em todo passo
+      </label>
+      <label class="mode-option">
+        <input type="radio" name="mode" value="review">
+        review — auto-avança quando packs passam
+      </label>
+    </fieldset>
+    <input type="hidden" name="node" value="{{ workspace.selected.key }}">
+    <button type="submit" class="primary">{{ "Reexecutar" if workspace.selected.status in ["pass", "fail", "skip", "http_5xx"] else "Iniciar" }}</button>
+  </form>
+  {% endif %}
+</section>

@@ -1,0 +1,13 @@
+id: ingest-N-omit-properties
+contract: contracts/api-ingest-post.yaml
+kind: N-omit-properties
+gate: auto
+tags:
+  - function
+diff:
+  omit:
+    - properties
+expect:
+  status: 400
+generate:
+  timestamp: now_iso

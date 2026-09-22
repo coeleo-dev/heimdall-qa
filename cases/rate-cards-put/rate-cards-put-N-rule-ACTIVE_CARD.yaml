@@ -1,0 +1,11 @@
+id: rate-cards-put-N-rule-ACTIVE_CARD
+contract: contracts/platform-rate-cards-put.yaml
+kind: N-rule-ACTIVE_CARD
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 422
+path_values:
+  rate_card_id: '{{active_rate_card_id}}'

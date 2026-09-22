@@ -1,0 +1,13 @@
+id: billable-metrics-put-O-set-aggregation_function
+contract: contracts/platform-billable-metrics-put.yaml
+kind: O-set-aggregation_function
+gate: auto
+tags:
+- function
+diff:
+  set:
+    aggregation_function: SUM
+expect:
+  status: 422
+  jsonpath:
+    $.error: event_type, aggregation_function and aggregation_window are immutable

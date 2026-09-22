@@ -1,0 +1,9 @@
+id: user-overrides-post-I-replay
+contract: contracts/platform-user-overrides-post.yaml
+kind: I-replay
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 201

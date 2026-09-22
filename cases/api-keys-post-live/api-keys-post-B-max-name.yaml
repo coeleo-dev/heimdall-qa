@@ -1,0 +1,11 @@
+id: api-keys-post-B-max-name
+contract: contracts/platform-api-keys-post-live.yaml
+kind: B-max-name
+gate: auto
+tags:
+- function
+diff:
+  set:
+    name: abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcab
+expect:
+  status: 201

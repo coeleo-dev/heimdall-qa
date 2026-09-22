@@ -1,0 +1,11 @@
+id: ingest-preview-B-max-event_type
+contract: contracts/api-ingest-preview.yaml
+kind: B-max-event_type
+gate: auto
+tags:
+- function
+diff:
+  set:
+    event_type: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+expect:
+  status: 200

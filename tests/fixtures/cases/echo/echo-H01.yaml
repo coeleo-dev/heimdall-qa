@@ -1,0 +1,8 @@
+id: echo-H01
+contract: contracts/qa-echo-post.yaml
+kind: H01
+gate: auto
+tags:
+  - function
+expect:
+  status: 202

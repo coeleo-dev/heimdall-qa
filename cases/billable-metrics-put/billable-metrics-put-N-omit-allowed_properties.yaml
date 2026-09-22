@@ -1,0 +1,11 @@
+id: billable-metrics-put-N-omit-allowed_properties
+contract: contracts/platform-billable-metrics-put.yaml
+kind: N-omit-allowed_properties
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - allowed_properties
+expect:
+  status: 400

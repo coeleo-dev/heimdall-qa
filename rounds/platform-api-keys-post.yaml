@@ -1,0 +1,18 @@
+id: platform-api-keys-post
+suite: suites/platform-api-keys-post.yaml
+mode: review
+dimensions:
+- function
+environment: sandbox
+include:
+- cases/api-keys-post/api-keys-post-H01.yaml
+- cases/api-keys-post/api-keys-post-H-setup-revocable.yaml
+- cases/api-keys-post/api-keys-post-B-max-name.yaml
+- cases/api-keys-post/api-keys-post-N-omit-name.yaml
+- cases/api-keys-post/api-keys-post-N-omit-environment.yaml
+- cases/api-keys-post/api-keys-post-N-pattern-environment.yaml
+- cases/api-keys-post/api-keys-post-N-over-name.yaml
+- cases/api-keys-post/api-keys-post-N-auth.yaml
+- cases/api-keys-post/api-keys-post-N-rule-NAME_TOO_SHORT.yaml
+- cases/api-keys-post/api-keys-post-N-rule-PRODUCTION_LOCKED.yaml
+- cases/api-keys-post/api-keys-post-N-rule-SANDBOX_LIMIT.yaml

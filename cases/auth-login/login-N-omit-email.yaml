@@ -1,0 +1,13 @@
+id: login-N-omit-email
+contract: contracts/auth-login.yaml
+kind: N-omit-email
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - email
+expect:
+  status: 400
+generate:
+  password: secret.password

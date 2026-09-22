@@ -1,0 +1,14 @@
+id: trilho-b-math
+suite: suites/trilho-b/math.yaml
+mode: review
+dimensions:
+  - function
+environment: sandbox
+include:
+  - cases/metering/metering-N-rule-AMOUNT_ZERO.yaml
+  - cases/trilho-b/math-negative-amount.yaml
+  - cases/trilho-b/math-overflow-amount.yaml
+  - cases/trilho-b/math-micro-debit.yaml
+  - cases/auth-register/register-N-rule-INVALID_CPF.yaml
+  - cases/tenants-activate/tenants-activate-N-rule-CPF_FORBIDDEN.yaml
+  - cases/metering/metering-N-rule-INSUFFICIENT_BALANCE.yaml

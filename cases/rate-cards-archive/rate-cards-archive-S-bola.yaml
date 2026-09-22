@@ -1,0 +1,9 @@
+id: rate-cards-archive-S-bola
+contract: contracts/platform-rate-cards-archive.yaml
+kind: S-bola
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 404

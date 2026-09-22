@@ -1,0 +1,13 @@
+id: ingest-B-max-customer_id
+contract: contracts/api-ingest-post.yaml
+kind: B-max-customer_id
+gate: auto
+tags:
+  - function
+diff:
+  set:
+    customer_id: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+expect:
+  status: 404
+generate:
+  timestamp: now_iso

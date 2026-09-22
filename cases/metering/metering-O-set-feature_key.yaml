@@ -1,0 +1,11 @@
+id: metering-O-set-feature_key
+contract: contracts/api-metering-post.yaml
+kind: O-set-feature_key
+gate: auto
+tags:
+- function
+diff:
+  set:
+    feature_key: '{{feature_key}}'
+expect:
+  status: 202

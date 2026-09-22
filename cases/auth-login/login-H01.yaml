@@ -1,0 +1,15 @@
+id: login-H01
+contract: contracts/auth-login.yaml
+kind: H01
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 200
+generate:
+  email: secret.email
+  password: secret.password
+capture_response:
+  jwt: jwt
+  refresh_token: refresh_token

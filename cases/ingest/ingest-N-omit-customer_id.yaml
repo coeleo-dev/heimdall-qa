@@ -1,0 +1,13 @@
+id: ingest-N-omit-customer_id
+contract: contracts/api-ingest-post.yaml
+kind: N-omit-customer_id
+gate: auto
+tags:
+  - function
+diff:
+  omit:
+    - customer_id
+expect:
+  status: 400
+generate:
+  timestamp: now_iso

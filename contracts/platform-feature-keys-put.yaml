@@ -1,0 +1,24 @@
+endpoint: PUT /platform/entitlements/feature-keys/{{feature_key}}
+dto: com.nokr.domain.entitlements.dto.UpdateFeatureKeyRequest
+auth: jwt
+idempotency: header_uuid_v4
+area: feature-keys-put
+resource_id_in_path: true
+baseline: baselines/feature-keys-put.json
+fields:
+  name:
+    required: true
+    json: name
+    max_length: 256
+  description:
+    required: false
+    json: description
+    max_length: 2000
+  archived:
+    required: false
+    json: archived
+    example: false
+async: sync
+rules: []
+live_only_rules: []
+p_gaps: []

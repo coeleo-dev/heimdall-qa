@@ -1,0 +1,12 @@
+endpoint: DELETE /platform/entitlements/users/{{nokr_user_id}}/{{feature_key}}
+dto: com.nokr.domain.entitlements.controller.PlatformEntitlementController
+auth: jwt
+area: user-overrides-delete
+resource_id_in_path: true
+baseline: baselines/empty.json
+fields: {}
+idempotency: header_uuid_v4
+async: sync
+rules: []
+live_only_rules: []
+p_gaps: []

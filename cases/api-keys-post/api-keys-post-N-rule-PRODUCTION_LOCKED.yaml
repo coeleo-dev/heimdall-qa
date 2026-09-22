@@ -1,0 +1,12 @@
+id: api-keys-post-N-rule-PRODUCTION_LOCKED
+contract: contracts/platform-api-keys-post.yaml
+kind: N-rule-PRODUCTION_LOCKED
+gate: auto
+tags:
+- function
+diff:
+  set:
+    name: live
+    environment: PRODUCTION
+expect:
+  status: 403

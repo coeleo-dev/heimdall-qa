@@ -1,0 +1,23 @@
+id: trilho-b-bola
+steps:
+  - loop:
+      times: 1
+      case: cases/trilho-b/bola-user-get.yaml
+  - loop:
+      times: 1
+      case: cases/trilho-b/bola-user-balance.yaml
+  - loop:
+      times: 1
+      case: cases/trilho-b/bola-metering.yaml
+  - loop:
+      times: 1
+      case: cases/trilho-b/bola-entitlements.yaml
+  - loop:
+      times: 1
+      case: cases/trilho-b/bola-api-key-delete.yaml
+  - loop:
+      times: 1
+      case: cases/trilho-b/bola-webhook-patch.yaml
+  - loop:
+      times: 1
+      case: cases/trilho-b/bola-webhook-rotate.yaml

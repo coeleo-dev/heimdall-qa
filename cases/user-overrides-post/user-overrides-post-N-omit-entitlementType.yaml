@@ -1,0 +1,11 @@
+id: user-overrides-post-N-omit-entitlementType
+contract: contracts/platform-user-overrides-post.yaml
+kind: N-omit-entitlementType
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - entitlementType
+expect:
+  status: 400

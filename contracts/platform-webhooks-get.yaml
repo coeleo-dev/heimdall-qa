@@ -1,0 +1,11 @@
+endpoint: GET /platform/webhooks
+dto: com.nokr.domain.notification.outbound.controller.WebhookController
+auth: jwt
+area: webhooks-get
+baseline: baselines/empty.json
+fields: {}
+idempotency: none
+async: sync
+rules: []
+live_only_rules: []
+p_gaps: []

@@ -1,0 +1,13 @@
+id: ingest-N-omit-event_type
+contract: contracts/api-ingest-post.yaml
+kind: N-omit-event_type
+gate: auto
+tags:
+  - function
+diff:
+  omit:
+    - event_type
+expect:
+  status: 400
+generate:
+  timestamp: now_iso

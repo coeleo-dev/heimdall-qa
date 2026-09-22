@@ -1,0 +1,16 @@
+id: setup-other-webhook
+contract: contracts/platform-webhooks-post.yaml
+kind: H-setup-other
+gate: auto
+tags:
+  - function
+diff:
+  set:
+    url: "https://example.com/tenant-b-webhook"
+    description: "Tenant B Webhook"
+headers:
+  Authorization: Bearer {{other_jwt}}
+expect:
+  status: 201
+capture_response:
+  other_webhook_id: id

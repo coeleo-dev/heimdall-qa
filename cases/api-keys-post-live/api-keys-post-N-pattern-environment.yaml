@@ -1,0 +1,11 @@
+id: api-keys-post-N-pattern-environment
+contract: contracts/platform-api-keys-post-live.yaml
+kind: N-pattern-environment
+gate: auto
+tags:
+- function
+diff:
+  set:
+    environment: STAGING
+expect:
+  status: 400

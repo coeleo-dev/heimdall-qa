@@ -1,0 +1,13 @@
+id: ingest-N-denylist-face_id
+contract: contracts/api-ingest-post.yaml
+kind: N-denylist-face_id
+gate: auto
+tags:
+  - function
+diff:
+  set:
+    properties.face_id: denied
+expect:
+  status: 400
+generate:
+  timestamp: now_iso

@@ -1,0 +1,16 @@
+id: register-N-omit-document_type
+contract: contracts/auth-register.yaml
+kind: N-omit-document_type
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - document_type
+expect:
+  status: 400
+generate:
+  email: email
+  company_name: company_name
+  document_number: cnpj
+  password: password

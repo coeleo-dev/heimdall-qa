@@ -1,0 +1,9 @@
+id: webhooks-rotate-H01
+contract: contracts/platform-webhooks-rotate.yaml
+kind: H01
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 200

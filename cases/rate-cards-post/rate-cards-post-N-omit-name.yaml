@@ -1,0 +1,11 @@
+id: rate-cards-post-N-omit-name
+contract: contracts/platform-rate-cards-post.yaml
+kind: N-omit-name
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - name
+expect:
+  status: 400

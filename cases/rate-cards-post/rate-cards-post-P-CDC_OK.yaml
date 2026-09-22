@@ -1,0 +1,11 @@
+id: rate-cards-post-P-CDC_OK
+contract: contracts/platform-rate-cards-post.yaml
+kind: P-CDC_OK
+gate: auto
+tags:
+- function
+diff:
+  set:
+    active_from: '2026-10-03T00:00:00Z'
+expect:
+  status: 201

@@ -1,0 +1,21 @@
+id: api-users-post-H-setup-other
+contract: contracts/api-users-post.yaml
+kind: H-setup-other
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 201
+headers:
+  Authorization: Bearer {{other_api_key}}
+generate:
+  external_user_id: uuid
+  kyc_profile.name: person_name
+  kyc_profile.email: email
+  kyc_profile.cpf_cnpj: cpf
+  kyc_profile.address: address
+capture:
+  other_external_user_id: external_user_id
+capture_response:
+  other_nokr_user_id: nokr_user_id

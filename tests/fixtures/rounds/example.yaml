@@ -1,0 +1,8 @@
+id: example
+suite: suites/unused.yaml
+mode: headless
+dimensions:
+  - function
+environment: sandbox
+include:
+  - cases/echo/echo-H01.yaml

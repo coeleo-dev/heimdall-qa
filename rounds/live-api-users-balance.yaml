@@ -1,0 +1,14 @@
+id: live-api-users-balance
+suite: suites/api-users-balance.yaml
+mode: review
+dimensions:
+- function
+environment: production
+include:
+- cases/api-users-balance/api-users-balance-H01.yaml
+- cases/api-users-balance/api-users-balance-N-notfound.yaml
+- cases/api-users-balance/api-users-balance-S-bola.yaml
+- cases/api-users-balance/api-users-balance-N-auth.yaml
+- cases/api-users-balance/api-users-balance-N-rule-FROZEN.yaml
+- cases/api-users-balance/api-users-balance-E-conflict.yaml
+notes: Production replay of sandbox round. Use nk_live_ in secrets.local.yaml.

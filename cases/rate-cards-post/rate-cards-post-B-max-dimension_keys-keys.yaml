@@ -1,0 +1,22 @@
+id: rate-cards-post-B-max-dimension_keys-keys
+contract: contracts/platform-rate-cards-post.yaml
+kind: B-max-dimension_keys-keys
+gate: auto
+tags:
+- function
+diff:
+  set:
+    dimension_keys:
+    - k0
+    - k1
+    - k2
+    - k3
+    - k4
+    - k5
+    - k6
+    - k7
+    billable_metric_id: '{{spare_metric_id}}'
+    active_from: '2030-01-01T00:00:00Z'
+    active_until: '2030-06-01T00:00:00Z'
+expect:
+  status: 201

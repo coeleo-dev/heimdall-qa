@@ -1,0 +1,11 @@
+id: api-keys-post-H-setup-revocable
+contract: contracts/platform-api-keys-post.yaml
+kind: H-setup-revocable
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 201
+capture_response:
+  revocable_api_key_id: id

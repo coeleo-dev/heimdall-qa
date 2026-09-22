@@ -1,0 +1,9 @@
+id: user-overrides-delete-I-replay
+contract: contracts/platform-user-overrides-delete.yaml
+kind: I-replay
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 204

@@ -1,0 +1,10 @@
+id: platform-webhooks-get
+suite: suites/platform-webhooks-get.yaml
+mode: review
+dimensions:
+- function
+environment: sandbox
+include:
+- cases/webhooks-get/webhooks-get-H01.yaml
+- cases/webhooks-get/webhooks-get-N-auth.yaml
+- cases/webhooks-get/webhooks-get-E-isolate.yaml

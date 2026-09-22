@@ -1,0 +1,16 @@
+id: fuzz-xss-metering
+contract: contracts/api-metering-post.yaml
+kind: S-fuzz-xss
+gate: auto
+tags:
+  - security
+diff:
+  set:
+    description: "<script>alert('xss')</script>"
+    amount: "0.01"
+headers:
+  Authorization: Bearer {{api_key}}
+expect:
+  status: 202
+generate:
+  idempotency_key: uuid_v4

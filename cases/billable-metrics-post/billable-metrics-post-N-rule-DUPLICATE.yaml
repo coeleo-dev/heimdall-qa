@@ -1,0 +1,11 @@
+id: billable-metrics-post-N-rule-DUPLICATE
+contract: contracts/platform-billable-metrics-post.yaml
+kind: N-rule-DUPLICATE
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 409
+generate:
+  name: captured.last_unique_json

@@ -1,0 +1,11 @@
+id: user-overrides-delete-I-format
+contract: contracts/platform-user-overrides-delete.yaml
+kind: I-format
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 400
+headers:
+  X-Idempotency-Key: not-a-uuid-v4

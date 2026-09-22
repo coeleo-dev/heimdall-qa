@@ -1,0 +1,16 @@
+id: register-N-pattern-document_type
+contract: contracts/auth-register.yaml
+kind: N-pattern-document_type
+gate: auto
+tags:
+- function
+diff:
+  set:
+    document_type: PJ
+expect:
+  status: 400
+generate:
+  email: email
+  company_name: company_name
+  document_number: cnpj
+  password: password

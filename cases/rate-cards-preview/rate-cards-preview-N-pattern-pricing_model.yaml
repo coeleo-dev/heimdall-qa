@@ -1,0 +1,11 @@
+id: rate-cards-preview-N-pattern-pricing_model
+contract: contracts/platform-rate-cards-preview.yaml
+kind: N-pattern-pricing_model
+gate: auto
+tags:
+- function
+diff:
+  set:
+    pricing_model: '!!!'
+expect:
+  status: 400

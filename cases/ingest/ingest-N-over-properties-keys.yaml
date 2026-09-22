@@ -1,0 +1,46 @@
+id: ingest-N-over-properties-keys
+contract: contracts/api-ingest-post.yaml
+kind: N-over-properties-keys
+gate: auto
+tags:
+  - function
+diff:
+  set:
+    properties:
+      model: gpt-4o
+      tokens: 100
+      extra00: 1
+      extra01: 1
+      extra02: 1
+      extra03: 1
+      extra04: 1
+      extra05: 1
+      extra06: 1
+      extra07: 1
+      extra08: 1
+      extra09: 1
+      extra10: 1
+      extra11: 1
+      extra12: 1
+      extra13: 1
+      extra14: 1
+      extra15: 1
+      extra16: 1
+      extra17: 1
+      extra18: 1
+      extra19: 1
+      extra20: 1
+      extra21: 1
+      extra22: 1
+      extra23: 1
+      extra24: 1
+      extra25: 1
+      extra26: 1
+      extra27: 1
+      extra28: 1
+      extra29: 1
+      extra30: 1
+expect:
+  status: 400
+generate:
+  timestamp: now_iso

@@ -1,0 +1,11 @@
+id: trilho-b-state
+suite: suites/trilho-b/state.yaml
+mode: review
+dimensions:
+  - function
+environment: sandbox
+include:
+  - cases/trilho-b/state-idempotency-replay.yaml
+  - cases/trilho-b/state-idempotency-conflict.yaml
+  - cases/trilho-b/state-kill-switch-trigger.yaml
+  - cases/trilho-b/state-kill-switch-blocked.yaml

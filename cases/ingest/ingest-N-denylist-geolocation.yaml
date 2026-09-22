@@ -1,0 +1,13 @@
+id: ingest-N-denylist-geolocation
+contract: contracts/api-ingest-post.yaml
+kind: N-denylist-geolocation
+gate: auto
+tags:
+  - function
+diff:
+  set:
+    properties.geolocation: denied
+expect:
+  status: 400
+generate:
+  timestamp: now_iso

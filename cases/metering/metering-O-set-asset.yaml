@@ -1,0 +1,11 @@
+id: metering-O-set-asset
+contract: contracts/api-metering-post.yaml
+kind: O-set-asset
+gate: auto
+tags:
+- function
+diff:
+  set:
+    asset: BRL
+expect:
+  status: 202

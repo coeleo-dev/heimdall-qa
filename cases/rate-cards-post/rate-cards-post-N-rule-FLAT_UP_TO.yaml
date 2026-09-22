@@ -1,0 +1,16 @@
+id: rate-cards-post-N-rule-FLAT_UP_TO
+contract: contracts/platform-rate-cards-post.yaml
+kind: N-rule-FLAT_UP_TO
+gate: auto
+tags:
+- function
+diff:
+  set:
+    tiers:
+    - unit_amount: '0.00003'
+      up_to_amount: 100
+      priority: 0
+      dimensions:
+        model: gpt-4o
+expect:
+  status: 422

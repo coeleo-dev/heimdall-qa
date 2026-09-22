@@ -1,0 +1,14 @@
+id: live-api-entitlements-check-bulk
+suite: suites/api-entitlements-check-bulk.yaml
+mode: review
+dimensions:
+- function
+environment: production
+include:
+- cases/entitlements-check-bulk/entitlements-check-bulk-H01.yaml
+- cases/entitlements-check-bulk/entitlements-check-bulk-N-omit-userId.yaml
+- cases/entitlements-check-bulk/entitlements-check-bulk-N-omit-checks.yaml
+- cases/entitlements-check-bulk/entitlements-check-bulk-N-auth.yaml
+- cases/entitlements-check-bulk/entitlements-check-bulk-N-rule-CHECKS_EMPTY.yaml
+- cases/entitlements-check-bulk/entitlements-check-bulk-N-rule-OTHER_TENANT.yaml
+notes: Production replay of sandbox round. Use nk_live_ in secrets.local.yaml.

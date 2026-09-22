@@ -1,0 +1,15 @@
+endpoint: DELETE /platform/api-keys/{{revocable_api_key_id}}
+dto: com.nokr.domain.auth.controller.B2BApiKeyController
+auth: jwt
+area: api-keys-delete
+resource_id_in_path: true
+baseline: baselines/empty.json
+fields: {}
+rules:
+- id: ALREADY_REVOKED
+  status: 409
+  error: already revoked
+idempotency: none
+async: sync
+live_only_rules: []
+p_gaps: []

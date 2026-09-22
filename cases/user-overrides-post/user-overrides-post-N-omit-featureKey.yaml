@@ -1,0 +1,11 @@
+id: user-overrides-post-N-omit-featureKey
+contract: contracts/platform-user-overrides-post.yaml
+kind: N-omit-featureKey
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - featureKey
+expect:
+  status: 400

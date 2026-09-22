@@ -1,0 +1,11 @@
+id: tenants-settings-N-rule-CREDITS_BELOW_MIN
+contract: contracts/platform-tenants-settings.yaml
+kind: N-rule-CREDITS_BELOW_MIN
+gate: auto
+tags:
+- function
+diff:
+  set:
+    test_drive_credits: 0.99999
+expect:
+  status: 400

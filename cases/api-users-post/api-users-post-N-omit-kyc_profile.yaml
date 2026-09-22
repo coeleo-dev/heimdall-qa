@@ -1,0 +1,11 @@
+id: api-users-post-N-omit-kyc_profile
+contract: contracts/api-users-post.yaml
+kind: N-omit-kyc_profile
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - kyc_profile
+expect:
+  status: 400

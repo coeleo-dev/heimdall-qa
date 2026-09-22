@@ -1,0 +1,16 @@
+id: bola-metering
+contract: contracts/api-metering-post.yaml
+kind: S-bola-other
+gate: auto
+tags:
+  - security
+diff:
+  set:
+    nokr_user_id: "{{other_nokr_user_id}}"
+    amount: "0.01"
+headers:
+  Authorization: Bearer {{api_key}}
+expect:
+  status: 403
+generate:
+  idempotency_key: uuid_v4

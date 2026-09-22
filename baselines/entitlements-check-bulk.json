@@ -1,0 +1,11 @@
+{
+  "userId": "{{nokr_user_id}}",
+  "checks": [
+    {
+      "featureKey": "{{feature_key}}"
+    },
+    {
+      "featureKey": "whitelabel"
+    }
+  ]
+}

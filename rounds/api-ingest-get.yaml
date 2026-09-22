@@ -1,0 +1,12 @@
+id: api-ingest-get
+suite: suites/api-ingest-get.yaml
+mode: review
+dimensions:
+- function
+environment: sandbox
+include:
+- cases/ingest-get/ingest-get-H01.yaml
+- cases/ingest-get/ingest-get-N-notfound.yaml
+- cases/ingest-get/ingest-get-S-bola.yaml
+- cases/ingest-get/ingest-get-N-auth.yaml
+- cases/ingest-get/ingest-get-E-conflict.yaml

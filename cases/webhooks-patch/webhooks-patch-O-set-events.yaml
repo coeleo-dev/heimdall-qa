@@ -1,0 +1,12 @@
+id: webhooks-patch-O-set-events
+contract: contracts/platform-webhooks-patch.yaml
+kind: O-set-events
+gate: auto
+tags:
+- function
+diff:
+  set:
+    events:
+    - rating.insufficient
+expect:
+  status: 200

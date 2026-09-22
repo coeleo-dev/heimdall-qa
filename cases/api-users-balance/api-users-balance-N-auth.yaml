@@ -1,0 +1,11 @@
+id: api-users-balance-N-auth
+contract: contracts/api-users-balance.yaml
+kind: N-auth
+gate: auto
+tags:
+- function
+diff: {}
+expect:
+  status: 401
+omit_headers:
+- Authorization

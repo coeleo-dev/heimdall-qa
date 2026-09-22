@@ -1,0 +1,15 @@
+endpoint: POST /platform/rate-cards/{{rate_card_id}}/archive
+dto: com.nokr.domain.metering.rating.dto.ArchiveRateCardRequest
+auth: jwt
+idempotency: header_uuid_v4
+area: rate-cards-archive
+resource_id_in_path: true
+baseline: baselines/rate-cards-archive.json
+fields:
+  reason:
+    required: true
+    json: reason
+async: sync
+rules: []
+live_only_rules: []
+p_gaps: []

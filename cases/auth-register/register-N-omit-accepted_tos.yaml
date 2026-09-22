@@ -1,0 +1,16 @@
+id: register-N-omit-accepted_tos
+contract: contracts/auth-register.yaml
+kind: N-omit-accepted_tos
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - accepted_tos
+expect:
+  status: 400
+generate:
+  email: email
+  company_name: company_name
+  document_number: cnpj
+  password: password

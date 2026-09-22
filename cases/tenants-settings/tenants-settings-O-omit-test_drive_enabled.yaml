@@ -1,0 +1,11 @@
+id: tenants-settings-O-omit-test_drive_enabled
+contract: contracts/platform-tenants-settings.yaml
+kind: O-omit-test_drive_enabled
+gate: auto
+tags:
+- function
+diff:
+  omit:
+  - test_drive_enabled
+expect:
+  status: 200
