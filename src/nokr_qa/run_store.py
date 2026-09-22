@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from nokr_qa.errors import HarnessError
 from nokr_qa.packs import PackResult
 from nokr_qa.redact import redact_obj
 
@@ -59,69 +58,6 @@ def write_step(
 
 def write_verdict(step_dir: Path, payload: dict[str, Any]) -> None:
     _write_json(step_dir / "verdict.json", payload)
-
-
-def write_ui_step(
-    run_dir: Path,
-    step_index: int,
-    step_id: str,
-    *,
-    navigation: dict[str, Any],
-    aria: str,
-    values: dict[str, Any],
-    console: list[dict[str, Any]],
-    network: list[dict[str, Any]],
-    packs: list[PackResult],
-    timing: dict[str, Any],
-    screenshot: bytes | None = None,
-    logs_web: list[str] | None = None,
-    logs_worker: list[str] | None = None,
-    logs_incomplete: bool = False,
-    log_fallback: str | None = None,
-    a11y: dict[str, Any] | None = None,
-) -> Path:
-    """Writes one `ui` step folder (A.13).
-
-    Artifacts sit next to the HTTP ones, in `steps/NNN-ui-<id>/`, matching the
-    layout the spec settled on in E0. Everything textual goes through
-    `redact_obj` — a JWT or an `nk_test_` key must never reach disk (§5.5), and
-    that includes the axe `html` snippets, which quote the rendered screen.
-
-    The ARIA comparison lives inside `navigation` (it is a property of the read),
-    not in a file of its own — the tree it compares against is the committed
-    baseline, referenced by path.
-    """
-    if not aria.strip():
-        raise HarnessError(
-            code="UI_ARIA_EMPTY",
-            message=f"step {step_id} produced an empty ARIA snapshot",
-            hint=(
-                "`ui.structure` compares this file against a committed baseline; "
-                "an empty snapshot would be a false green"
-            ),
-        )
-    step_dir = run_dir / "steps" / f"{step_index:03d}-ui-{step_id}"
-    step_dir.mkdir(parents=True, exist_ok=True)
-    _write_json(step_dir / "ui.json", redact_obj(navigation))
-    (step_dir / "aria.yml").write_text(str(redact_obj(aria)), encoding="utf-8")
-    _write_json(step_dir / "a11y.json", redact_obj(a11y or {"enabled": False, "violations": []}))
-    _write_json(step_dir / "ui-values.json", redact_obj(values))
-    _write_json(step_dir / "console.log", redact_obj(console))
-    _write_json(step_dir / "network.json", redact_obj(network))
-    if screenshot is not None:
-        (step_dir / "screenshot.png").write_bytes(screenshot)
-    _write_json(step_dir / "timing.json", timing)
-    _write_json(
-        step_dir / "packs.json",
-        {
-            "results": [asdict(item) for item in packs],
-            "logs_incomplete": logs_incomplete,
-            "log_fallback": log_fallback,
-        },
-    )
-    _write_lines(step_dir / "logs-web.txt", logs_web or [])
-    _write_lines(step_dir / "logs-worker.txt", logs_worker or [])
-    return step_dir
 
 
 def write_summary(run_dir: Path, payload: dict[str, Any]) -> None:

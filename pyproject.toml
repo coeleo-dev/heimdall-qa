@@ -18,11 +18,6 @@ dependencies = [
     "python-multipart>=0.0.9",
     "faker>=30",
     "validate-docbr>=1.8",
-    "playwright>=1.63",
-    # Ships `axe.min.js` vendored (572 KB) in the wheel, so `ui.a11y` needs no
-    # network at runtime and no external service (§5.4). Only depends on
-    # `playwright>=1.36`, which the line above already satisfies.
-    "axe-playwright-python>=0.1.8",
 ]
 
 [project.optional-dependencies]

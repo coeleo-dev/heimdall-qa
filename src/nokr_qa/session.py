@@ -34,7 +34,6 @@ from nokr_qa.run_store import write_verdict
 from nokr_qa.schema.models import CaseFile
 from nokr_qa.suite_run import SuiteRun
 from nokr_qa.suite_run import VisibleStep
-from nokr_qa.suite_run import has_ui_steps
 from nokr_qa.suite_run import visible_steps
 
 _UI_MODES = frozenset({"walk", "review"})
@@ -131,7 +130,7 @@ class RoundSession:
             raise HarnessError(
                 code="MODE_REQUIRES_UI",
                 message=f"mode {mode} requires the Fase 7 UI",
-                hint="choose walk or review in the browser, or use nokr-qa run --mode headless",
+                hint="choose walk or review in the review UI, or use nokr-qa run --mode headless",
             )
         self._mode = mode
         self._started = perf_counter()
@@ -146,15 +145,6 @@ class RoundSession:
         self._captures = {}
         self._pacer = {}
         if self._suite is not None:
-            if has_ui_steps(self._suite):
-                raise HarnessError(
-                    code="UI_STEP_REVIEW_UNSUPPORTED",
-                    message="this round has a `ui` step, which the review UI cannot drive",
-                    hint=(
-                        "run it with `nokr-qa run ROUND --mode headless` until E6 "
-                        "wires the browser step into the review panel"
-                    ),
-                )
             self._ctx = SuiteRun(
                 suite=self._suite,
                 round_file=self._round_file,

@@ -17,20 +17,15 @@ class BudgetsMs(BaseModel):
 
 
 class UiConfig(BaseModel):
-    """Review UI bind plus the browser-step policy (A.19, fase A5/A6).
+    """Where the human review UI binds.
 
-    The block keeps the literal `ui:` name the emenda uses, so the page timeout
-    lives next to the bind instead of inventing a second `ui:` section.
+    The block keeps the literal `ui:` name, and it is the only block in this file
+    that is neither product data nor a budget: it is harness infrastructure, which
+    is why it does not move to the project descriptor.
     """
 
     host: str = "127.0.0.1"
     port: int = 7878
-    page_ms: int = 15000
-    logs_ms: int = 1500
-    screenshot: bool = True
-    # E3: run axe-core on every `ui` step. Off is a deliberate choice, not a
-    # silent default — the pack reports `skipped` with the reason when disabled.
-    a11y: bool = True
 
 
 class LogFiles(BaseModel):
@@ -49,7 +44,6 @@ class HarnessConfig(BaseModel):
     bruno_collection: str = ""
     nokr_web: str = "http://127.0.0.1:8080"
     nokr_admin: str = "http://127.0.0.1:9090"
-    nokr_dashboard: str = "http://localhost:4200"
     ui: UiConfig = Field(default_factory=UiConfig)
     log_files: LogFiles = Field(default_factory=LogFiles)
     budgets_ms: BudgetsMs = Field(default_factory=BudgetsMs)

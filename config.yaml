@@ -1,18 +1,11 @@
 bruno_collection: /home/davi/Documentos/bruno/Nokr API - Dev Collection
 nokr_web: http://127.0.0.1:8080
 nokr_admin: http://127.0.0.1:9090
-# Dashboard origin. The hostname MUST stay `localhost`: the browser resolves the
-# API to http://localhost:8080 (see core/api-base-url.ts) and CORS only allows
-# http://localhost:4200. `127.0.0.1:4200` breaks both.
-nokr_dashboard: http://localhost:4200
-# `ui` is the human review bind (A.12) plus the browser-step policy (A.19).
+# `ui` is the human review bind (A.12). It is harness infrastructure, not project
+# data, so it stays here when the project config moves to the descriptor.
 ui:
   host: 127.0.0.1
   port: 7878
-  page_ms: 15000      # A.19: page load timeout; exhausting it FAILS the step, never SKIP
-  logs_ms: 1500       # how long the step waits for its trace_id line in the JVM logs
-  screenshot: true    # E3 wires this to the ui.visual waive
-  a11y: true          # E3: axe-core WCAG A/AA per step (`ui.a11y`); off => skipped
 log_files:
   web: ../NokrAPI/logs/nokr-web.log
   worker: ../NokrAPI/logs/nokr-worker.log

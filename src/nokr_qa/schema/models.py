@@ -1,12 +1,14 @@
-from pathlib import PurePosixPath
 from typing import Any
 from typing import Literal
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
-from pydantic import field_validator
 from pydantic import model_validator
+
+from nokr_qa.step_kinds import registered_step_kinds
+from nokr_qa.step_kinds import unknown_step_kind_message
+from nokr_qa.step_kinds import unknown_step_kinds
 
 
 class SaturateSpec(BaseModel):
@@ -207,49 +209,6 @@ class LoopSpec(BaseModel):
     after_each: AfterEachSpec | None = None
 
 
-class UiStep(BaseModel):
-    """Browser step (A.19): drives one dashboard screen and reads its surfaces.
-
-    `extra="forbid"` on purpose: `SuiteStep` uses `extra="ignore"`, so a typo
-    inside the `ui:` block would otherwise be dropped in silence and the step
-    would run with a default it never declared.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    id: str = Field(min_length=1)
-    # Route to open, exactly as `core/surfaces.ts` spells it (`/customers?tab=ledger`).
-    path: str = Field(min_length=1)
-    # Endpoint whose response proves the screen finished loading, e.g.
-    # `/platform/dashboard/metrics`. Matching is by path substring.
-    wait_for: str | None = None
-    # Region the ARIA snapshot is scoped to (A.19/§6: never the whole body).
-    region: str = "main"
-    timeout_ms: int | None = Field(default=None, ge=1)
-    # Committed ARIA template, resolved against the run root. Absent means
-    # `ui.structure` reports `skipped` with a hint — never a silent pass.
-    baseline: str | None = None
-    # Reuses the `Waive` model, so the >= 40 chars reason / P-GAP rule is already
-    # enforced by its validator (Design by Contract).
-    waive: list[Waive] = Field(default_factory=list)
-
-    @field_validator("baseline")
-    @classmethod
-    def baseline_stays_inside_the_root(cls, value: str | None) -> str | None:
-        """A baseline is read from disk, so it may not walk out of `--root`.
-
-        The path comes from YAML that the agent writes from a DTO. Resolving it
-        against the root is what keeps `../../etc/passwd` from being a valid
-        declaration, not just a convention.
-        """
-        if value is None:
-            return None
-        normalized = PurePosixPath(value.replace("\\", "/"))
-        if normalized.is_absolute() or ".." in normalized.parts:
-            raise ValueError("baseline must be a path inside the run root, without ..")
-        return value
-
-
 class SurfaceSpec(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -271,12 +230,30 @@ class ProbeSpec(BaseModel):
 
 
 class SuiteStep(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    """One step of a suite: exactly one registered kind, nothing else.
+
+    `extra="allow"` plus the validator below is what turns an unknown key into a
+    named error. With the previous `extra="ignore"`, a suite could declare a kind
+    nobody implemented and the key would be dropped in silence — the step would
+    then run as a different kind, or not run at all.
+    """
+
+    model_config = ConfigDict(extra="allow")
 
     probe_begin: str | None = None
     loop: LoopSpec | None = None
     probe: ProbeSpec | None = None
-    ui: UiStep | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def every_declared_kind_is_registered(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        declared = [key for key in data if key not in registered_step_kinds()]
+        unknown = unknown_step_kinds(declared)
+        if unknown:
+            raise ValueError(unknown_step_kind_message(unknown[0]))
+        return data
 
     @model_validator(mode="after")
     def exactly_one_kind(self) -> "SuiteStep":
@@ -286,14 +263,12 @@ class SuiteStep(BaseModel):
                 ("probe_begin", self.probe_begin),
                 ("loop", self.loop),
                 ("probe", self.probe),
-                ("ui", self.ui),
             )
             if value is not None
         ]
         if len(present) != 1:
-            raise ValueError(
-                "suite step must set exactly one of probe_begin, loop, probe, ui"
-            )
+            known = ", ".join(sorted(registered_step_kinds()))
+            raise ValueError(f"suite step must set exactly one of {known}")
         return self
 
 

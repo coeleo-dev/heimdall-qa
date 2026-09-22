@@ -35,10 +35,10 @@ _ISSUED_CREDENTIAL_KEYS = frozenset(
         "prefix",
     }
 )
-# Packs whose failure is the point of the emenda. Waiving one would delete the
-# only check that proves the screen matches the backend, so the waive is refused
-# instead of honoured (A.19: not waivable without a registered P-GAP).
-NON_WAIVABLE_PACKS = frozenset({"ui.value"})
+# Packs whose failure is the point of a check, so a waive is refused instead of
+# honoured. Empty as of fase 1.1: the only non-waivable pack left with its step
+# kind. The mechanism stays, because the next one is not a special case.
+NON_WAIVABLE_PACKS: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -84,27 +84,9 @@ class PackContext:
     case_kind: str = ""
     business_rules: list[Any] = field(default_factory=list)
     omit_headers: list[str] = field(default_factory=list)
-    # ── UI step evidence (E3, A.19) ──────────────────────────────────────────
-    # Set for a `ui` step so the structural packs can judge what the browser
-    # collected. `has_primary` says whether the screen produced a traced backend
-    # response at all: the transport packs only make sense when it did, while the
-    # structural packs must run either way.
-    has_primary: bool = False
-    ui_path: str = ""
-    ui_region: str = ""
-    ui_console: list[dict[str, Any]] = field(default_factory=list)
-    ui_network: list[dict[str, Any]] = field(default_factory=list)
-    ui_structure: dict[str, Any] | None = None
-    ui_a11y: dict[str, Any] | None = None
 
 
 def run_all(ctx: PackContext) -> list[PackResult]:
-    # A `ui` step has no case contract, so it gets its own set instead of the
-    # HTTP one. Dispatching here (rather than in the caller) keeps every step
-    # kind going through a single `run_all`, so a new kind cannot silently skip
-    # its packs.
-    if ctx.case_kind == "ui":
-        return run_ui(ctx)
     results = [
         _http_baseline(ctx),
         _security_leak(ctx),
@@ -122,160 +104,6 @@ def run_all(ctx: PackContext) -> list[PackResult]:
     if _expect_is_4xx(ctx) and 400 <= ctx.status_code < 500:
         results.append(_http_error(ctx))
     return [_apply_waive(ctx, item) for item in results]
-
-
-def run_ui(ctx: PackContext) -> list[PackResult]:
-    """Every pack a `ui` step gets, in the order A.19 fixes (§3.8).
-
-    The transport packs ride along only when the screen produced a traced backend
-    response; the structural packs always run, because the ARIA tree, the console
-    and the a11y scan exist whether or not a request was observed.
-    """
-    results: list[PackResult] = []
-    if ctx.has_primary:
-        results.extend(run_ui_transport(ctx))
-    results.extend(
-        [
-            _ui_render(ctx),
-            _ui_structure(ctx),
-            _ui_a11y(ctx),
-            _ui_visual(ctx),
-        ]
-    )
-    return [_apply_waive(ctx, item) for item in results]
-
-
-def run_ui_transport(ctx: PackContext) -> list[PackResult]:
-    """Transport packs for the response the *browser* produced (A.19, §2.3).
-
-    The emenda's central claim is that `observability` and `http.success` already
-    cover browser traffic with zero changes to them: the browser sends the same
-    `X-Trace-Id` through `extraHTTPHeaders`, so the log collector finds the lines
-    exactly as it does for an `httpx` step. This function only has to pick the
-    three packs that make sense without a case contract and reuse them verbatim.
-
-    `ctx` must describe the primary response the screen was waiting for, with
-    `expect_status` set to the status that was actually observed: the step's job
-    is to report whether the backend behaved, not to claim a status it never
-    asked for. The page budget replaces the HTTP budget because a ClickHouse
-    overview query is not a hot-path transaction.
-    """
-    results = [
-        _http_baseline(ctx),
-        _observability(ctx),
-    ]
-    if _expect_is_2xx(ctx) and 200 <= ctx.status_code < 300:
-        results.append(_http_success(ctx))
-    return [_apply_waive(ctx, item) for item in results]
-
-
-# ── structural packs (E3, A.19) ───────────────────────────────────────────────
-#
-# These judge what the browser collected, never the browser itself. A console
-# error, an ARIA divergence and a WCAG violation are all *product* findings: they
-# are a `fail` on the screen, not a broken instrument.
-
-_UI_CONSOLE_FAIL = frozenset({"error", "pageerror"})
-_UI_CONSOLE_WARN = frozenset({"warning", "warn"})
-
-
-def _ui_render(ctx: PackContext) -> PackResult:
-    """Fails on a console error or a 5xx the screen provoked (A.19).
-
-    Console entries and network traffic carry no trace id, which is why the
-    driver resets both per step — otherwise a previous screen's noise would be
-    attributed to this one.
-    """
-    pack_id = "ui.render"
-    errors = [
-        str(item.get("text") or "").strip()
-        for item in ctx.ui_console
-        if str(item.get("type") or "").lower() in _UI_CONSOLE_FAIL
-    ]
-    server_errors = [
-        f"{item.get('method')} {item.get('path')} -> {item.get('status')}"
-        for item in ctx.ui_network
-        if isinstance(item.get("status"), int) and item["status"] >= 500
-    ]
-    warnings = [
-        str(item.get("text") or "").strip()
-        for item in ctx.ui_console
-        if str(item.get("type") or "").lower() in _UI_CONSOLE_WARN
-    ]
-    failures = [f"console error: {text}" for text in errors if text]
-    failures += [f"observed 5xx: {text}" for text in server_errors]
-    if failures:
-        return PackResult(pack_id, "fail", "; ".join(failures[:5]))
-    if warnings:
-        return PackResult(pack_id, "warn", f"console warning: {warnings[0]}")
-    return PackResult(pack_id, "pass")
-
-
-def _ui_structure(ctx: PackContext) -> PackResult:
-    """Fails when the ARIA tree diverges from the committed template."""
-    pack_id = "ui.structure"
-    structure = ctx.ui_structure or {}
-    if not structure.get("enabled"):
-        return PackResult(
-            pack_id,
-            "skipped",
-            "no baseline declared for this step: add `baseline: baselines/ui/....aria.yml`",
-        )
-    if structure.get("matched"):
-        return PackResult(pack_id, "pass")
-    return PackResult(
-        pack_id,
-        "fail",
-        "ARIA tree diverges from the baseline: " + _first_line(str(structure.get("error") or "")),
-    )
-
-
-def _ui_a11y(ctx: PackContext) -> PackResult:
-    """Fails on any WCAG A/AA violation, with the offending node named."""
-    pack_id = "ui.a11y"
-    report = ctx.ui_a11y or {}
-    if not report.get("enabled"):
-        return PackResult(pack_id, "skipped", "a11y scan disabled by config (ui.a11y: false)")
-    violations = [item for item in (report.get("violations") or []) if isinstance(item, dict)]
-    if not violations:
-        return PackResult(pack_id, "pass")
-    return PackResult(pack_id, "fail", _describe_violations(violations))
-
-
-def _ui_visual(ctx: PackContext) -> PackResult:
-    """Pixel diff, deliberately not enabled in v1 (A.19 §1).
-
-    It reports `skipped` with the reason rather than `pass`, because claiming a
-    green pixel comparison that never ran is exactly the false green A.19 warns
-    about.
-    """
-    return PackResult(
-        "ui.visual",
-        "skipped",
-        "pixel diff is out of scope in v1: the ARIA snapshot is the structural gate",
-    )
-
-
-def _describe_violations(violations: list[dict[str, Any]]) -> str:
-    parts = []
-    for item in violations[:5]:
-        node = (item.get("nodes") or [{}])[0]
-        target = node.get("target")
-        where = ", ".join(str(selector) for selector in target) if isinstance(target, list) else ""
-        parts.append(
-            f"{item.get('id')} ({item.get('impact')}) at {where or 'unknown node'}"
-        )
-    if len(violations) > 5:
-        parts.append(f"+{len(violations) - 5} more")
-    return "; ".join(parts)
-
-
-def _first_line(text: str, *, limit: int = 200) -> str:
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped:
-            return stripped[:limit]
-    return text.strip()[:limit]
 
 
 def _apply_waive(ctx: PackContext, result: PackResult) -> PackResult:
