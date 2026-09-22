@@ -1,6 +1,6 @@
 # F8 — Rename, OSS e o corte do provider
 
-> **Frente:** F8 do [plano de estudo](../../../../../.cursor/plans/heimdall_qa_plano_de_estudo_eb1f8620.plan.md).
+> **Frente:** F8 do [plano de estudo](../../../../../../../.cursor/plans/heimdall_qa_plano_de_estudo_eb1f8620.plan.md).
 > **Pergunta:** o que fica no núcleo e o que vai para o provider, e em que ordem?
 > **Escopo declarado no plano:** o corte é aplicado **só sobre o caminho HTTP**. `browser.py` e os packs `ui.*` migram na fase 3.
 > **Entregáveis:** critério de corte aplicado item a item, plano de empacotamento, definição do provider de brinquedo.

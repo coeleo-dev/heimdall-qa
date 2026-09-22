@@ -176,7 +176,7 @@ O núcleo conhece o **pacote base Java** da Nokr para decidir se um stack trace 
 
 Três amarras: número fixo de fontes, formato de marcador específico do Logback, e um
 fallback que pode produzir falso positivo. É a peça mais frágil do harness (ver
-[05-logs.md](05-logs.md), frente F5).
+[05-logs.md](05-logs-distribuidos.md), frente F5).
 **→ núcleo + sources:** N fontes declaradas; marcador como regex declarada; fallback por
 timestamp da linha, nunca pelo relógio local.
 
