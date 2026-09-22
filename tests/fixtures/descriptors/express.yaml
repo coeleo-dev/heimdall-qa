@@ -1,0 +1,53 @@
+# Level 3 — a Node/Express API with nothing of Nokr in it.
+#
+# The boundary test: `scheme: raw` (a direct header value, no `Bearer`) and
+# `format: json-lines` are the only two features the Nokr descriptor does not
+# exercise, and neither one required a new field in the design.
+version: 1
+
+project:
+  id: billing-demo
+  name: Billing Demo
+
+environments:
+  local:
+    base_url: http://localhost:3000
+
+auth:
+  api_key:
+    header: X-Api-Key
+    scheme: raw
+
+routes:
+  - prefix: /v1/charges
+    auth: api_key
+    budget: fast
+  - prefix: /v1/
+    auth: api_key
+
+budgets:
+  fast:
+    budget: 200
+    fail: 1000
+  default:
+    budget: 2000
+    fail: 5000
+
+errors:
+  validation_status: 400
+  envelope: code_message
+
+trace:
+  header: x-request-id
+  prefix: "billing-"
+
+log_sources:
+  - id: app
+    path: ./logs/app.log
+    format: json-lines
+    marker_field: requestId
+
+contract:
+  source: openapi
+  location: ./openapi.yaml
+  spec_version: "3.1"

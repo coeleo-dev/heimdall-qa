@@ -1,0 +1,13 @@
+# Level 0 — the entry ramp. Nine lines, no auth, no logs, no discovery.
+#
+# If the harness cannot run against this, the claim "works on any REST API" is
+# false. That is why this file is a gate (fase 1.6 turns it into
+# examples/toy-provider/) and not an example.
+version: 1
+
+project:
+  id: toy-provider
+
+environments:
+  local:
+    base_url: http://localhost:8000

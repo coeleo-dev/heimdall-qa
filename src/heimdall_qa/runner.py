@@ -882,6 +882,7 @@ def execute_round(
     runs_dir: Path,
     secrets: dict[str, str] | None = None,
     mode: str = "headless",
+    descriptor: dict[str, str] | None = None,
 ) -> Path:
     if mode != "headless":
         raise HarnessError(
@@ -906,6 +907,7 @@ def execute_round(
             runs_dir=runs_dir,
             secrets=secrets,
             mode=mode,
+            descriptor=descriptor,
         )
     cases = _load_included_cases(round_file, root)
     _reject_todo_status(cases)
@@ -942,6 +944,7 @@ def execute_round(
             started,
             root,
             human_reject_rate=0.0,
+            descriptor=descriptor,
         ),
     )
     write_evidence(run_dir, _build_evidence(records))
@@ -1375,6 +1378,7 @@ def _build_summary(
     started: float,
     root: Path,
     human_reject_rate: float = 0.0,
+    descriptor: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     elapsed = [item.elapsed_ms for item in records]
     return {
@@ -1399,6 +1403,9 @@ def _build_summary(
         "logs_incomplete": sum(1 for item in records if item.logs_incomplete),
         "human_reject_rate": human_reject_rate,
         "review_duration_ms": (perf_counter() - started) * 1000.0,
+        # Which descriptor was in force, and why that one (ADR-01). Precedence
+        # with no record is indistinguishable from a mistake.
+        "descriptor": descriptor,
     }
 
 

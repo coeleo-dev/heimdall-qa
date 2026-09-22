@@ -110,3 +110,35 @@ def test_execute_round_connect_error_finishes_with_fail_step(tmp_path: Path):
     assert verdict["status"] == "fail"
     assert verdict["actor"] == "auto"
     assert (runs_dir / "latest").is_symlink()
+
+
+def test_execute_round_records_which_descriptor_was_in_force(tmp_path: Path):
+    """Precedence with no record is indistinguishable from a mistake (ADR-01)."""
+    runs_dir = tmp_path / "runs"
+    run_dir = execute_round(
+        EXAMPLE_ROUND,
+        root=FIXTURES,
+        config=_config(tmp_path),
+        client=_client(_echo_handler),
+        runs_dir=runs_dir,
+        mode="headless",
+        descriptor={"origin": "target", "path": "qa/project.yaml"},
+    )
+    summary = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
+    assert summary["descriptor"] == {"origin": "target", "path": "qa/project.yaml"}
+
+
+def test_execute_round_without_a_descriptor_records_that_too(tmp_path: Path):
+    """`null` beats a missing key: the reader can tell "none" from "not recorded"."""
+    runs_dir = tmp_path / "runs"
+    run_dir = execute_round(
+        EXAMPLE_ROUND,
+        root=FIXTURES,
+        config=_config(tmp_path),
+        client=_client(_echo_handler),
+        runs_dir=runs_dir,
+        mode="headless",
+    )
+    summary = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
+    assert "descriptor" in summary
+    assert summary["descriptor"] is None

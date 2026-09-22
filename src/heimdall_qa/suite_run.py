@@ -123,6 +123,7 @@ def execute_suite_round(
     runs_dir: Path,
     secrets: dict[str, str],
     mode: str,
+    descriptor: dict[str, str] | None = None,
 ) -> Path:
     cases = _load_included_cases(round_file, root)
     _reject_todo_status(cases)
@@ -142,7 +143,9 @@ def execute_suite_round(
     write_book(run_dir, ctx.book)
     write_summary(
         run_dir,
-        _build_summary(round_file, mode, cases, ctx.records, started, root),
+        _build_summary(
+            round_file, mode, cases, ctx.records, started, root, descriptor=descriptor
+        ),
     )
     write_evidence(run_dir, _build_evidence(ctx.records))
     link_latest(runs_dir, run_dir)

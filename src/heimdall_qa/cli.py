@@ -14,6 +14,7 @@ from heimdall_qa.campaign import validate_campaign
 from heimdall_qa.collection import is_campaign_yaml
 from heimdall_qa.config import HarnessConfig
 from heimdall_qa.config import load_config
+from heimdall_qa.descriptor import resolve_descriptor
 from heimdall_qa.errors import HarnessError
 from heimdall_qa.errors import format_cli
 from heimdall_qa.fixtures import build_payload
@@ -45,6 +46,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     validate_parser.add_argument("round")
     validate_parser.add_argument("--root", default=None)
+    validate_parser.add_argument(
+        "--descriptor",
+        default=None,
+        help="Project descriptor to validate (default: ROOT/qa/project.yaml)",
+    )
     scaffold_parser = subparsers.add_parser(
         "scaffold-endpoint",
         help="Generate case stubs from a contract (mechanical expect filled)",
@@ -94,6 +100,11 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--mode", default="headless")
     run_parser.add_argument("--config", default=None)
     run_parser.add_argument("--secrets", default=None)
+    run_parser.add_argument(
+        "--descriptor",
+        default=None,
+        help="Project descriptor in force (default: ROOT/qa/project.yaml)",
+    )
     last_run_parser = subparsers.add_parser(
         "last-run",
         help="Print the absolute path of runs/latest",
@@ -170,6 +181,9 @@ def _dispatch(args: argparse.Namespace) -> int:
 
 def _run_validate(args: argparse.Namespace) -> int:
     root = Path(args.root) if args.root else Path.cwd()
+    # A descriptor that fails here never reaches a run. An absent one is not an
+    # error: it is optional until a case needs something only it knows.
+    resolve_descriptor(root, explicit=getattr(args, "descriptor", None))
     errors = validate_round(Path(args.round), root)
     for error in errors:
         print(error, file=sys.stderr)
@@ -236,6 +250,7 @@ def _run_run(args: argparse.Namespace) -> int:
     root = Path(args.root) if args.root else Path.cwd()
     config = _resolve_config(args.config)
     secrets = _resolve_secrets(args.secrets, root)
+    resolved = resolve_descriptor(root, explicit=getattr(args, "descriptor", None))
     runs_dir = Path.cwd() / "runs"
     with httpx.Client(timeout=10.0) as client:
         run_dir = execute_round(
@@ -246,6 +261,7 @@ def _run_run(args: argparse.Namespace) -> int:
             runs_dir=runs_dir,
             secrets=secrets,
             mode=args.mode,
+            descriptor=resolved.as_summary() if resolved is not None else None,
         )
     print(str(run_dir.resolve()))
     summary = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))

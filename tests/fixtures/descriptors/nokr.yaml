@@ -1,0 +1,78 @@
+# Level 2 — a Spring API (the Nokr), reduced to the essentials.
+#
+# Note that `X-Nokr-Environment` and `nk_test_` survive: generalising the harness
+# is not deleting the product's identity, it is moving that identity out of the
+# core and into a file the product's own team reviews.
+version: 1
+
+project:
+  id: nokr
+  name: Nokr
+
+environments:
+  sandbox:
+    base_url: http://127.0.0.1:8080
+  production:
+    base_url: https://api.nokr.com
+
+auth:
+  jwt:
+    header: Authorization
+    scheme: bearer
+  api_key:
+    header: Authorization
+    scheme: bearer
+    prefixes:
+      sandbox: "nk_test_"
+      production: "nk_live_"
+  admin:
+    header: X-Nokr-Admin-Secret
+    scheme: raw
+
+environment_header:
+  name: X-Nokr-Environment
+  values:
+    sandbox: sandbox
+    production: production
+
+routes:
+  - prefix: /platform/
+    auth: jwt
+    require_environment_header: true
+  - prefix: /admin/
+    auth: admin
+  - prefix: /api/ingest
+    auth: api_key
+    budget: fast
+    async: true
+  - prefix: /api/metering
+    auth: api_key
+    budget: fast
+  - prefix: /auth/
+    auth: none
+    budget: long
+
+budgets:
+  fast:
+    budget: 50
+    fail: 1500
+  default:
+    budget: 1500
+    fail: 1500
+  long:
+    budget: 8000
+    fail: 8000
+
+errors:
+  validation_status: 422
+  envelope: spring
+  product_packages:
+    - com.nokr
+
+trace:
+  header: X-Trace-Id
+  prefix: "heimdall-"
+
+contract:
+  source: openapi
+  location: http://127.0.0.1:8080/v3/api-docs
