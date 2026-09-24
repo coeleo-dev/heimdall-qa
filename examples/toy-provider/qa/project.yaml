@@ -1,0 +1,15 @@
+# The entry ramp — what "works on any REST API" costs to declare.
+#
+# Six lines, no auth, no logs, no routes: just the origin of the mock in `app.py`.
+# This is the file `tests/fixtures/descriptors/toy.yaml` turned into; the gate T3
+# runs the harness against it from a clean wheel, with nothing of the product on
+# disk, which is the only thing that proves the harness is generic rather than
+# merely decoupled.
+version: 1
+
+project:
+  id: toy
+
+environments:
+  local:
+    base_url: http://127.0.0.1:8110

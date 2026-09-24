@@ -16,10 +16,11 @@ from heimdall_qa.collection import inspect_round
 from heimdall_qa.collection import parent_round
 from heimdall_qa.config import HarnessConfig
 from heimdall_qa.errors import HarnessError
+from heimdall_qa.schema.load import content_root
+from heimdall_qa.schema.load import resolve_path
 from heimdall_qa.session import QueueItem
 from heimdall_qa.session import RoundSession
 from heimdall_qa.session import SessionView
-from heimdall_qa.validate import resolve_path
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,10 @@ class WorkspaceSession:
     ) -> None:
         self._root = root
         self._config = config
+        #: Content lives under the project's declared prefix (or the root itself),
+        #: and every round key is relative to it, so the tree matches the paths
+        #: the campaigns write (`rounds/...`) no matter where they are checked out.
+        self._content = content_root(root, config.project)
         self._client = client
         self._runs_dir = runs_dir
         self._secrets = secrets or {}
@@ -62,7 +67,7 @@ class WorkspaceSession:
             self._selected_key = start.key
 
     @classmethod
-    def wrap(cls, session: RoundSession) -> "WorkspaceSession":
+    def wrap(cls, session: RoundSession) -> WorkspaceSession:
         workspace = cls(
             root=session._root,
             config=session._config,
@@ -75,7 +80,9 @@ class WorkspaceSession:
         return workspace
 
     def refresh(self) -> None:
-        self._tree = index_workspace(self._root, self._runs_dir)
+        self._tree = index_workspace(
+            self._root, self._runs_dir, self._config.project
+        )
 
     def select(self, key: str) -> WorkspaceView:
         node = find_node(self._tree, key)
@@ -108,7 +115,7 @@ class WorkspaceSession:
                 hint="finish or stop the current round before starting another",
             )
         round_node = self._require_startable()
-        round_path = resolve_path(self._root, round_node.path or "")
+        round_path = resolve_path(self._root, round_node.path or "", self._config.project)
         if self._active is not None and self._active.view().phase == "start":
             if self._active._round_path.resolve() == round_path.resolve():
                 self._active.start(mode)
@@ -236,7 +243,7 @@ class WorkspaceSession:
     def _live_round_key(self) -> str | None:
         if self._active is None:
             return None
-        rel = _posix_rel(self._active._round_path, self._root)
+        rel = _posix_rel(self._active._round_path, self._content)
         return f"round:{rel}"
 
     def _selected_is_live(self, selected: TreeNode) -> bool:
@@ -274,7 +281,7 @@ class WorkspaceSession:
         return find_step_dir(run_dir, node.case_id)
 
     def _select_focus_path(self, path: Path) -> None:
-        rel = _posix_rel(path, self._root)
+        rel = _posix_rel(path, self._content)
         key = f"round:{rel}"
         if find_node(self._tree, key) is None:
             self._tree = self._tree + (
@@ -282,6 +289,7 @@ class WorkspaceSession:
                     rel,
                     self._root,
                     self._runs_dir,
+                    self._config.project,
                     endpoint=None,
                     matrix=None,
                 ),

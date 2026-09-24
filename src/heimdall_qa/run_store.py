@@ -1,9 +1,14 @@
+import json
+from collections.abc import Iterable
 from dataclasses import asdict
 from datetime import datetime
-import json
 from pathlib import Path
 from typing import Any
 
+from heimdall_qa.logs.collector import LogCollection
+from heimdall_qa.logs.collector import SourceRead
+from heimdall_qa.logs.collector import not_declared
+from heimdall_qa.oracle import Oracle
 from heimdall_qa.packs import PackResult
 from heimdall_qa.redact import redact_obj
 
@@ -33,27 +38,75 @@ def write_step(
     response: dict[str, Any],
     timing: dict[str, Any],
     packs: list[PackResult],
-    logs_web: list[str] | None = None,
-    logs_worker: list[str] | None = None,
-    logs_incomplete: bool = False,
-    log_fallback: str | None = None,
+    logs: LogCollection | None = None,
+    patterns: Iterable[str] = (),
 ) -> Path:
+    """One step's evidence: the exchange, the verdicts, and what each log answered.
+
+    The log evidence is **one file per declared source** — `logs-web.txt`,
+    `logs-worker.txt`, and whatever else the project declares, including the sources
+    this used to drop on the floor. `logs.json` carries what the files cannot: which
+    source owed a line and did not answer, and the merged timeline the declared
+    timestamps order.
+
+    `patterns` are the project's credential shapes, handed to the redactor so the
+    exchange leaves behind no key of the product's — whatever that product's keys
+    are shaped like.
+    """
     step_dir = run_dir / "steps" / f"{step_index:03d}-{case_id}"
     step_dir.mkdir(parents=True, exist_ok=True)
-    _write_json(step_dir / "request.json", redact_obj(request))
-    _write_json(step_dir / "response.json", redact_obj(response))
+    _write_json(step_dir / "request.json", redact_obj(request, patterns))
+    _write_json(step_dir / "response.json", redact_obj(response, patterns))
     _write_json(step_dir / "timing.json", timing)
+    collected = logs if logs is not None else not_declared()
     _write_json(
         step_dir / "packs.json",
         {
             "results": [asdict(item) for item in packs],
-            "logs_incomplete": logs_incomplete,
-            "log_fallback": log_fallback,
+            "logs_incomplete": collected.incomplete,
         },
     )
-    _write_lines(step_dir / "logs-web.txt", logs_web or [])
-    _write_lines(step_dir / "logs-worker.txt", logs_worker or [])
+    _write_json(step_dir / "logs.json", _log_payload(collected))
+    for read in collected.reads:
+        _write_lines(
+            step_dir / f"logs-{read.id}.txt",
+            [entry.text for entry in read.entries],
+        )
     return step_dir
+
+
+def _log_payload(collected: LogCollection) -> dict[str, Any]:
+    return {
+        "measured": collected.measured,
+        "incomplete": collected.incomplete,
+        "sources": [_source_payload(read) for read in collected.reads],
+        "timeline": [
+            {"source": entry.source, "at": _iso(entry.at), "text": entry.text}
+            for entry in collected.timeline()
+        ],
+    }
+
+
+def _source_payload(read: SourceRead) -> dict[str, Any]:
+    """One source's answer, `reason` included.
+
+    The reason is written down because "the file is not there", "the file says
+    nothing about this trace" and "the project declared the trace does not reach
+    it" are three different findings that used to render as the same emptiness.
+    """
+    return {
+        "id": read.id,
+        "role": read.role,
+        "propagate": read.propagate,
+        "found": read.found,
+        "reason": read.reason,
+        "truncated": read.truncated,
+        "lines": len(read.entries),
+    }
+
+
+def _iso(moment: datetime | None) -> str | None:
+    return moment.isoformat() if moment is not None else None
 
 
 def write_verdict(step_dir: Path, payload: dict[str, Any]) -> None:
@@ -64,8 +117,9 @@ def write_summary(run_dir: Path, payload: dict[str, Any]) -> None:
     _write_json(run_dir / "summary.json", payload)
 
 
-def write_book(run_dir: Path, book: Any) -> None:
-    _write_json(run_dir / "book.json", book.to_dict())
+def write_book(run_dir: Path, oracle: Oracle) -> None:
+    """The book as evidence, whatever the project's oracle decided to record."""
+    _write_json(run_dir / "book.json", oracle.as_dict())
 
 
 def write_probe(run_dir: Path, probe_id: str, name: str, payload: Any) -> Path:

@@ -1,0 +1,159 @@
+items-H01:
+  contract: contracts/items.yaml
+  kind: H01
+  gate: auto
+  tags:
+    - function
+  diff: {}
+  expect:
+    status: 201
+items-I-new-key:
+  contract: contracts/items.yaml
+  kind: I-new-key
+  gate: auto
+  tags:
+    - function
+  diff: {}
+  expect:
+    status: 201
+items-I-replay:
+  contract: contracts/items.yaml
+  kind: I-replay
+  gate: auto
+  tags:
+    - function
+  diff: {}
+  expect:
+    status: 201
+items-I-replay-conflict:
+  contract: contracts/items.yaml
+  kind: I-replay-conflict
+  gate: auto
+  tags:
+    - function
+  diff:
+    set:
+      name: a different body
+  expect:
+    status: 409
+items-I-missing:
+  contract: contracts/items.yaml
+  kind: I-missing
+  gate: auto
+  tags:
+    - function
+  diff: {}
+  expect:
+    status: 400
+  omit_headers:
+    - X-Idempotency-Key
+items-I-format:
+  contract: contracts/items.yaml
+  kind: I-format
+  gate: auto
+  tags:
+    - function
+  diff: {}
+  expect:
+    status: 400
+  headers:
+    X-Idempotency-Key: not-a-uuid-v4
+items-N-omit-name:
+  contract: contracts/items.yaml
+  kind: N-omit-name
+  gate: auto
+  tags:
+    - function
+  diff:
+    omit:
+      - name
+  expect:
+    status: 400
+items-N-omit-label:
+  contract: contracts/items.yaml
+  kind: N-omit-label
+  gate: auto
+  tags:
+    - function
+  diff:
+    omit:
+      - item_label
+  expect:
+    status: 400
+items-N-omit-code:
+  contract: contracts/items.yaml
+  kind: N-omit-code
+  gate: auto
+  tags:
+    - function
+  diff:
+    omit:
+      - item_code
+  expect:
+    status: 400
+items-N-over-name:
+  contract: contracts/items.yaml
+  kind: N-over-name
+  gate: auto
+  tags:
+    - function
+  diff:
+    set:
+      name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  expect:
+    status: 400
+items-N-over-label:
+  contract: contracts/items.yaml
+  kind: N-over-label
+  gate: auto
+  tags:
+    - function
+  diff:
+    set:
+      item_label: aaaaaaaaa
+  expect:
+    status: 400
+items-B-max-name:
+  contract: contracts/items.yaml
+  kind: B-max-name
+  gate: auto
+  tags:
+    - function
+  diff:
+    set:
+      name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  expect:
+    status: 201
+items-B-max-label:
+  contract: contracts/items.yaml
+  kind: B-max-label
+  gate: auto
+  tags:
+    - function
+  diff:
+    set:
+      item_label: aaaaaaaa
+  expect:
+    status: 201
+items-N-pattern-code:
+  contract: contracts/items.yaml
+  kind: N-pattern-code
+  gate: auto
+  tags:
+    - function
+  diff:
+    set:
+      item_code: '!!!'
+  expect:
+    status: 400
+items-N-auth:
+  contract: contracts/items.yaml
+  kind: N-auth
+  gate: auto
+  tags:
+    - function
+  diff: {}
+  expect:
+    status: 401
+  omit_headers:
+    - X-Fixture-Token

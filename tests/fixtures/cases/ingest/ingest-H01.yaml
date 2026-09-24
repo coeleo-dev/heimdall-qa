@@ -1,9 +1,0 @@
-id: ingest-H01
-contract: contracts/api-ingest-post.yaml
-kind: H01
-gate: auto
-tags:
-  - function
-  - business
-expect:
-  status: 202

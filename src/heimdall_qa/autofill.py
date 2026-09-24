@@ -1,7 +1,7 @@
-from pathlib import Path
 from typing import Any
 
-from heimdall_qa.schema.load import load_case
+from heimdall_qa.errors import HarnessError
+from heimdall_qa.project import ProjectView
 from heimdall_qa.schema.models import Contract
 from heimdall_qa.schema.models import FieldSpec
 from heimdall_qa.schema.models import LiveOnlyRule
@@ -14,23 +14,33 @@ def mechanical_expect(
     kind: str,
     contract: Contract,
     happy_status: int | None,
+    project: ProjectView,
 ) -> dict[str, int | str]:
+    """The `expect` a generated case starts with.
+
+    The status of each negative axis comes from the project, not from a literal
+    here: 400 for a malformed body and 422 for a product rule are both common, and
+    which one a target answers is a fact about the target. Only the product-rule
+    axis is read from the contract, because it varies per rule within one API.
+    """
     if kind == "H01":
         return _status_or_todo(happy_status)
     if _is_bean_validation_kind(kind):
-        return {"status": 400}
+        return {"status": project.validation_status()}
     if kind == "N-auth":
-        return {"status": 401}
+        return {"status": project.error_status("auth")}
     if kind.startswith("N-rule-"):
         return _rule_expect(kind.removeprefix("N-rule-"), contract.rules)
-    if kind in {"I-missing", "I-format"}:
-        return {"status": 400}
+    if kind == "I-missing":
+        return {"status": project.error_status("missing_header")}
+    if kind == "I-format":
+        return {"status": project.validation_status()}
     if kind in {"N-notfound", "S-bola"}:
-        return {"status": 404}
+        return {"status": project.error_status("not_found")}
     if kind == "E-conflict":
-        return {"status": 400}
+        return {"status": project.error_status("environment_conflict")}
     if kind == "E-isolate":
-        return {"status": 403}
+        return {"status": project.error_status("environment_isolation")}
     if _is_happy_clone_kind(kind):
         return _two_xx_or_todo(happy_status)
     if kind.startswith("P-"):
@@ -42,15 +52,16 @@ def mechanical_payload(
     kind: str,
     contract: Contract,
     happy_status: int | None,
+    project: ProjectView,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "diff": mechanical_diff(kind, contract),
-        "expect": mechanical_expect(kind, contract, happy_status),
+        "expect": mechanical_expect(kind, contract, happy_status, project),
     }
-    omit_headers = mechanical_omit_headers(kind, contract)
+    omit_headers = mechanical_omit_headers(kind, contract, project)
     if omit_headers:
         payload["omit_headers"] = omit_headers
-    headers = mechanical_headers(kind, contract)
+    headers = mechanical_headers(kind, contract, project)
     if headers:
         payload["headers"] = headers
     burst = mechanical_burst(kind, contract)
@@ -113,9 +124,25 @@ def mechanical_diff(kind: str, contract: Contract) -> dict[str, Any]:
     return {}
 
 
-def mechanical_omit_headers(kind: str, contract: Contract) -> list[str]:
+def mechanical_omit_headers(
+    kind: str,
+    contract: Contract,
+    project: ProjectView,
+) -> list[str]:
+    """The headers a generated case must leave out to produce the failure it names.
+
+    `N-auth` used to omit the literal `Authorization`, which made the harness
+    unable to test a route whose credential travels in another header — and the
+    header is a fact the descriptor already declares, next to the scheme the
+    contract names. Reading it here is the same move fase 1.4 made everywhere
+    else: the literal was the product's, not the harness's.
+    """
     if kind == "N-auth":
-        return ["Authorization"]
+        scheme = project.auth_named(contract.auth)
+        # `auth: none` on an `N-auth` case means the contract and the coverage
+        # disagree; the harness's own default header is the honest answer, and the
+        # case will fail loudly rather than silently send no header at all.
+        return [scheme.header if scheme is not None else "Authorization"]
     if kind == "I-missing":
         return ["X-Idempotency-Key"]
     if kind.startswith("N-rule-"):
@@ -139,9 +166,40 @@ def mechanical_saturate(kind: str, contract: Contract) -> dict[str, Any] | None:
     return rule.saturate.model_dump(exclude_none=True)
 
 
-def mechanical_headers(kind: str, contract: Contract) -> dict[str, str]:
+def mechanical_headers(
+    kind: str,
+    contract: Contract,
+    project: ProjectView,
+) -> dict[str, str]:
+    """The headers a generated case has to *add* to produce the failure it names.
+
+    Every arm here was unreachable until the Java parity fixture ran: the
+    environment arm returned early, so `I-format` sent a perfectly good
+    idempotency key while its `expect` said 400, and a rule that fails only with
+    a particular header was sent without it. The reference corpus already carried
+    those headers because a human wrote them, which is why nothing failed — a
+    hand-authored case is not a test of the generator.
+    """
     if kind in {"E-conflict", "E-isolate"}:
-        return {"X-Nokr-Environment": "production"}
+        # The point of these cases is that the same resource collides across
+        # environments, so they are generated against the second one. A project with
+        # no environment header cannot express that, and a case that silently omits
+        # it would pass while testing nothing.
+        name = project.environment_header_name()
+        isolation = project.isolation_environment()
+        if name is None or isolation is None:
+            raise HarnessError(
+                code="DESCRIPTOR_ENVIRONMENT_HEADER_MISSING",
+                message=(
+                    f"case kind {kind} needs a second environment, but the project"
+                    " descriptor declares no environment_header.isolation"
+                ),
+                hint=(
+                    "declare environment_header.name, .values and .isolation in the"
+                    " project descriptor"
+                ),
+            )
+        return {name: project.environment_value(isolation)}
     if kind == "I-format":
         return {"X-Idempotency-Key": "not-a-uuid-v4"}
     if kind.startswith("N-rule-"):
@@ -153,18 +211,6 @@ def mechanical_headers(kind: str, contract: Contract) -> dict[str, str]:
             if rule.id == kind.removeprefix("P-") and rule.headers:
                 return dict(rule.headers)
     return {}
-
-
-def read_h01_status(case_path: Path) -> int | None:
-    if not case_path.is_file():
-        return None
-    try:
-        status = load_case(case_path).expect.status
-    except (OSError, ValueError):
-        return None
-    if isinstance(status, int):
-        return status
-    return None
 
 
 def _is_bean_validation_kind(kind: str) -> bool:

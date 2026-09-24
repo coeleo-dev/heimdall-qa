@@ -1,32 +1,32 @@
 import argparse
 import json
-from pathlib import Path
 import sys
 import traceback
+from pathlib import Path
 
 import httpx
-from pydantic import ValidationError
-import yaml
-from yaml import YAMLError
 
-from heimdall_qa.campaign import campaign_status
-from heimdall_qa.campaign import validate_campaign
-from heimdall_qa.collection import is_campaign_yaml
-from heimdall_qa.config import HarnessConfig
-from heimdall_qa.config import load_config
-from heimdall_qa.descriptor import resolve_descriptor
+from heimdall_qa import __version__
+from heimdall_qa.discovery import DiscoveryReport
+from heimdall_qa.discovery import render_report
 from heimdall_qa.errors import HarnessError
 from heimdall_qa.errors import format_cli
-from heimdall_qa.fixtures import build_payload
-from heimdall_qa.runner import execute_round
-from heimdall_qa.scaffold import scaffold_endpoint
-from heimdall_qa.scaffold import scaffold_round
-from heimdall_qa.schema.load import load_campaign
-from heimdall_qa.schema.load import load_round
+from heimdall_qa.findings import explain
+from heimdall_qa.operations import Settings
+from heimdall_qa.operations import build_workspace
+from heimdall_qa.operations import campaign_report
+from heimdall_qa.operations import discover_surface
+from heimdall_qa.operations import fixture_payload
+from heimdall_qa.operations import latest_run
+from heimdall_qa.operations import resolve_settings
+from heimdall_qa.operations import run_round
+from heimdall_qa.operations import scaffold_contract
+from heimdall_qa.operations import scaffold_contract_round
+from heimdall_qa.operations import validate_campaign_file
+from heimdall_qa.operations import validate_round_file
+from heimdall_qa.operations import write_starter
 from heimdall_qa.serve.app import create_app
 from heimdall_qa.serve.bind import assert_local_bind
-from heimdall_qa.validate import validate_round
-from heimdall_qa.workspace import WorkspaceSession
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -35,17 +35,48 @@ def build_parser() -> argparse.ArgumentParser:
         description="Heimdall QA review harness",
     )
     parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+        help="Print the harness version and exit",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Print exception cause and traceback",
     )
     subparsers = parser.add_subparsers(dest="command")
+    init_parser = subparsers.add_parser(
+        "init",
+        help="Write the starter tree a project begins from",
+    )
+    init_parser.add_argument(
+        "--root",
+        default=None,
+        help="Directory to write into (default: the working directory)",
+    )
+    init_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite the starter files; a tree you have edited is kept without it",
+    )
     validate_parser = subparsers.add_parser(
         "validate",
         help="Validate a round against contract coverage",
     )
-    validate_parser.add_argument("round")
+    validate_parser.add_argument(
+        "round",
+        nargs="?",
+        default=None,
+        help="Round YAML to validate; omit it with --explain",
+    )
+    validate_parser.add_argument(
+        "--explain",
+        action="store_true",
+        help="List every rule code with the one-line reason it exists, and exit",
+    )
     validate_parser.add_argument("--root", default=None)
+    validate_parser.add_argument("--config", default=None)
     validate_parser.add_argument(
         "--descriptor",
         default=None,
@@ -56,7 +87,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Generate case stubs from a contract (mechanical expect filled)",
     )
     scaffold_parser.add_argument("contract")
-    scaffold_parser.add_argument("--out", default="cases")
+    scaffold_parser.add_argument(
+        "--out",
+        default="cases",
+        help="Directory the area's case file goes in (default: cases)",
+    )
+    scaffold_parser.add_argument("--root", default=None)
+    scaffold_parser.add_argument("--config", default=None)
+    scaffold_parser.add_argument("--descriptor", default=None)
     scaffold_parser.add_argument("--force", action="store_true")
     scaffold_parser.add_argument("--h01-status", type=int, default=None)
     scaffold_round_parser = subparsers.add_parser(
@@ -65,11 +103,52 @@ def build_parser() -> argparse.ArgumentParser:
     )
     scaffold_round_parser.add_argument("contract")
     scaffold_round_parser.add_argument("--out", default="rounds")
-    scaffold_round_parser.add_argument("--cases-out", default=None)
+    scaffold_round_parser.add_argument(
+        "--cases-out",
+        default=None,
+        help="Directory the area's case file goes in (default: <content>/cases)",
+    )
     scaffold_round_parser.add_argument("--force", action="store_true")
     scaffold_round_parser.add_argument("--h01-status", type=int, default=None)
     scaffold_round_parser.add_argument("--round-id", default=None)
     scaffold_round_parser.add_argument("--root", default=None)
+    scaffold_round_parser.add_argument("--config", default=None)
+    scaffold_round_parser.add_argument("--descriptor", default=None)
+    discover_parser = subparsers.add_parser(
+        "discover",
+        help="Read the API's own contract and generate contracts, cases and a gaps report",
+    )
+    discover_parser.add_argument(
+        "--source",
+        default=None,
+        help="Reader to use for this run instead of the declared contract.source",
+    )
+    discover_parser.add_argument(
+        "--location",
+        default=None,
+        help="Document to read for this run instead of contract.location",
+    )
+    discover_parser.add_argument("--contracts-out", default="contracts")
+    discover_parser.add_argument("--cases-out", default="cases")
+    discover_parser.add_argument(
+        "--report",
+        default=None,
+        help="Where to write the gaps report (default: <content>/DISCOVERY.md)",
+    )
+    discover_parser.add_argument(
+        "--route",
+        nargs="+",
+        default=None,
+        help="Read only this route, e.g. --route POST /api/ingest",
+    )
+    discover_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print the report and write nothing, which answers 'what would you generate'",
+    )
+    discover_parser.add_argument("--force", action="store_true")
+    discover_parser.add_argument("--root", default=None)
+    discover_parser.add_argument("--descriptor", default=None)
     campaign_parser = subparsers.add_parser(
         "campaign",
         help="Validate or report status of a multi-round campaign",
@@ -84,12 +163,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     campaign_validate.add_argument("campaign")
     campaign_validate.add_argument("--root", default=None)
+    campaign_validate.add_argument("--descriptor", default=None)
     campaign_status_parser = campaign_sub.add_parser(
         "status",
         help="Report run status for every round in a campaign",
     )
     campaign_status_parser.add_argument("campaign")
     campaign_status_parser.add_argument("--root", default=None)
+    campaign_status_parser.add_argument("--descriptor", default=None)
     campaign_status_parser.add_argument("--runs-dir", default="runs")
     run_parser = subparsers.add_parser(
         "run",
@@ -131,6 +212,9 @@ def build_parser() -> argparse.ArgumentParser:
         "kind",
         help="email, password, person_name, company_name, address, cpf, cnpj, or register",
     )
+    fixture_parser.add_argument("--root", default=None)
+    fixture_parser.add_argument("--config", default=None)
+    fixture_parser.add_argument("--descriptor", default=None)
     return parser
 
 
@@ -159,13 +243,29 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
 
+def _settings(args: argparse.Namespace, *, runs_dir: Path | None = None) -> Settings:
+    """The wiring every command shares, built once from the parsed arguments."""
+    root = Path(args.root) if getattr(args, "root", None) else Path.cwd()
+    return resolve_settings(
+        root,
+        config_path=getattr(args, "config", None),
+        secrets_path=getattr(args, "secrets", None),
+        descriptor_path=getattr(args, "descriptor", None),
+        runs_dir=runs_dir,
+    )
+
+
 def _dispatch(args: argparse.Namespace) -> int:
+    if args.command == "init":
+        return _run_init(args)
     if args.command == "validate":
         return _run_validate(args)
     if args.command == "scaffold-endpoint":
         return _run_scaffold(args)
     if args.command == "scaffold-round":
         return _run_scaffold_round(args)
+    if args.command == "discover":
+        return _run_discover(args)
     if args.command == "campaign":
         return _run_campaign(args)
     if args.command == "run":
@@ -179,46 +279,91 @@ def _dispatch(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_init(args: argparse.Namespace) -> int:
+    """The starter tree, and a line per file so `init` reports what it did."""
+    root = Path(args.root) if getattr(args, "root", None) else Path.cwd()
+    for line in write_starter(root, force=args.force):
+        print(line)
+    print(f"next: heimdall-qa validate rounds/smoke.yaml   # in {root.resolve()}")
+    return 0
+
+
 def _run_validate(args: argparse.Namespace) -> int:
-    root = Path(args.root) if args.root else Path.cwd()
+    if getattr(args, "explain", False):
+        print(explain())
+        return 0
+    if not args.round:
+        raise HarnessError(
+            code="VALIDATE_NO_ROUND",
+            message="validate needs a round, or --explain to list the rules",
+            hint="heimdall-qa validate rounds/<id>.yaml | heimdall-qa validate --explain",
+        )
     # A descriptor that fails here never reaches a run. An absent one is not an
     # error: it is optional until a case needs something only it knows.
-    resolve_descriptor(root, explicit=getattr(args, "descriptor", None))
-    errors = validate_round(Path(args.round), root)
-    for error in errors:
-        print(error, file=sys.stderr)
-    return 1 if errors else 0
+    findings = validate_round_file(_settings(args), args.round)
+    for item in findings:
+        print(item.render(), file=sys.stderr)
+    return 1 if findings else 0
 
 
 def _run_scaffold(args: argparse.Namespace) -> int:
-    contract_path = Path(args.contract)
-    ids = scaffold_endpoint(
-        contract_path,
-        Path(args.out),
+    for case_id in scaffold_contract(
+        _settings(args),
+        args.contract,
+        out=args.out,
         force=args.force,
         h01_status=args.h01_status,
-    )
-    for case_id in ids:
+    ):
         print(case_id)
     return 0
 
 
 def _run_scaffold_round(args: argparse.Namespace) -> int:
-    root = Path(args.root) if args.root else Path.cwd()
-    cases_out = Path(args.cases_out) if args.cases_out else None
-    result = scaffold_round(
-        Path(args.contract),
-        Path(args.out),
-        cases_dir=cases_out,
+    result = scaffold_contract_round(
+        _settings(args),
+        args.contract,
+        out=args.out,
+        cases_out=args.cases_out,
         force=args.force,
         h01_status=args.h01_status,
         round_id=args.round_id,
-        root=root,
     )
     print(result["round"])
     for case_id in result["case_ids"]:
         print(case_id)
     return 0
+
+
+def _run_discover(args: argparse.Namespace) -> int:
+    report = discover_surface(
+        _settings(args),
+        source=args.source,
+        location=args.location,
+        route=" ".join(args.route) if args.route else None,
+        contracts_out=args.contracts_out,
+        cases_out=args.cases_out,
+        report=args.report,
+        dry_run=args.dry_run,
+        force=args.force,
+    )
+    if args.dry_run:
+        # The report is the whole output of a read-only run, so it goes to stdout
+        # where a diff can take it, and no file is left behind to review by mistake.
+        print(render_report(report), end="")
+        return 0
+    _report_discovery(report)
+    return 0
+
+
+def _report_discovery(report: DiscoveryReport) -> None:
+    """The path first, because it is what the next command reads."""
+    print(str(report.report_path.resolve()))
+    print(
+        f"{len(report.endpoints)} endpoints,"
+        f" {report.written_case_count()} cases written,"
+        f" {report.kept_case_count()} kept,"
+        f" {report.gap_count()} gaps"
+    )
 
 
 def _run_campaign(args: argparse.Namespace) -> int:
@@ -232,206 +377,58 @@ def _run_campaign(args: argparse.Namespace) -> int:
 
 
 def _run_campaign_validate(args: argparse.Namespace) -> int:
-    root = Path(args.root) if args.root else Path.cwd()
-    errors = validate_campaign(Path(args.campaign), root)
-    for error in errors:
-        print(error, file=sys.stderr)
-    return 1 if errors else 0
+    findings = validate_campaign_file(_settings(args), args.campaign)
+    for item in findings:
+        print(item.render(), file=sys.stderr)
+    return 1 if findings else 0
 
 
 def _run_campaign_status(args: argparse.Namespace) -> int:
-    root = Path(args.root) if args.root else Path.cwd()
-    payload = campaign_status(Path(args.campaign), root, Path(args.runs_dir))
-    print(json.dumps(payload, indent=2, ensure_ascii=False))
+    settings = _settings(args, runs_dir=Path(args.runs_dir))
+    print(json.dumps(campaign_report(settings, args.campaign), indent=2, ensure_ascii=False))
     return 0
 
 
 def _run_run(args: argparse.Namespace) -> int:
-    root = Path(args.root) if args.root else Path.cwd()
-    config = _resolve_config(args.config)
-    secrets = _resolve_secrets(args.secrets, root)
-    resolved = resolve_descriptor(root, explicit=getattr(args, "descriptor", None))
-    runs_dir = Path.cwd() / "runs"
+    settings = _settings(args)
     with httpx.Client(timeout=10.0) as client:
-        run_dir = execute_round(
-            Path(args.round),
-            root=root,
-            config=config,
-            client=client,
-            runs_dir=runs_dir,
-            secrets=secrets,
-            mode=args.mode,
-            descriptor=resolved.as_summary() if resolved is not None else None,
-        )
+        run_dir = run_round(settings, args.round, client=client, mode=args.mode)
     print(str(run_dir.resolve()))
-    summary = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
-    counts = summary["counts"]
+    counts = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))["counts"]
     if counts["fail"] or counts["http_5xx"]:
         return 1
     return 0
 
 
 def _run_fixture(args: argparse.Namespace) -> int:
-    print(json.dumps(build_payload(args.kind), ensure_ascii=False, indent=2))
+    print(json.dumps(fixture_payload(_settings(args), args.kind), ensure_ascii=False, indent=2))
     return 0
 
 
 def _run_last_run(args: argparse.Namespace) -> int:
-    latest = Path(args.runs_dir) / "latest"
-    if not latest.is_symlink() or not latest.exists():
-        raise HarnessError(
-            code="LAST_RUN_MISSING",
-            message="no runs/latest symlink",
-            hint="run a round first: heimdall-qa run ROUND --mode headless",
-        )
-    print(str(latest.resolve()))
+    print(str(latest_run(Path(args.runs_dir))))
     return 0
 
 
 def _run_serve(args: argparse.Namespace) -> int:
     import uvicorn
 
-    root = Path(args.root) if args.root else Path.cwd()
-    config = _resolve_config(args.config)
-    assert_local_bind(config.ui.host)
-    secrets = _resolve_secrets(args.secrets, root)
+    settings = _settings(args)
+    assert_local_bind(settings.config.ui.host)
     client = httpx.Client(timeout=10.0)
-    workspace = _build_workspace(
-        getattr(args, "target", None),
-        root=root,
-        config=config,
-        client=client,
-        secrets=secrets,
-    )
+    workspace = build_workspace(settings, client=client, target=getattr(args, "target", None))
     app = create_app(workspace=workspace)
-    print(f"http://{config.ui.host}:{config.ui.port}")
+    print(f"http://{settings.config.ui.host}:{settings.config.ui.port}")
     try:
         uvicorn.run(
             app,
-            host=config.ui.host,
-            port=config.ui.port,
+            host=settings.config.ui.host,
+            port=settings.config.ui.port,
             access_log=False,
         )
     finally:
         client.close()
     return 0
-
-
-def _build_workspace(
-    target: str | None,
-    *,
-    root: Path,
-    config: HarnessConfig,
-    client: httpx.Client,
-    secrets: dict[str, str],
-) -> WorkspaceSession:
-    runs_dir = Path.cwd() / "runs"
-    if not target:
-        return WorkspaceSession(
-            root=root,
-            config=config,
-            client=client,
-            runs_dir=runs_dir,
-            secrets=secrets,
-        )
-    path = Path(target)
-    if is_campaign_yaml(path):
-        workspace = WorkspaceSession(
-            root=root,
-            config=config,
-            client=client,
-            runs_dir=runs_dir,
-            secrets=secrets,
-        )
-        try:
-            campaign = load_campaign(path)
-        except (OSError, ValueError, ValidationError, YAMLError) as exc:
-            raise HarnessError(
-                code="ROUND_INVALID",
-                message="campaign YAML is invalid",
-                hint="fix the campaign file and run heimdall-qa campaign validate",
-                details=(str(exc),),
-            ) from exc
-        workspace.select(f"campaign:{campaign.id}")
-        return workspace
-    try:
-        load_round(path)
-    except (OSError, ValueError, ValidationError, YAMLError) as exc:
-        raise HarnessError(
-            code="ROUND_INVALID",
-            message="round YAML is invalid",
-            hint="fix the round file and run heimdall-qa validate",
-            details=(str(exc),),
-        ) from exc
-    return WorkspaceSession(
-        root=root,
-        config=config,
-        client=client,
-        runs_dir=runs_dir,
-        secrets=secrets,
-        focus=path,
-    )
-
-
-def _resolve_config(raw: str | None) -> HarnessConfig:
-    if raw:
-        return _read_config(Path(raw))
-    default = Path.cwd() / "config.yaml"
-    if default.is_file():
-        return _read_config(default)
-    return HarnessConfig()
-
-
-def _read_config(path: Path) -> HarnessConfig:
-    if not path.is_file():
-        raise HarnessError(
-            code="CONFIG_INVALID",
-            message=f"config file not found: {path}",
-            hint="pass --config or create config.yaml in the working directory",
-        )
-    try:
-        return load_config(path)
-    except (OSError, ValueError, ValidationError, YAMLError) as exc:
-        raise HarnessError(
-            code="CONFIG_INVALID",
-            message=f"config file is invalid: {path}",
-            hint="fix config.yaml and retry",
-            details=(str(exc),),
-        ) from exc
-
-
-def _resolve_secrets(raw: str | None, root: Path) -> dict[str, str]:
-    if raw:
-        return _read_secrets(Path(raw))
-    default = root / "secrets.local.yaml"
-    if default.is_file():
-        return _read_secrets(default)
-    return {}
-
-
-def _read_secrets(path: Path) -> dict[str, str]:
-    if not path.is_file():
-        raise HarnessError(
-            code="CONFIG_INVALID",
-            message=f"secrets file not found: {path}",
-            hint="create secrets.local.yaml with api_key, jwt, or admin_secret",
-        )
-    try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except (OSError, YAMLError) as exc:
-        raise HarnessError(
-            code="CONFIG_INVALID",
-            message=f"secrets file is invalid: {path}",
-            hint="fix secrets.local.yaml and retry",
-            details=(str(exc),),
-        ) from exc
-    if not isinstance(data, dict):
-        raise HarnessError(
-            code="CONFIG_INVALID",
-            message=f"secrets file must be a mapping: {path}",
-            hint="use keys api_key, jwt, or admin_secret",
-        )
-    return {str(key): str(value) for key, value in data.items()}
 
 
 def _print_verbose(err: BaseException) -> None:

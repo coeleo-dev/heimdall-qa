@@ -213,6 +213,7 @@ def _step_payload(
     probe_rows = _probe_rows(probe)
     is_probe = bool(probe_rows)
     http_status = response_doc.get("status") if isinstance(response_doc, dict) else None
+    log_sources, log_timeline = _log_evidence(step_dir)
     return {
         "request_doc": request_doc,
         "response_doc": response_doc,
@@ -220,8 +221,8 @@ def _step_payload(
         "packs": packs,
         "pack_alerts": [item for item in packs if item.get("status") in {"fail", "warn"}],
         "pack_ok": [item for item in packs if item.get("status") not in {"fail", "warn"}],
-        "logs_web": _read_text(step_dir / "logs-web.txt"),
-        "logs_worker": _read_text(step_dir / "logs-worker.txt"),
+        "logs_sources": log_sources,
+        "logs_timeline": log_timeline,
         "probe": probe,
         "probe_rows": probe_rows,
         "is_probe": is_probe,
@@ -252,8 +253,8 @@ def _empty_step() -> dict[str, Any]:
         "packs": [],
         "pack_alerts": [],
         "pack_ok": [],
-        "logs_web": "",
-        "logs_worker": "",
+        "logs_sources": [],
+        "logs_timeline": [],
         "probe": {},
         "probe_rows": [],
         "is_probe": False,
@@ -277,6 +278,29 @@ def _empty_step() -> dict[str, Any]:
 def _recorded_verdict(step_dir: Path) -> dict[str, Any]:
     payload = _read_json(step_dir / "verdict.json")
     return payload if isinstance(payload, dict) else {}
+
+
+def _log_evidence(step_dir: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """What each declared source answered, and the trace's merged timeline.
+
+    The metadata comes from `logs.json` because the *reason* a source is empty is
+    the whole point: the page has to say "the file is not there" and "the project
+    declared the trace does not reach it", not render both as a blank panel.
+    """
+    payload = _read_json(step_dir / "logs.json")
+    sources = payload.get("sources", []) if isinstance(payload, dict) else []
+    timeline = payload.get("timeline", []) if isinstance(payload, dict) else []
+    rows: list[dict[str, Any]] = []
+    for source in sources if isinstance(sources, list) else []:
+        if not isinstance(source, dict):
+            continue
+        rows.append(
+            {
+                **source,
+                "text": _read_text(step_dir / f"logs-{source.get('id', '')}.txt"),
+            }
+        )
+    return rows, [item for item in timeline if isinstance(item, dict)]
 
 
 def _case_label(view: SessionView, step_dir: Path) -> str:

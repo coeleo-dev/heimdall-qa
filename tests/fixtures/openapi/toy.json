@@ -1,0 +1,174 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Toy API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/toy/health": {
+      "get": {
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "ready"
+          }
+        }
+      }
+    },
+    "/toy/items": {
+      "post": {
+        "operationId": "createItem",
+        "parameters": [
+          {
+            "name": "X-Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateItem"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "created"
+          },
+          "422": {
+            "description": "refused by a rule"
+          }
+        }
+      }
+    },
+    "/toy/items/{id}": {
+      "get": {
+        "operationId": "getItem",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "one item"
+          },
+          "404": {
+            "description": "missing"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteItem",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "missing"
+          }
+        }
+      }
+    },
+    "/toy/convert": {
+      "post": {
+        "operationId": "convert",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduledItem"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "accepted"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateItem": {
+        "type": "object",
+        "required": ["name", "amount"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 40,
+            "example": "widget"
+          },
+          "amount": {
+            "type": "integer",
+            "example": 1000
+          },
+          "currency": {
+            "type": "string",
+            "enum": ["BRL", "USD"]
+          },
+          "label": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "tax_id": {
+            "type": "string",
+            "maxLength": 14
+          },
+          "metadata": {
+            "type": "object",
+            "maxProperties": 5
+          }
+        }
+      },
+      "ScheduledItem": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": ["scheduled_for"],
+            "properties": {
+              "scheduled_for": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2026-01-01T00:00:00Z"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/CreateItem"
+          }
+        ]
+      }
+    }
+  }
+}

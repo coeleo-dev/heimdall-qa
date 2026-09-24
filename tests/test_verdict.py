@@ -31,7 +31,7 @@ def _result(
         step_dir=step_dir,
         status_code=status_code,
         packs=packs,
-        trace_id="nokrqa-test",
+        trace_id="heimdall-test",
     )
 
 

@@ -1,0 +1,25 @@
+server:
+  port: 8120
+
+spring:
+  application:
+    name: spring-fixture
+  # A validation failure has to answer in English. The harness's `http.error` pack
+  # refuses a message that reads Portuguese, which is a real rule (the constitution
+  # makes the codebase English-only) and a real trap: Hibernate Validator resolves
+  # its messages from `Locale.getDefault()`, so this fixture answered
+  # "name nao deve estar em branco" until the locale was pinned. The pack was right
+  # and the fixture was wrong, which is the outcome a parity target wants.
+  web:
+    locale: en_US
+    locale-resolver: fixed
+
+# The file the harness reads. The pattern is the whole of the correlation: the
+# reader's marker is `trace_id: [<value>]`, and the value comes from the filter.
+logging:
+  file:
+    name: logs/fixture.log
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level trace_id: [%X{traceId:-}] %logger{0} - %msg%n"
+  level:
+    root: INFO

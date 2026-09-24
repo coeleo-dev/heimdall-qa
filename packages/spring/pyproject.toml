@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "heimdall-qa-spring"
+version = "0.1.0"
+description = "Spring Boot contract reader for Heimdall QA"
+readme = "README.md"
+requires-python = ">=3.12"
+# The reader imports the core's IR (`heimdall_qa.contract_source`) and its error
+# type, and nothing else. The dependency is one-way and declared here, so a Spring
+# project installs the reader and gets the core with it, and a project that never
+# touches Java never installs any of this.
+dependencies = ["heimdall-qa>=0.1.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+# The seam itself: the core discovers this reader by name and never imports it.
+[project.entry-points."heimdall_qa.contract_sources"]
+spring = "heimdall_qa_spring.reader"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

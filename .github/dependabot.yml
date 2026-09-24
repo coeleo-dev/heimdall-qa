@@ -1,0 +1,53 @@
+# Dependency updates, opened as a starting point rather than applied on sight.
+#
+# This project's dependency surface is small on purpose — the harness is stdlib plus
+# pydantic, httpx, PyYAML and the review screen's web stack — so the value here is not
+# volume. It is that an update arrives as a PR that runs the gates, which is the only
+# way to know whether a bump broke the thing the harness exists to measure.
+#
+# Grouped, because a weekly PR per package is noise a maintainer learns to ignore, and
+# an ignored dependency PR is how a repository ends up pinned to a version nobody
+# chose.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # The core's runtime dependencies move together and are tested together.
+      core:
+        patterns: ["*"]
+        exclude-patterns: ["ruff", "pytest*"]
+      # Tooling: a lint or test-runner bump is a separate decision from a runtime one,
+      # and it should be reviewable on its own.
+      tooling:
+        patterns: ["ruff", "pytest*"]
+
+  # The reader is its own distribution with its own dependency, and a bump there must
+  # not be bundled with a core one — the whole point of the split is that the two move
+  # independently.
+  - package-ecosystem: pip
+    directory: /packages/spring
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+
+  # The Java parity target. Its Spring Boot version is a claim about the reader: that
+  # it reads current Spring source, not the source of two years ago.
+  - package-ecosystem: maven
+    directory: /examples/spring-fixture
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+
+  # The workflows. A pinned action is a dependency like any other, and the one place
+  # where an update is cheap to review.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

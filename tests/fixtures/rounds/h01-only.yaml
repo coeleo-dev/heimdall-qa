@@ -6,4 +6,4 @@ dimensions:
   - business
 environment: sandbox
 include:
-  - cases/ingest/ingest-H01.yaml
+  - cases/ingest.yaml

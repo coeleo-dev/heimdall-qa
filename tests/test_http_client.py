@@ -1,6 +1,8 @@
 from pathlib import Path
 
 import httpx
+import pytest
+from pydantic import ValidationError
 
 from heimdall_qa.config import HarnessConfig
 from heimdall_qa.config import load_config
@@ -11,11 +13,11 @@ def test_send_records_status_headers_body_and_elapsed():
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "POST"
         assert request.url.path == "/api/ingest"
-        assert request.headers["x-trace-id"] == "nokrqa-run-1"
+        assert request.headers["x-trace-id"] == "heimdall-run-1"
         return httpx.Response(
             202,
             json={"status": "ACCEPTED"},
-            headers={"X-Trace-Id": "nokrqa-run-1"},
+            headers={"X-Trace-Id": "heimdall-run-1"},
         )
 
     transport = httpx.MockTransport(handler)
@@ -24,39 +26,42 @@ def test_send_records_status_headers_body_and_elapsed():
         client,
         "POST",
         "http://127.0.0.1:8080/api/ingest",
-        headers={"X-Trace-Id": "nokrqa-run-1"},
+        headers={"X-Trace-Id": "heimdall-run-1"},
         json_body={"event_type": "llm_tokens"},
     )
     assert exchange.status_code == 202
-    assert exchange.response_headers["x-trace-id"] == "nokrqa-run-1"
+    assert exchange.response_headers["x-trace-id"] == "heimdall-run-1"
     assert '"ACCEPTED"' in exchange.response_text
     assert exchange.elapsed_ms >= 0
 
 
-def test_load_config_reads_nokr_web_and_budgets(tmp_path: Path):
+def test_load_config_reads_harness_infrastructure_only(tmp_path: Path):
+    """`config.yaml` holds no fact about an API, and refuses one that tries."""
     path = tmp_path / "config.yaml"
     path.write_text(
         "\n".join(
             [
-                "bruno_collection: /tmp/bruno",
-                "nokr_web: http://127.0.0.1:8080",
-                "nokr_admin: http://127.0.0.1:9090",
-                "budgets_ms:",
-                "  hot_path:",
-                "    budget: 50",
-                "    fail: 1500",
-                "  default:",
-                "    budget: 1500",
-                "    fail: 1500",
-                "register_gap_ms: 2000",
+                "ui:",
+                "  host: 127.0.0.1",
+                "  port: 7878",
+                "probes:",
+                "  ingest_poll_ms: 8000",
+                "pace_gap_ms: 2000",
             ]
         ),
         encoding="utf-8",
     )
     config = load_config(path)
     assert isinstance(config, HarnessConfig)
-    assert config.nokr_web == "http://127.0.0.1:8080"
-    assert config.nokr_admin == "http://127.0.0.1:9090"
-    assert config.budgets_ms.hot_path.fail == 1500
-    assert config.budgets_ms.hot_path.budget == 50
-    assert config.register_gap_ms == 2000
+    assert config.ui.port == 7878
+    assert config.probes.ingest_poll_ms == 8000
+    assert config.pace_gap_ms == 2000
+    assert config.project.descriptor is None
+
+
+def test_load_config_refuses_a_product_fact(tmp_path: Path):
+    """Silently ignoring `legacy_web` is how a run hits a stale origin."""
+    path = tmp_path / "config.yaml"
+    path.write_text("legacy_web: http://127.0.0.1:8080\n", encoding="utf-8")
+    with pytest.raises(ValidationError):
+        load_config(path)

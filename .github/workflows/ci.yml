@@ -1,0 +1,115 @@
+# What CI is for, and what it deliberately is not.
+#
+# The harness's whole claim is that a green suite means the thing under review was
+# actually measured. So CI has to make the same claim about the harness itself: not
+# "the tests pass" — a clone whose bootstrap is broken passes its tests on the
+# maintainer's machine — but "a clone from this commit, on a machine that has nothing,
+# bootstraps and goes green". That is the `clone` job below, and it is the reason the
+# matrix exists: the seam being measured is the install, not the code.
+#
+# The gates are separate jobs rather than steps in one, because a failure should name
+# which claim broke. `boundary` failing means a review target leaked; `toy` failing
+# means the harness stopped measuring an API; `spring` failing means the Java reader
+# did. Three different afternoons.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A pushed fix must not queue behind the run it fixes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      # No project install: the lint opinion is in `pyproject.toml`, and ruff reads it
+      # from the checkout. An installed harness would tell CI nothing extra.
+      - run: pip install ruff
+      - run: ruff check --output-format github .
+
+  clone:
+    name: A fresh clone, bootstrap to green (python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      # Every version is worth its own answer; one failure should not cancel the rest.
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      # The clone's own entry point, not a re-spelling of it. If `bin/bootstrap` stops
+      # working, this job fails here rather than at a colleague's first command.
+      - name: Bootstrap
+        run: bin/bootstrap
+      - name: The core's suite, with no product installed
+        run: .venv/bin/python -m pytest -q
+      - name: The reader's suite, with no JVM required
+        run: .venv/bin/python -m pytest -q packages/spring
+
+  boundary:
+    name: Boundary — nothing of a review target is publishable
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: bin/bootstrap
+      # Asserts the absence of the trees a review target owns, the absence of its
+      # tokens from the published set, that the core names no product, and that the
+      # suite passes in the tree exactly as it would ship.
+      - run: bin/audit-remote
+
+  toy:
+    name: The toy gate — a clean wheel still measures an API
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: bin/bootstrap
+      # No product on disk, one provider small enough to read, and the claims in the
+      # script's header: the harness still runs, still refuses a TODO, still measures.
+      - run: bash examples/toy-provider/gate.sh
+
+  spring:
+    name: The Java gate — a Spring target, read and then talked to
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      # The fixture is Spring Boot 4 on Java 25; the harness needs no JDK, the target
+      # it reads does. This job is the one place the two toolchains meet.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+      - run: bin/bootstrap
+      # Builds the fixture with the Maven wrapper, starts it, reads its source tree,
+      # and runs a round against the running application.
+      - run: bash examples/spring-fixture/gate.sh

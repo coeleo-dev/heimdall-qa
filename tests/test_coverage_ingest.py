@@ -1,5 +1,5 @@
-from pathlib import Path
 import shutil
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -59,7 +59,7 @@ def _get_contract(*, auth: str, p_gaps: list[str] | None = None) -> Contract:
     return Contract.model_validate(
         {
             "endpoint": "GET /api/users/{{external_user_id}}",
-            "dto": "com.nokr.domain.user.controller.UserController",
+            "dto": "com.example.domain.user.controller.UserController",
             "auth": auth,
             "baseline": "baselines/empty.json",
             "fields": {},
@@ -103,7 +103,7 @@ def test_validate_example_round_passes():
 
 def test_validate_h01_only_round_fails():
     errors = validate_round(H01_ROUND, FIXTURES)
-    joined = "\n".join(errors)
+    joined = "\n".join(item.render() for item in errors)
     assert errors
     assert "ingest-N-omit-timestamp" in joined
 
@@ -114,14 +114,14 @@ def test_stub_status_todo_is_invalid(tmp_path: Path):
     shutil.copy(INGEST_CONTRACT, contracts / "api-ingest-post.yaml")
     case_dir = tmp_path / "cases"
     case_dir.mkdir()
-    (case_dir / "ingest-H01.yaml").write_text(
+    (case_dir / "ingest.yaml").write_text(
         "\n".join(
             [
-                "id: ingest-H01",
-                "contract: contracts/api-ingest-post.yaml",
-                "kind: H01",
-                "expect:",
-                "  status: TODO",
+                "ingest-H01:",
+                "  contract: contracts/api-ingest-post.yaml",
+                "  kind: H01",
+                "  expect:",
+                "    status: TODO",
             ]
         ),
         encoding="utf-8",
@@ -135,7 +135,7 @@ def test_stub_status_todo_is_invalid(tmp_path: Path):
                 "mode: review",
                 "environment: sandbox",
                 "include:",
-                "  - cases/ingest-H01.yaml",
+                "  - cases/ingest.yaml",
             ]
         ),
         encoding="utf-8",
@@ -151,7 +151,7 @@ def test_validate_rule_without_code_or_error_is_incomplete(tmp_path: Path):
         "\n".join(
             [
                 "endpoint: POST /qa/note",
-                "dto: com.nokr.qa.NoteRequest",
+                "dto: com.example.qa.NoteRequest",
                 "auth: none",
                 "baseline: baselines/note.json",
                 "fields:",
@@ -167,38 +167,24 @@ def test_validate_rule_without_code_or_error_is_incomplete(tmp_path: Path):
     )
     cases = tmp_path / "cases"
     cases.mkdir()
-    (cases / "note-H01.yaml").write_text(
+    (cases / "note.yaml").write_text(
         "\n".join(
             [
-                "id: note-H01",
-                "contract: contracts/note.yaml",
-                "kind: H01",
-                "expect:",
-                "  status: 201",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    (cases / "note-N-omit-note.yaml").write_text(
-        "\n".join(
-            [
-                "id: note-N-omit-note",
-                "contract: contracts/note.yaml",
-                "kind: N-omit-note",
-                "expect:",
-                "  status: 400",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    (cases / "note-N-rule-DUPLICATE.yaml").write_text(
-        "\n".join(
-            [
-                "id: note-N-rule-DUPLICATE",
-                "contract: contracts/note.yaml",
-                "kind: N-rule-DUPLICATE",
-                "expect:",
-                "  status: 409",
+                "note-H01:",
+                "  contract: contracts/note.yaml",
+                "  kind: H01",
+                "  expect:",
+                "    status: 201",
+                "note-N-omit-note:",
+                "  contract: contracts/note.yaml",
+                "  kind: N-omit-note",
+                "  expect:",
+                "    status: 400",
+                "note-N-rule-DUPLICATE:",
+                "  contract: contracts/note.yaml",
+                "  kind: N-rule-DUPLICATE",
+                "  expect:",
+                "    status: 409",
             ]
         ),
         encoding="utf-8",
@@ -212,15 +198,11 @@ def test_validate_rule_without_code_or_error_is_incomplete(tmp_path: Path):
                 "mode: review",
                 "environment: sandbox",
                 "include:",
-                "  - cases/note-H01.yaml",
-                "  - cases/note-N-omit-note.yaml",
-                "  - cases/note-N-rule-DUPLICATE.yaml",
+                "  - cases/note.yaml",
             ]
         ),
         encoding="utf-8",
     )
     errors = validate_round(round_path, tmp_path)
-    joined = "\n".join(errors)
-    assert errors
-    assert "DUPLICATE" in joined
-    assert "code" in joined or "error" in joined
+    assert "RULE_NEEDS_IDENTITY" in {item.code for item in errors}
+    assert "DUPLICATE" in "\n".join(item.render() for item in errors)

@@ -4,13 +4,14 @@ from pathlib import Path
 import httpx
 import pytest
 
-from heimdall_qa.config import HarnessConfig
-from heimdall_qa.config import LogFiles
 from heimdall_qa.errors import HarnessError
 from heimdall_qa.session import RoundSession
+from heimdall_qa.testing import config_for
+from heimdall_qa.testing import project_at
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 WALK_HN = FIXTURES / "rounds" / "walk-hn.yaml"
+_DESCRIPTOR = FIXTURES / "qa" / "project.yaml"
 
 
 def _handler(web_log: Path, *, log_h01: bool, log_n: bool):
@@ -45,16 +46,16 @@ def _append_trace(web_log: Path, trace: str) -> None:
 
 
 def _session(tmp_path: Path, handler) -> RoundSession:
-    web_log = tmp_path / "nokr-web.log"
-    worker_log = tmp_path / "nokr-worker.log"
+    web_log = tmp_path / "web.log"
+    worker_log = tmp_path / "worker.log"
     web_log.write_text("", encoding="utf-8")
     worker_log.write_text("", encoding="utf-8")
     client = httpx.Client(transport=httpx.MockTransport(handler), timeout=10.0)
     return RoundSession(
         WALK_HN,
         root=FIXTURES,
-        config=HarnessConfig(
-            log_files=LogFiles(web=str(web_log), worker=str(worker_log)),
+        config=config_for(
+            project_at(_DESCRIPTOR, web=str(web_log), worker=str(worker_log))
         ),
         client=client,
         runs_dir=tmp_path / "runs",
@@ -62,7 +63,7 @@ def _session(tmp_path: Path, handler) -> RoundSession:
 
 
 def test_walk_pauses_on_first_step_without_human_verdict(tmp_path: Path):
-    web_log = tmp_path / "nokr-web.log"
+    web_log = tmp_path / "web.log"
     web_log.write_text("", encoding="utf-8")
     session = _session(tmp_path, _handler(web_log, log_h01=True, log_n=False))
     view = session.start("walk")
@@ -80,7 +81,7 @@ def test_walk_pauses_on_first_step_without_human_verdict(tmp_path: Path):
 
 
 def test_review_auto_advances_passing_h01_and_pauses_on_n(tmp_path: Path):
-    web_log = tmp_path / "nokr-web.log"
+    web_log = tmp_path / "web.log"
     web_log.write_text("", encoding="utf-8")
     session = _session(tmp_path, _handler(web_log, log_h01=True, log_n=False))
     view = session.start("review")
@@ -94,7 +95,7 @@ def test_review_auto_advances_passing_h01_and_pauses_on_n(tmp_path: Path):
 
 
 def test_apply_verdict_fail_requires_comment(tmp_path: Path):
-    web_log = tmp_path / "nokr-web.log"
+    web_log = tmp_path / "web.log"
     web_log.write_text("", encoding="utf-8")
     session = _session(tmp_path, _handler(web_log, log_h01=True, log_n=False))
     session.start("walk")
@@ -106,7 +107,7 @@ def test_apply_verdict_fail_requires_comment(tmp_path: Path):
 
 
 def test_apply_verdict_stop_finishes_run(tmp_path: Path):
-    web_log = tmp_path / "nokr-web.log"
+    web_log = tmp_path / "web.log"
     web_log.write_text("", encoding="utf-8")
     session = _session(tmp_path, _handler(web_log, log_h01=True, log_n=False))
     session.start("walk")
@@ -122,7 +123,7 @@ def test_apply_verdict_stop_finishes_run(tmp_path: Path):
 
 
 def test_session_headless_mode_requires_ui(tmp_path: Path):
-    web_log = tmp_path / "nokr-web.log"
+    web_log = tmp_path / "web.log"
     web_log.write_text("", encoding="utf-8")
     session = _session(tmp_path, _handler(web_log, log_h01=True, log_n=False))
     with pytest.raises(HarnessError) as caught:

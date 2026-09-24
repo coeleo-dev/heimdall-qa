@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from dataclasses import replace
-import json
 from pathlib import Path
 from typing import Any
 from typing import Literal
@@ -11,13 +11,16 @@ from pydantic import ValidationError
 from yaml import YAMLError
 
 from heimdall_qa.campaign import find_latest_run
+from heimdall_qa.project import ProjectView
 from heimdall_qa.runner import optional_suite
+from heimdall_qa.schema.load import content_root
+from heimdall_qa.schema.load import iter_cases
 from heimdall_qa.schema.load import load_campaign
-from heimdall_qa.schema.load import load_case
 from heimdall_qa.schema.load import load_round
 from heimdall_qa.schema.load import load_yaml
+from heimdall_qa.schema.load import resolve_path
+from heimdall_qa.schema.load import split_selector
 from heimdall_qa.suite_run import visible_steps
-from heimdall_qa.validate import resolve_path
 from heimdall_qa.validate import validate_round
 
 NodeKind = Literal["campaign", "folder", "round", "case"]
@@ -40,7 +43,7 @@ class TreeNode:
     kind: NodeKind
     label: str
     status: str
-    children: tuple["TreeNode", ...] = ()
+    children: tuple[TreeNode, ...] = ()
     path: str | None = None
     round_id: str | None = None
     endpoint: str | None = None
@@ -52,24 +55,31 @@ class TreeNode:
     environment: str = ""
 
 
-def index_workspace(root: Path, runs_dir: Path) -> tuple[TreeNode, ...]:
+def index_workspace(
+    root: Path,
+    runs_dir: Path,
+    project: ProjectView | None = None,
+) -> tuple[TreeNode, ...]:
+    content = content_root(root, project)
     claimed: set[str] = set()
     campaigns: list[TreeNode] = []
-    campaigns_dir = root / "campaigns"
+    campaigns_dir = content / "campaigns"
     if campaigns_dir.is_dir():
         for path in sorted(campaigns_dir.glob("*.yaml")):
-            node = _campaign_node(path, root, runs_dir, claimed)
+            node = _campaign_node(path, root, runs_dir, claimed, project)
             if node is not None:
                 campaigns.append(node)
     orphans: list[TreeNode] = []
-    rounds_dir = root / "rounds"
+    rounds_dir = content / "rounds"
     if rounds_dir.is_dir():
         for path in sorted(rounds_dir.glob("*.yaml")):
-            rel = _rel(path, root)
+            rel = _rel(path, content)
             if rel in claimed:
                 continue
             orphans.append(
-                inspect_round(rel, root, runs_dir, endpoint=None, matrix=None)
+                inspect_round(
+                    rel, root, runs_dir, project, endpoint=None, matrix=None
+                )
             )
     return tuple(campaigns + orphans)
 
@@ -78,11 +88,12 @@ def inspect_round(
     rel: str,
     root: Path,
     runs_dir: Path,
+    project: ProjectView | None = None,
     *,
     endpoint: str | None,
     matrix: str | None,
 ) -> TreeNode:
-    round_path = resolve_path(root, rel)
+    round_path = resolve_path(root, rel, project)
     key = f"round:{rel}"
     if not round_path.is_file():
         return TreeNode(
@@ -111,8 +122,8 @@ def inspect_round(
             startable=False,
         )
     label = endpoint or round_file.id
-    children = _round_children(rel, round_file, root)
-    errors = validate_round(round_path, root)
+    children = _round_children(rel, round_file, root, project)
+    errors = validate_round(round_path, root, project)
     if errors:
         return TreeNode(
             key=key,
@@ -124,7 +135,7 @@ def inspect_round(
             round_id=round_file.id,
             endpoint=endpoint or round_file.id,
             matrix=matrix,
-            reason=errors[0],
+            reason=errors[0].summary(),
             startable=False,
             environment=round_file.environment,
         )
@@ -214,6 +225,7 @@ def _campaign_node(
     root: Path,
     runs_dir: Path,
     claimed: set[str],
+    project: ProjectView | None,
 ) -> TreeNode | None:
     try:
         campaign = load_campaign(path)
@@ -226,6 +238,7 @@ def _campaign_node(
             entry.round,
             root,
             runs_dir,
+            project,
             endpoint=entry.endpoint,
             matrix=entry.matrix,
         )
@@ -254,8 +267,9 @@ def _round_children(
     rel: str,
     round_file: Any,
     root: Path,
+    project: ProjectView | None = None,
 ) -> tuple[TreeNode, ...]:
-    suite = optional_suite(round_file, root)
+    suite = optional_suite(round_file, root, project)
     if suite is not None:
         items = [
             _case_node(rel, visible.label, visible.label)
@@ -264,12 +278,18 @@ def _round_children(
         return tuple(items)
     items: list[TreeNode] = []
     for relative in round_file.include:
-        case_id = Path(relative).stem
         try:
-            case_id = load_case(resolve_path(root, relative)).id
+            found = list(iter_cases(root, [relative], project))
         except (ValidationError, ValueError, OSError, YAMLError):
-            pass
-        items.append(_case_node(rel, case_id, case_id))
+            # A round whose case does not parse still has to appear in the tree:
+            # the review screen is where the reason gets read, and a round that
+            # vanished from the collection is a round nobody can fix.
+            path, case_id = split_selector(relative)
+            label = case_id or Path(path).stem
+            items.append(_case_node(rel, label, label))
+            continue
+        for _, case in found:
+            items.append(_case_node(rel, case.id, case.id))
     return tuple(items)
 
 

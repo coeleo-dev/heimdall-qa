@@ -5,18 +5,19 @@ import httpx
 import pytest
 
 from heimdall_qa.config import HarnessConfig
-from heimdall_qa.config import LogFiles
 from heimdall_qa.errors import HarnessError
+from heimdall_qa.project import ProjectView
 from heimdall_qa.runner import _generated
 from heimdall_qa.runner import execute_step
-from heimdall_qa.schema.load import load_case
 from heimdall_qa.schema.models import CaseFile
 from heimdall_qa.schema.models import Contract
 from heimdall_qa.schema.models import ExpectSpec
 from heimdall_qa.schema.models import FieldSpec
+from heimdall_qa.testing import config_for
+from heimdall_qa.testing import project_at
 
 _BASELINE = {
-    "email": "qa-trilho-a@nokr.dev",
+    "email": "qa-campaign-a@example.dev",
     "password": "Str0ng!Pass123",
     "company_name": "Acme Corp LTDA",
     "document_number": "11222333000181",
@@ -28,7 +29,7 @@ _BASELINE = {
 def _contract() -> Contract:
     return Contract(
         endpoint="POST /auth/register",
-        dto="com.nokr.domain.auth.dto.RegisterRequest",
+        dto="com.example.domain.auth.dto.RegisterRequest",
         auth="none",
         idempotency="none",
         baseline="baselines/auth-register.json",
@@ -47,12 +48,21 @@ def _case(**kwargs) -> CaseFile:
     return CaseFile.model_validate(payload)
 
 
-def _config(tmp_path: Path) -> HarnessConfig:
-    web_log = tmp_path / "nokr-web.log"
-    worker_log = tmp_path / "nokr-worker.log"
+_DESCRIPTOR = Path(__file__).resolve().parent / "fixtures" / "qa" / "project.yaml"
+_PROJECT = project_at(_DESCRIPTOR)
+
+
+def _project(tmp_path: Path) -> ProjectView:
+    """The descriptor in force, with this test's own (empty) log files."""
+    web_log = tmp_path / "web.log"
+    worker_log = tmp_path / "worker.log"
     web_log.write_text("", encoding="utf-8")
     worker_log.write_text("", encoding="utf-8")
-    return HarnessConfig(log_files=LogFiles(web=str(web_log), worker=str(worker_log)))
+    return project_at(_DESCRIPTOR, web=str(web_log), worker=str(worker_log))
+
+
+def _config(tmp_path: Path) -> HarnessConfig:
+    return config_for(_project(tmp_path))
 
 
 def _run(
@@ -89,7 +99,7 @@ def test_generate_uuid_writes_capture_and_body(tmp_path: Path):
     store: dict[str, str] = {}
     nested_contract = Contract(
         endpoint="POST /api/users",
-        dto="com.nokr.domain.user.dto.CreateUserCommand",
+        dto="com.example.domain.user.dto.CreateUserCommand",
         auth="none",
         idempotency="none",
         baseline="baselines/api-users-post.json",
@@ -98,7 +108,7 @@ def test_generate_uuid_writes_capture_and_body(tmp_path: Path):
 
     def handler(request: httpx.Request) -> httpx.Response:
         captured.append(request)
-        return httpx.Response(201, json={"nokr_user_id": "u1"})
+        return httpx.Response(201, json={"external_user_id": "u1"})
 
     client = httpx.Client(transport=httpx.MockTransport(handler), timeout=10.0)
     execute_step(
@@ -125,7 +135,7 @@ def test_setup_other_uuid_does_not_clobber_session_external_user_id(tmp_path: Pa
     store = {"external_user_id": "session-user-id"}
     nested_contract = Contract(
         endpoint="POST /api/users",
-        dto="com.nokr.domain.user.dto.CreateUserCommand",
+        dto="com.example.domain.user.dto.CreateUserCommand",
         auth="none",
         idempotency="none",
         unique_json="external_user_id",
@@ -135,7 +145,7 @@ def test_setup_other_uuid_does_not_clobber_session_external_user_id(tmp_path: Pa
 
     def handler(request: httpx.Request) -> httpx.Response:
         captured.append(request)
-        return httpx.Response(201, json={"nokr_user_id": "other-1"})
+        return httpx.Response(201, json={"external_user_id": "other-1"})
 
     client = httpx.Client(transport=httpx.MockTransport(handler), timeout=10.0)
     execute_step(
@@ -165,7 +175,7 @@ def test_generate_email_replaces_baseline(tmp_path: Path):
     _run(tmp_path, _case(generate={"email": "email"}), captured)
     email = _body(captured[0])["email"]
     assert email != _BASELINE["email"]
-    assert email.endswith("@qa.nokr.dev")
+    assert email.endswith("@qa.example.dev")
 
 
 def test_unknown_generate_kind_fails(tmp_path: Path):
@@ -176,12 +186,12 @@ def test_unknown_generate_kind_fails(tmp_path: Path):
 
 def test_generated_unknown_kind_fails():
     with pytest.raises(HarnessError) as err:
-        _generated("iban")
+        _generated("iban", _PROJECT)
     assert err.value.code == "GENERATE_UNKNOWN"
 
 
 def test_generated_email_is_not_literal():
-    value = _generated("email")
+    value = _generated("email", _PROJECT)
     assert value != "email"
     assert "@" in value
 
@@ -224,32 +234,11 @@ def test_missing_capture_fails_clearly(tmp_path: Path):
     assert err.value.message == "captured.register_email missing"
 
 
-def test_register_yaml_uses_generate_and_capture():
-    root = Path(__file__).resolve().parents[1]
-    h01 = load_case(root / "cases" / "auth-register" / "register-H01.yaml")
-    assert h01.generate == {
-        "email": "email",
-        "company_name": "company_name",
-        "document_number": "cnpj",
-        "password": "password",
-    }
-    assert h01.capture == {"register_email": "email", "register_password": "password"}
-    duplicate = load_case(
-        root / "cases" / "auth-register" / "register-N-rule-DUPLICATE_EMAIL.yaml"
-    )
-    assert duplicate.generate == {
-        "email": "captured.register_email",
-        "company_name": "company_name",
-        "document_number": "cnpj",
-        "password": "password",
-    }
-
-
 def test_generate_nested_kyc_fields(tmp_path: Path):
     captured: list[httpx.Request] = []
     nested_contract = Contract(
         endpoint="POST /api/users",
-        dto="com.nokr.domain.user.dto.CreateUserCommand",
+        dto="com.example.domain.user.dto.CreateUserCommand",
         auth="none",
         idempotency="none",
         baseline="baselines/api-users-post.json",
@@ -286,7 +275,7 @@ def test_generate_nested_kyc_fields(tmp_path: Path):
     )
     body = _body(captured[0])
     assert body["kyc_profile"]["name"] != "replace-with-generate"
-    assert body["kyc_profile"]["email"].endswith("@qa.nokr.dev")
+    assert body["kyc_profile"]["email"].endswith("@qa.example.dev")
     assert body["kyc_profile"]["cpf_cnpj"] != "replace-with-generate"
 
 
@@ -302,7 +291,7 @@ def test_unresolved_placeholder_fails(tmp_path: Path):
         execute_step(
             case=_case(),
             contract=_contract(),
-            baseline={"nokr_user_id": "{{nokr_user_id}}"},
+            baseline={"external_user_id": "{{external_user_id}}"},
             config=_config(tmp_path),
             client=client,
             run_dir=tmp_path / "run",
@@ -332,10 +321,10 @@ def test_replace_with_generate_fills_email_and_password(tmp_path: Path):
         run_id="register",
     )
     body = _body(captured[0])
-    assert body["email"].endswith("@qa.nokr.dev")
+    assert body["email"].endswith("@qa.example.dev")
     assert body["password"].startswith("Aa1!")
     stored = json.loads((tmp_path / "run" / "steps" / "001-register-H01" / "request.json").read_text())
-    assert stored["body"]["email"].endswith("@qa.nokr.dev")
+    assert stored["body"]["email"].endswith("@qa.example.dev")
     assert stored["body"]["password"] == "[REDACTED]"
 
 
@@ -356,10 +345,10 @@ def test_replace_with_generate_uses_secrets_without_generate_block(tmp_path: Pat
         run_dir=tmp_path / "run",
         step_index=1,
         run_id="login",
-        secrets={"email": "ops@nokr.dev", "password": "Aa1!tenant"},
+        secrets={"email": "ops@example.dev", "password": "Aa1!tenant"},
     )
     body = _body(captured[0])
-    assert body["email"] == "ops@nokr.dev"
+    assert body["email"] == "ops@example.dev"
     assert body["password"] == "Aa1!tenant"
 
 
@@ -382,10 +371,10 @@ def test_secret_email_and_password_replace_placeholders(tmp_path: Path):
         run_dir=tmp_path / "run",
         step_index=1,
         run_id="login",
-        secrets={"email": "ops@nokr.dev", "password": "Aa1!tenant"},
+        secrets={"email": "ops@example.dev", "password": "Aa1!tenant"},
     )
     body = _body(captured[0])
-    assert body["email"] == "ops@nokr.dev"
+    assert body["email"] == "ops@example.dev"
     assert body["password"] == "Aa1!tenant"
 
 
@@ -475,11 +464,11 @@ def test_secrets_win_over_register_capture(tmp_path: Path):
         run_dir=tmp_path / "login-run",
         step_index=1,
         run_id="login",
-        secrets={"email": "ops@nokr.dev", "password": "Aa1!tenant"},
+        secrets={"email": "ops@example.dev", "password": "Aa1!tenant"},
         captures={},
     )
     body = _body(http_calls[1])
-    assert body["email"] == "ops@nokr.dev"
+    assert body["email"] == "ops@example.dev"
     assert body["password"] == "Aa1!tenant"
 
 
@@ -494,7 +483,7 @@ def test_capture_response_stores_jwt_after_http(tmp_path: Path):
             json={
                 "jwt": "issued-jwt",
                 "refresh_token": "issued-refresh",
-                "api_key": "nk_test_issued",
+                "api_key": "test_key_issued",
             },
         )
 
@@ -520,7 +509,7 @@ def test_capture_response_stores_jwt_after_http(tmp_path: Path):
     )
     assert store["jwt"] == "issued-jwt"
     assert store["refresh_token"] == "issued-refresh"
-    assert store["api_key"] == "nk_test_issued"
+    assert store["api_key"] == "test_key_issued"
     assert store["register_email"] == _body(captured[0])["email"]
     saved = json.loads((tmp_path / "run" / "captures.json").read_text(encoding="utf-8"))
     assert saved["jwt"] == "issued-jwt"
@@ -612,7 +601,7 @@ def test_jwt_auth_uses_shared_capture_without_secrets(tmp_path: Path):
         case=_case(id="keys-H01", expect=ExpectSpec(status=200)),
         contract=Contract(
             endpoint="POST /platform/api-keys",
-            dto="com.nokr.domain.auth.dto.CreateApiKeyRequest",
+            dto="com.example.domain.auth.dto.CreateApiKeyRequest",
             auth="jwt",
             idempotency="none",
             baseline="baselines/platform-api-keys-post.json",
@@ -629,43 +618,5 @@ def test_jwt_auth_uses_shared_capture_without_secrets(tmp_path: Path):
         environment="sandbox",
     )
     assert seen[0].headers["Authorization"] == "Bearer captured-jwt-token"
-    assert seen[0].headers["X-Nokr-Environment"] == "sandbox"
-
-
-def test_prepare_case_accepts_jwt_from_shared_captures(tmp_path: Path):
-    from heimdall_qa.runner import _prepare_case
-
-    root = Path(__file__).resolve().parents[1]
-    runs_dir = tmp_path / "runs"
-    runs_dir.mkdir()
-    (runs_dir / "shared-captures.json").write_text(
-        json.dumps({"jwt": "captured-jwt-token"}),
-        encoding="utf-8",
-    )
-    case = load_case(root / "cases" / "api-keys-post" / "api-keys-post-H01.yaml")
-    _prepare_case(case, root, {}, runs_dir=runs_dir)
-
-
-def test_prepare_case_jwt_without_secret_or_capture_fails(tmp_path: Path):
-    from heimdall_qa.runner import _prepare_case
-
-    root = Path(__file__).resolve().parents[1]
-    case = load_case(root / "cases" / "api-keys-post" / "api-keys-post-H01.yaml")
-    with pytest.raises(HarnessError) as err:
-        _prepare_case(case, root, {}, runs_dir=tmp_path / "empty-runs")
-    assert err.value.code == "SECRET_MISSING"
-
-
-def test_register_h01_captures_response_tokens():
-    root = Path(__file__).resolve().parents[1]
-    h01 = load_case(root / "cases" / "auth-register" / "register-H01.yaml")
-    assert h01.capture_response == {
-        "jwt": "jwt",
-        "refresh_token": "refresh_token",
-        "api_key": "api_key",
-    }
-    login = load_case(root / "cases" / "auth-login" / "login-H01.yaml")
-    assert login.capture_response == {"jwt": "jwt", "refresh_token": "refresh_token"}
-    keys = load_case(root / "cases" / "api-keys-post" / "api-keys-post-H01.yaml")
-    assert keys.capture_response == {"api_key": "raw_key", "api_key_id": "id"}
+    assert seen[0].headers["X-Environment"] == "sandbox"
 

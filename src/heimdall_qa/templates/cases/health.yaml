@@ -1,0 +1,17 @@
+# One case per claim, and the first claim is the cheapest one: it answers.
+#
+# The case id is `<area>-<kind>`, and the round selects it as
+# `cases/health.yaml#health-H01`. Kinds are `H01` happy, `O*` optional, `B*` boundary,
+# `N*` negative, `I-*` idempotency, `E-*` isolation, `P-*` a product rule — `H01`
+# first, because `I-*` and the rest assume what it creates.
+#
+# `diff` is what the response must match; leaving it out means "the status is the
+# whole claim", which is the honest first case. Add a `diff` when a field is part of
+# what you are asserting.
+health-H01:
+  contract: contracts/health.yaml
+  kind: H01
+  tags:
+    - function
+  expect:
+    status: 200

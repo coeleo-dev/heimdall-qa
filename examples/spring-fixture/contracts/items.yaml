@@ -1,0 +1,19 @@
+endpoint: POST /fixture/items
+area: items
+auth: api_key
+baseline: baselines/items.json
+idempotency: header_uuid_v4
+async: sync
+fields:
+  name:
+    required: true
+    json: name
+    max_length: 40
+  label:
+    required: true
+    json: item_label
+    max_length: 8
+  code:
+    required: true
+    json: item_code
+    pattern: ^[A-Z]{3}$

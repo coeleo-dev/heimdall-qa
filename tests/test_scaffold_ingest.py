@@ -1,11 +1,16 @@
-from pathlib import Path
 import shutil
+from pathlib import Path
+
+import yaml
 
 from heimdall_qa.scaffold import scaffold_endpoint
+from heimdall_qa.testing import project_at
 from heimdall_qa.validate import validate_round
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 INGEST_CONTRACT = FIXTURES / "contracts" / "api-ingest-post.yaml"
+#: Scaffolding reads the descriptor for the isolation cases it generates.
+_PROJECT = project_at(FIXTURES / "qa" / "project.yaml")
 
 REQUIRED_IDS = (
     "ingest-N-omit-timestamp",
@@ -23,15 +28,15 @@ def test_scaffold_ingest_stubs_still_invalid(tmp_path: Path):
     ids = scaffold_endpoint(
         contracts / "api-ingest-post.yaml",
         out,
+        project=_PROJECT,
         contract_ref="contracts/api-ingest-post.yaml",
     )
     for required in REQUIRED_IDS:
         assert required in ids
-        assert (out / f"{required}.yaml").is_file()
+    written = yaml.safe_load((out / "ingest.yaml").read_text(encoding="utf-8"))
+    assert list(written) == list(ids)
 
-    includes = [f"cases/{case_id}.yaml" for case_id in ids]
     round_path = tmp_path / "round.yaml"
-    include_yaml = "\n".join(f"  - {path}" for path in includes)
     round_path.write_text(
         "\n".join(
             [
@@ -40,14 +45,12 @@ def test_scaffold_ingest_stubs_still_invalid(tmp_path: Path):
                 "mode: review",
                 "environment: sandbox",
                 "include:",
-                include_yaml,
+                "  - cases/ingest.yaml",
             ]
         ),
         encoding="utf-8",
     )
     errors = validate_round(round_path, tmp_path)
     assert any("TODO" in error for error in errors)
-    omit = out / "ingest-N-omit-timestamp.yaml"
-    payload = omit.read_text(encoding="utf-8")
-    assert "status: 400" in payload
+    assert written["ingest-N-omit-timestamp"]["expect"] == {"status": 400}
     assert "ingest-N-rule-TIERED" not in ids

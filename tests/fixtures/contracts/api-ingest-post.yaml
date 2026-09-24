@@ -1,5 +1,5 @@
 endpoint: POST /api/ingest
-dto: com.nokr.domain.metering.ingest.dto.IngestRequest
+dto: com.example.domain.metering.ingest.dto.IngestRequest
 auth: api_key
 idempotency: header_uuid_v4
 dedup: transaction_id

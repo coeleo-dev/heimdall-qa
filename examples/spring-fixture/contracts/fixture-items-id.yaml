@@ -1,0 +1,7 @@
+endpoint: GET /fixture/items/{{id}}
+area: fixture-items-id
+auth: api_key
+baseline: baselines/empty.json
+async: sync
+resource_id_in_path: true
+fields: {}

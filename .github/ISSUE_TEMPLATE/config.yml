@@ -1,0 +1,14 @@
+# Keep the issue tracker to the two things it is good at.
+#
+# A question about how to write a round is answered faster in Discussions, where the
+# person who asks it helps the next person with the same question. A security report
+# must not be an issue at all — the empty link below is what routes it to the private
+# flow instead.
+blank_issues_enabled: false
+contact_links:
+  - name: How do I write a contract, a case, a round?
+    url: https://github.com/heimdall-qa/heimdall-qa/blob/main/contrib/README.md
+    about: The contributing documentation, which is where those answers live.
+  - name: Report a vulnerability
+    url: https://github.com/heimdall-qa/heimdall-qa/security/advisories/new
+    about: Privately. SECURITY.md says what counts as one here, and it is not always what you expect.

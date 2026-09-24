@@ -6,7 +6,6 @@ from heimdall_qa.campaign import find_latest_run
 from heimdall_qa.campaign import validate_campaign
 from heimdall_qa.cli import main
 from heimdall_qa.schema.load import load_campaign
-from heimdall_qa.validate import validate_round
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 OK = FIXTURES / "campaigns" / "ok.yaml"
@@ -117,7 +116,42 @@ def test_fixture_ok_campaign_excludes_d():
     assert "D" in campaign.exclude.kinds
 
 
-def test_piloto_and_values_rounds_still_validate():
-    repo = Path(__file__).resolve().parents[1]
-    assert validate_round(repo / "rounds" / "piloto-ingest.yaml", repo) == []
-    assert validate_round(repo / "rounds" / "values-10m-7i.yaml", repo) == []
+def test_a_round_without_a_dto_reports_no_dto_key(tmp_path: Path):
+    """`dto` is provenance, so a target with none omits it instead of reporting null."""
+    campaign = tmp_path / "campaign.yaml"
+    campaign.write_text(
+        "\n".join(
+            [
+                "id: demo",
+                "environment: sandbox",
+                "rounds:",
+                "  - round: rounds/missing.yaml",
+                "    endpoint: POST /qa/echo",
+                "    matrix: A4",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    row = campaign_status(campaign, tmp_path, tmp_path / "runs")["rounds"][0]
+    assert "dto" not in row
+    assert row["endpoint"] == "POST /qa/echo"
+
+
+def test_a_round_with_a_dto_still_reports_it(tmp_path: Path):
+    campaign = tmp_path / "campaign.yaml"
+    campaign.write_text(
+        "\n".join(
+            [
+                "id: demo",
+                "environment: sandbox",
+                "rounds:",
+                "  - round: rounds/missing.yaml",
+                "    endpoint: POST /qa/echo",
+                "    dto: com.example.qa.EchoRequest",
+                "    matrix: A4",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    row = campaign_status(campaign, tmp_path, tmp_path / "runs")["rounds"][0]
+    assert row["dto"] == "com.example.qa.EchoRequest"

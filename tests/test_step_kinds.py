@@ -9,20 +9,18 @@ load.
 
 from pathlib import Path
 
-from pydantic import ValidationError
 import pytest
 import yaml
+from pydantic import ValidationError
 
 from heimdall_qa.schema.load import load_suite
 from heimdall_qa.schema.models import SuiteStep
+from heimdall_qa.step_kinds import LOOP
 from heimdall_qa.step_kinds import PROBE
 from heimdall_qa.step_kinds import PROBE_BEGIN
-from heimdall_qa.step_kinds import LOOP
 from heimdall_qa.step_kinds import registered_step_kinds
 from heimdall_qa.step_kinds import unknown_step_kind_message
 from heimdall_qa.step_kinds import unknown_step_kinds
-
-REPO = Path(__file__).resolve().parents[1]
 
 
 def test_the_core_ships_exactly_three_step_kinds():
@@ -100,11 +98,3 @@ def test_a_step_with_two_kinds_is_still_rejected():
         )
 
     assert "exactly one of" in str(raised.value)
-
-
-def test_every_suite_in_the_repo_still_loads():
-    """The registry must not reject the suites that are actually shipped."""
-    suites = sorted(REPO.glob("suites/**/*.yaml"))
-    assert suites, "no suite found to check against"
-    for path in suites:
-        load_suite(path)

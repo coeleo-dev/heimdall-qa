@@ -1,0 +1,68 @@
+# The descriptor of the Java proof target.
+#
+# It is short on purpose. Everything the harness needs about this API is either here
+# or read from the code: the routes and their fields come from `src/main/java` through
+# `heimdall-qa-spring`, the failure statuses come from the `@RestControllerAdvice`, and
+# what is left — the credential's header, the origin, where the log is — is the small
+# amount no source can answer.
+#
+# Compare it with `examples/toy-provider/qa/project.yaml`: the toy has no auth, no
+# logs and no contract source, because the point there is that the harness runs with
+# nothing declared. The point here is the opposite — that a declared Java target is
+# measured, and the only thing the descriptor adds is what the code cannot say.
+version: 1
+
+project:
+  id: spring-fixture
+  name: Spring fixture
+
+environments:
+  local:
+    base_url: http://127.0.0.1:8120
+
+# The one attribute no source can be asked: a controller declares *that* a credential
+# is needed (here, in `TraceTokenFilter`), never which scheme the harness should wear.
+# `api_key` is this harness's name for "a raw value in a header"; the header is the
+# fixture's own, which is what the `N-auth` case omits.
+auth:
+  api_key:
+    header: X-Fixture-Token
+    scheme: raw
+
+routes:
+  - prefix: /fixture/
+    auth: api_key
+
+trace:
+  header: X-Trace-Id
+  prefix: "heimdall-"
+
+# Relative to this file's directory, like every other path a descriptor declares
+# (`contract.location` included): the fixture root is one level up. `web` is the id
+# the runner reads; the fixture has no asynchronous half, so it declares one source
+# and no worker.
+log_sources:
+  - id: web
+    path: ../logs/fixture.log
+    format: logback
+
+# The two axes the source cannot answer, pinned here.
+#
+# The reader reads the advice table and finds no handler for either: the credential is
+# refused by the servlet filter, before any `@ExceptionHandler` can see the request,
+# and the not-found branch throws `NoSuchElementException` — a name the reader
+# deliberately does not map to an axis, because a product is free to mean anything by
+# its own exception. The values are what the running app answers; leaving them to the
+# harness default would make this fixture pass by coincidence rather than by
+# declaration, and a target whose not-found is a 400 would generate a wrong case with
+# nothing in the report to say so.
+errors:
+  statuses:
+    auth: 401
+    not_found: 404
+
+# The reader that reads the code. `heimdall-qa-spring` ships as its own distribution,
+# so install it with `pip install -e packages/spring` before discovering here.
+contract:
+  source: spring
+  location: ../src/main/java

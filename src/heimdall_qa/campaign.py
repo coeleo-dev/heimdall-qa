@@ -7,6 +7,10 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from heimdall_qa.descriptor import resolve_project
+from heimdall_qa.findings import ValidationFinding
+from heimdall_qa.findings import finding
+from heimdall_qa.project import ProjectView
 from heimdall_qa.schema.load import load_campaign
 from heimdall_qa.schema.load import load_round
 from heimdall_qa.schema.models import CampaignFile
@@ -18,34 +22,70 @@ from heimdall_qa.validate import validate_round
 _RUN_DIR = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{4}-(.+?)(?:~\d+)?$")
 
 
-def validate_campaign(campaign_path: Path, root: Path) -> list[str]:
+def validate_campaign(
+    campaign_path: Path,
+    root: Path,
+    project: ProjectView | None = None,
+) -> list[ValidationFinding]:
+    """Validates every round of a campaign against the project in force.
+
+    `project` is optional only because the campaign is the one entry point whose
+    caller does not already hold a view; it is resolved from `root` when omitted,
+    by the same precedence rule a run uses.
+    """
+    view = project if project is not None else resolve_project(root)
     try:
         campaign = load_campaign(campaign_path)
     except (ValidationError, ValueError, OSError) as exc:
-        return [f"{campaign_path}: {exc}"]
-    errors: list[str] = []
+        return [
+            finding(
+                "ROUND_UNREADABLE",
+                str(campaign_path),
+                str(exc),
+                fix="open the campaign and correct the YAML it reports.",
+            )
+        ]
+    findings: list[ValidationFinding] = []
     for entry in campaign.rounds:
-        round_path = resolve_path(root, entry.round)
+        round_path = resolve_path(root, entry.round, view)
         if not round_path.is_file():
-            errors.append(f"{entry.round}: round file is missing")
+            findings.append(
+                finding(
+                    "ROUND_UNREADABLE",
+                    entry.round,
+                    "the round the campaign lists is missing",
+                    fix="write the round, or drop the entry from the campaign.",
+                )
+            )
             continue
-        for error in validate_round(round_path, root):
-            errors.append(f"{entry.round}: {error}")
-    errors.extend(validate_campaign_chain(campaign, root))
-    return errors
+        for item in validate_round(round_path, root, view):
+            findings.append(
+                ValidationFinding(
+                    code=item.code,
+                    where=f"{entry.round}: {item.where}",
+                    message=item.message,
+                    fix=item.fix,
+                    why=item.why,
+                )
+            )
+    findings.extend(validate_campaign_chain(campaign, root, view))
+    return findings
 
 
 def campaign_status(
     campaign_path: Path,
     root: Path,
     runs_dir: Path,
+    project: ProjectView | None = None,
 ) -> dict[str, Any]:
+    view = project if project is not None else resolve_project(root)
     campaign = load_campaign(campaign_path)
     return {
         "id": campaign.id,
         "environment": campaign.environment,
         "rounds": [
-            _round_status(entry, root, runs_dir, campaign) for entry in campaign.rounds
+            _round_status(entry, root, runs_dir, campaign, view)
+            for entry in campaign.rounds
         ],
     }
 
@@ -70,16 +110,21 @@ def _round_status(
     root: Path,
     runs_dir: Path,
     campaign: CampaignFile,
+    project: ProjectView,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "round": entry.round,
         "endpoint": entry.endpoint,
         "matrix": entry.matrix,
-        "dto": entry.dto,
         "auth": entry.auth,
         "campaign_id": campaign.id,
     }
-    round_path = resolve_path(root, entry.round)
+    #: `dto` is provenance, and a target that has none (no OpenAPI, no Java
+    #: record) keeps the key out instead of reporting a null that reads like a
+    #: missing value.
+    if entry.dto is not None:
+        payload["dto"] = entry.dto
+    round_path = resolve_path(root, entry.round, project)
     if not round_path.is_file():
         payload["status"] = "not_reviewed"
         payload["reason"] = "round file is missing"

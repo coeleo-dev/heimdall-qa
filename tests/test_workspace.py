@@ -4,14 +4,16 @@ import httpx
 import pytest
 
 from heimdall_qa.config import HarnessConfig
-from heimdall_qa.config import LogFiles
 from heimdall_qa.errors import HarnessError
 from heimdall_qa.session import RoundSession
+from heimdall_qa.testing import config_for
+from heimdall_qa.testing import project_at
 from heimdall_qa.workspace import WorkspaceSession
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 WALK_HN = FIXTURES / "rounds" / "walk-hn.yaml"
 H01_ONLY = FIXTURES / "rounds" / "h01-only.yaml"
+_DESCRIPTOR = FIXTURES / "qa" / "project.yaml"
 
 
 def _http() -> httpx.Client:
@@ -21,15 +23,21 @@ def _http() -> httpx.Client:
     return httpx.Client(transport=httpx.MockTransport(handler), timeout=10.0)
 
 
+def _config(tmp_path: Path) -> HarnessConfig:
+    """Harness settings bound to the project in force, with this test's logs."""
+    return config_for(
+        project_at(
+            _DESCRIPTOR,
+            web=str(tmp_path / "web.log"),
+            worker=str(tmp_path / "worker.log"),
+        )
+    )
+
+
 def _workspace(tmp_path: Path, *, focus: Path | None = None) -> WorkspaceSession:
     return WorkspaceSession(
         root=FIXTURES,
-        config=HarnessConfig(
-            log_files=LogFiles(
-                web=str(tmp_path / "web.log"),
-                worker=str(tmp_path / "worker.log"),
-            )
-        ),
+        config=_config(tmp_path),
         client=_http(),
         runs_dir=tmp_path / "runs",
         focus=focus,
@@ -58,7 +66,7 @@ def test_rerun_creates_a_new_run_directory(tmp_path: Path):
     worker.write_text("", encoding="utf-8")
     workspace = WorkspaceSession(
         root=FIXTURES,
-        config=HarnessConfig(log_files=LogFiles(web=str(web), worker=str(worker))),
+        config=_config(tmp_path),
         client=_http(),
         runs_dir=tmp_path / "runs",
         focus=WALK_HN,
@@ -80,7 +88,7 @@ def test_select_case_after_round_done_opens_historical_step(tmp_path: Path):
     worker.write_text("", encoding="utf-8")
     workspace = WorkspaceSession(
         root=FIXTURES,
-        config=HarnessConfig(log_files=LogFiles(web=str(web), worker=str(worker))),
+        config=_config(tmp_path),
         client=_http(),
         runs_dir=tmp_path / "runs",
         focus=WALK_HN,
@@ -117,7 +125,7 @@ def test_select_case_without_live_session_uses_disk_run(tmp_path: Path):
     runs_dir = tmp_path / "runs"
     first = WorkspaceSession(
         root=FIXTURES,
-        config=HarnessConfig(log_files=LogFiles(web=str(web), worker=str(worker))),
+        config=_config(tmp_path),
         client=_http(),
         runs_dir=runs_dir,
         focus=WALK_HN,
@@ -127,7 +135,7 @@ def test_select_case_without_live_session_uses_disk_run(tmp_path: Path):
 
     reopened = WorkspaceSession(
         root=FIXTURES,
-        config=HarnessConfig(log_files=LogFiles(web=str(web), worker=str(worker))),
+        config=_config(tmp_path),
         client=_http(),
         runs_dir=runs_dir,
         focus=WALK_HN,
@@ -146,7 +154,7 @@ def test_busy_round_blocks_starting_another(tmp_path: Path):
     session = RoundSession(
         WALK_HN,
         root=FIXTURES,
-        config=HarnessConfig(log_files=LogFiles(web=str(web), worker=str(worker))),
+        config=_config(tmp_path),
         client=_http(),
         runs_dir=tmp_path / "runs",
     )

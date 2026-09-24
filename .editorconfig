@@ -1,0 +1,45 @@
+# The rules the authors already follow, written down once.
+#
+# This file is the only place a whitespace question is answered, which is the point:
+# a reviewer should be reading a diff for what changed, not for whether an editor
+# added a trailing space. It is also what makes a contribution from an unfamiliar
+# editor land in the same shape as one written here.
+#
+# The indents are not preferences — each is what the language's own tooling writes,
+# and the reason the repository has no reformatting commits.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+# Trailing whitespace is invisible in a diff and shows up as a change nobody meant,
+# so it is never part of a line here.
+trim_trailing_whitespace = true
+
+[*.{py,pyi}]
+indent_style = space
+indent_size = 4
+# The longest line the suite tolerates; see `[tool.ruff]` in `pyproject.toml`.
+max_line_length = 100
+
+[*.{yaml,yml,json}]
+indent_style = space
+indent_size = 2
+
+[*.java]
+indent_style = space
+indent_size = 4
+
+[*.{sh,bash}]
+indent_style = space
+indent_size = 4
+
+[*.{html,css,toml}]
+indent_style = space
+indent_size = 2
+
+[*.md]
+indent_style = space
+indent_size = 4

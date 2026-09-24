@@ -1,12 +1,12 @@
-from collections.abc import Callable
-from dataclasses import dataclass
-from datetime import datetime
-from datetime import timedelta
-from datetime import timezone
 import json
-from pathlib import Path
 import re
 import shutil
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import UTC
+from datetime import datetime
+from datetime import timedelta
+from pathlib import Path
 from time import monotonic
 from time import perf_counter
 from time import sleep
@@ -19,23 +19,29 @@ from pydantic import ValidationError
 from yaml import YAMLError
 
 from heimdall_qa.bru_parser import parse_bru
-from heimdall_qa.config import BudgetPair
 from heimdall_qa.config import HarnessConfig
 from heimdall_qa.coverage import expand
 from heimdall_qa.diff import apply_diff
 from heimdall_qa.diff import get_path
 from heimdall_qa.diff import set_path
 from heimdall_qa.errors import HarnessError
-from heimdall_qa.fixtures import SCALAR_KINDS
 from heimdall_qa.fixtures import build_value
+from heimdall_qa.fixtures import is_known_kind
 from heimdall_qa.http_client import HttpExchange
 from heimdall_qa.http_client import send
 from heimdall_qa.logs.collector import LogCollection
+from heimdall_qa.logs.collector import LogSourceTarget
 from heimdall_qa.logs.collector import collect
 from heimdall_qa.logs.collector import file_size
 from heimdall_qa.packs import PackContext
 from heimdall_qa.packs import PackResult
 from heimdall_qa.packs import run_all
+from heimdall_qa.placeholders import is_seed
+from heimdall_qa.placeholders import placeholder_name
+from heimdall_qa.placeholders import placeholder_names
+from heimdall_qa.placeholders import unresolved
+from heimdall_qa.project import FALLBACK_ASYNC_WAIT_MS
+from heimdall_qa.project import ProjectView
 from heimdall_qa.run_store import create_run
 from heimdall_qa.run_store import link_latest
 from heimdall_qa.run_store import read_shared_captures
@@ -44,7 +50,7 @@ from heimdall_qa.run_store import write_evidence
 from heimdall_qa.run_store import write_step
 from heimdall_qa.run_store import write_summary
 from heimdall_qa.run_store import write_verdict
-from heimdall_qa.schema.load import load_case
+from heimdall_qa.schema.load import iter_cases
 from heimdall_qa.schema.load import load_contract
 from heimdall_qa.schema.load import load_round
 from heimdall_qa.schema.load import load_suite
@@ -54,12 +60,11 @@ from heimdall_qa.schema.models import RoundFile
 from heimdall_qa.schema.models import RuleSpec
 from heimdall_qa.schema.models import SuiteFile
 from heimdall_qa.validate import resolve_path
-
+from heimdall_qa.validate import todo_paths
 
 _TRANSPORT_CODES = frozenset({"HTTP_UNREACHABLE", "HTTP_TIMEOUT"})
 _PATH_GHOST_KINDS = frozenset({"N-notfound", "S-bola"})
 _PATH_GHOST_SKIP = frozenset({"base_url"})
-_PLACEHOLDER = re.compile(r"\{\{([A-Za-z0-9_]+)\}\}")
 _UUID_VALUE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )
@@ -73,12 +78,12 @@ _LAB_AUTH = frozenset({"admin", "hmac"})
 _FROZEN_CAPTURES = frozenset({"frozen_user_id", "frozen_external_user_id"})
 _AUTH_HINTS = {
     "admin": (
-        "add admin_secret to secrets.local.yaml and start NokrAPI profile admin "
-        "on :9090 — the API key in runs/shared-captures.json is not the admin secret"
+        "add admin_secret to secrets.local.yaml and start the API's admin profile; "
+        "the API key in runs/shared-captures.json is not the admin secret"
     ),
     "admin_secret": (
-        "add admin_secret to secrets.local.yaml and start NokrAPI profile admin "
-        "on :9090 — the API key in runs/shared-captures.json is not the admin secret"
+        "add admin_secret to secrets.local.yaml and start the API's admin profile; "
+        "the API key in runs/shared-captures.json is not the admin secret"
     ),
     "api_key": (
         "run register-H01 or api-keys-post-H01 (api_key persists in "
@@ -149,16 +154,20 @@ def execute_step(
     mapping = _request_mapping(case, captures, secrets)
     path_mapping = _path_mapping(case.kind, contract.endpoint, mapping, secrets)
     body = apply_diff(baseline, case.diff)
-    method, url, headers = _resolve_target(case, contract, config, path_mapping)
+    method, url, headers = _resolve_target(
+        case, contract, config, path_mapping, environment
+    )
     headers.update(case.headers)
     headers = interpolate(headers, mapping)
-    body, headers = _apply_generate(body, headers, case.generate, captures, secrets)
+    body, headers = _apply_generate(
+        body, headers, case.generate, captures, secrets, config.project
+    )
     mapping = _request_mapping(case, captures, secrets)
     path_mapping = _path_mapping(case.kind, contract.endpoint, mapping, secrets)
     url = interpolate(url, path_mapping)
     headers = interpolate(headers, mapping)
     body = interpolate(body, mapping)
-    body = _fill_sentinels(body, mapping)
+    body = _fill_sentinels(body, mapping, config.project)
     body = _apply_session_unique(body, contract, case, captures)
     _reject_unresolved_placeholders(body, where="request body")
     _reject_unresolved_placeholders(url, where="request url")
@@ -166,17 +175,15 @@ def execute_step(
     write_captures(run_dir, captures)
     omit = {name.lower() for name in case.omit_headers}
     if "authorization" not in omit:
-        _ensure_auth(headers, contract, secrets, environment, captures)
+        _ensure_auth(headers, contract, secrets, environment, captures, config.project)
     if "x-idempotency-key" not in omit:
         _ensure_idempotency(headers, contract, case, captures)
     _drop_omitted_headers(headers, omit)
-    trace_id = f"nokrqa-{run_id}-{step_index}"
-    headers["X-Trace-Id"] = trace_id
+    trace_id = f"{config.project.trace_prefix()}{run_id}-{step_index}"
+    headers[config.project.trace_header()] = trace_id
     json_body = body if method not in {"GET", "HEAD"} else None
-    web_log = _resolve_log(config.log_files.web)
-    worker_log = _resolve_log(config.log_files.worker)
-    web_start = file_size(web_log)
-    worker_start = file_size(worker_log)
+    path = urlparse(url).path
+    targets = _log_targets(config.project)
     _pace_register(url, config, pacer)
     exchange, transport_error = _send_attempts(
         client, method, url, headers, json_body, case
@@ -186,12 +193,10 @@ def execute_step(
     write_captures(run_dir, captures)
     snapshot = collect(
         trace_id=trace_id,
-        web_log=web_log,
-        worker_log=worker_log,
-        wait_logs_ms=case.wait_logs_ms or 0,
-        request_at=datetime.now(timezone.utc),
-        web_start_offset=web_start,
-        worker_start_offset=worker_start,
+        targets=targets,
+        wait_logs_ms=_wait_logs_ms(
+            case, contract, config.project, path, exchange.status_code
+        ),
     )
     packs = run_all(
         _pack_context(
@@ -200,11 +205,15 @@ def execute_step(
             headers,
             json_body,
             exchange,
+            path,
             trace_id,
             environment,
             dimensions,
             config,
             snapshot,
+            _settles_asynchronously(
+                case, contract, config.project, path, exchange.status_code
+            ),
         )
     )
     step_dir = write_step(
@@ -219,10 +228,8 @@ def execute_step(
         },
         timing={"elapsed_ms": exchange.elapsed_ms},
         packs=packs,
-        logs_web=snapshot.web_lines,
-        logs_worker=snapshot.worker_lines,
-        logs_incomplete=snapshot.logs_incomplete,
-        log_fallback=snapshot.fallback,
+        logs=snapshot,
+        patterns=config.project.redact_patterns(),
     )
     return StepResult(
         step_dir,
@@ -262,7 +269,7 @@ def _ghost_path_ids(
     secrets: dict[str, str],
 ) -> dict[str, str]:
     ghosts: dict[str, str] = {}
-    for name in _PLACEHOLDER.findall(endpoint):
+    for name in sorted(placeholder_names(endpoint)):
         if name in _PATH_GHOST_SKIP or name in secrets:
             continue
         captured = mapping.get(name)
@@ -287,12 +294,12 @@ def _resolve_target(
     contract: Contract,
     config: HarnessConfig,
     mapping: dict[str, str],
+    environment: str,
 ) -> tuple[str, str, dict[str, str]]:
     if case.bru:
-        return _from_bru(case.bru, config, mapping)
+        return _from_bru(case.bru, config, mapping, environment)
     method, path = _split_endpoint(contract.endpoint)
-    base = config.nokr_admin if path.startswith("/admin/") else config.nokr_web
-    url = interpolate(f"{base.rstrip('/')}{path}", mapping)
+    url = interpolate(config.project.url(path, environment), mapping)
     return method, url, {}
 
 
@@ -300,12 +307,16 @@ def _from_bru(
     bru: str,
     config: HarnessConfig,
     secrets: dict[str, str],
+    environment: str,
 ) -> tuple[str, str, dict[str, str]]:
     path = Path(bru)
     if not path.is_absolute():
-        path = Path(config.bruno_collection) / bru
+        path = config.project.required_request_collection() / bru
     parsed = parse_bru(path)
-    url = parsed.url.replace("{{base_url}}", config.nokr_web.rstrip("/"))
+    # A `.bru` request names no origin: it is the same request against every
+    # environment, so `{{base_url}}` is the environment's, not a route's.
+    origin = config.project.base_url(environment).rstrip("/")
+    url = parsed.url.replace("{{base_url}}", origin)
     headers = {
         key: _substitute_secrets(value, secrets)
         for key, value in parsed.headers.items()
@@ -342,9 +353,10 @@ def _apply_generate(
     generate: dict[str, Any] | None,
     captures: dict[str, str],
     secrets: dict[str, str],
+    project: ProjectView,
 ) -> tuple[dict[str, Any], dict[str, str]]:
     for key, kind in (generate or {}).items():
-        value = _resolve_generate(str(kind), captures, secrets)
+        value = _resolve_generate(str(kind), captures, secrets, project)
         if key == "idempotency_key":
             headers["X-Idempotency-Key"] = value
             continue
@@ -358,6 +370,7 @@ def _resolve_generate(
     kind: str,
     captures: dict[str, str],
     secrets: dict[str, str],
+    project: ProjectView,
 ) -> str:
     if kind.startswith("captured."):
         name = kind.removeprefix("captured.")
@@ -382,7 +395,7 @@ def _resolve_generate(
             message=f"missing secret {name}",
             hint=_AUTH_HINTS.get(name, _DEFAULT_SECRET_HINT),
         )
-    return _generated(kind)
+    return _generated(kind, project)
 
 
 def _store_captures(
@@ -431,22 +444,24 @@ _GENERATE_OFFSETS = {
 }
 
 
-def _generated(kind: str) -> str:
+def _generated(kind: str, project: ProjectView) -> str:
     if kind in {"uuid", "uuid_v4"}:
         return str(uuid4())
     offset = _GENERATE_OFFSETS.get(kind)
     if offset is not None:
-        return (datetime.now(timezone.utc) + offset).strftime("%Y-%m-%dT%H:%M:%SZ")
-    if kind in SCALAR_KINDS:
-        return build_value(kind)
+        return (datetime.now(UTC) + offset).strftime("%Y-%m-%dT%H:%M:%SZ")
+    if is_known_kind(kind, project):
+        return build_value(kind, project=project)
     raise HarnessError(
         code="GENERATE_UNKNOWN",
         message=f"unknown generate kind: {kind}",
-        hint="use uuid, now_iso*, email, password, person_name, company_name, address, cpf, cnpj, secret.<name>, or captured.<name>",
+        hint=(
+            "use uuid, now_iso*, secret.<name>, captured.<name>, or a fixture kind"
+            " the project declares in fixtures.generators"
+        ),
     )
 
 
-_UNRESOLVED_PLACEHOLDER = re.compile(r"\{\{[A-Za-z0-9_]+\}\}")
 _SECRET_CAPTURE_KEYS = {
     "email": "register_email",
     "password": "register_password",
@@ -454,15 +469,15 @@ _SECRET_CAPTURE_KEYS = {
     "refresh_token": "refresh_token",
     "api_key": "api_key",
 }
+#: Field names whose *role* the kernel knows, so a sentinel under one of them
+#: needs no declaration. A tax id is not one of them: which document a project
+#: calls for is data, declared in `fixtures.field_kinds`.
 _SENTINEL_FIELD_KINDS = {
     "email": "email",
     "password": "password",
     "person_name": "person_name",
     "company_name": "company_name",
     "address": "address",
-    "cpf": "cpf",
-    "cnpj": "cnpj",
-    "document_number": "cnpj",
 }
 
 
@@ -471,29 +486,38 @@ def _usable_secret(secrets: dict[str, str], name: str) -> str | None:
     if value is None:
         return None
     text = str(value)
-    if not text or text.startswith("replace-with-") or _UNRESOLVED_PLACEHOLDER.search(text):
+    if not text or unresolved(text):
         return None
     return text
 
 
 def _placeholder_name(value: str) -> str | None:
-    match = _UNRESOLVED_PLACEHOLDER.fullmatch(value.strip())
-    if match is None:
-        return None
-    return value.strip()[2:-2]
+    return placeholder_name(value)
 
 
 def _is_placeholder(value: str) -> bool:
-    return value.startswith("replace-with-") or _placeholder_name(value) is not None
+    return is_seed(value) or _placeholder_name(value) is not None
 
 
-def _fill_sentinels(value: Any, secrets: dict[str, str], key: str | None = None) -> Any:
+def _fill_sentinels(value: Any, secrets: dict[str, str], project: ProjectView) -> Any:
+    return _fill_sentinels_deep(value, secrets, project, None)
+
+
+def _fill_sentinels_deep(
+    value: Any,
+    secrets: dict[str, str],
+    project: ProjectView,
+    key: str | None,
+) -> Any:
     if value is None:
         return None
     if isinstance(value, dict):
-        return {name: _fill_sentinels(item, secrets, name) for name, item in value.items()}
+        return {
+            name: _fill_sentinels_deep(item, secrets, project, name)
+            for name, item in value.items()
+        }
     if isinstance(value, list):
-        return [_fill_sentinels(item, secrets, key) for item in value]
+        return [_fill_sentinels_deep(item, secrets, project, key) for item in value]
     if not isinstance(value, str) or not _is_placeholder(value):
         return value
     secret_name = _placeholder_name(value) or key
@@ -501,9 +525,12 @@ def _fill_sentinels(value: Any, secrets: dict[str, str], key: str | None = None)
         secret = _usable_secret(secrets, secret_name)
         if secret is not None:
             return secret
-        kind = _SENTINEL_FIELD_KINDS.get(secret_name)
+        # The project may name a field the kernel has never heard of; what it
+        # cannot do is name one of them `email` and mean a CPF.
+        kinds = {**_SENTINEL_FIELD_KINDS, **project.field_kinds()}
+        kind = kinds.get(secret_name)
         if kind is not None:
-            return build_value(kind)
+            return build_value(kind, project=project)
     return value
 
 
@@ -511,7 +538,7 @@ def _reject_unresolved_placeholders(value: Any, *, where: str = "request body") 
     if value is None:
         return
     if isinstance(value, str):
-        if _UNRESOLVED_PLACEHOLDER.search(value) or value.startswith("replace-with-"):
+        if unresolved(value):
             raise HarnessError(
                 code="PLACEHOLDER_UNRESOLVED",
                 message=f"{where} still has placeholder {value}",
@@ -551,19 +578,53 @@ def _ensure_auth(
     secrets: dict[str, str],
     environment: str,
     captures: dict[str, str] | None = None,
+    project: ProjectView | None = None,
 ) -> None:
+    """Puts the credential the descriptor declares on the request.
+
+    Which header, and whether the value is `Bearer <token>` or raw, is declared:
+    before 1.4 this function wrote the product's own header names as literals. The
+    environment header goes on only where the route says it must, which is what
+    keeps a request to `/api/…` byte-identical to what it was.
+
+    `hmac` and `basic` are deliberately not injected: a signature is computed by
+    the caller, and a base64 credential is not a secret we can paste. Those the
+    case declares itself.
+    """
     captures = captures or {}
-    if contract.auth == "api_key" and "Authorization" not in headers:
-        headers["Authorization"] = f"Bearer {_credential(secrets, captures, 'api_key')}"
-    elif contract.auth == "jwt":
-        if "Authorization" not in headers:
-            headers["Authorization"] = f"Bearer {_credential(secrets, captures, 'jwt')}"
-        headers.setdefault("X-Nokr-Environment", environment)
-    elif contract.auth == "admin":
-        headers.setdefault(
-            "X-Nokr-Admin-Secret",
-            _credential(secrets, captures, "admin_secret"),
+    view = project if project is not None else ProjectView()
+    scheme = view.auth_named(contract.auth)
+    if scheme is None:
+        if contract.auth == "none":
+            return
+        raise HarnessError(
+            code="DESCRIPTOR_UNKNOWN_AUTH",
+            message=(
+                f"contract declares auth '{contract.auth}', which the project"
+                " descriptor does not define"
+            ),
+            hint=f"declare auth.{contract.auth} in the project descriptor",
         )
+    if scheme.scheme in {"bearer", "raw"} and scheme.header not in headers:
+        secret_name = _AUTH_SECRET_KEYS.get(contract.auth, contract.auth)
+        credential = _credential(secrets, captures, secret_name)
+        headers[scheme.header] = (
+            f"Bearer {credential}" if scheme.scheme == "bearer" else credential
+        )
+    if not _needs_environment_header(contract, view):
+        return
+    header_name = view.environment_header_name()
+    if header_name:
+        headers.setdefault(header_name, view.environment_value(environment))
+
+
+def _needs_environment_header(contract: Contract, project: ProjectView) -> bool:
+    """Whether this route resolves its environment from a header."""
+    if project.descriptor is None:
+        return False
+    _, path = _split_endpoint(contract.endpoint)
+    route = project.route(path)
+    return bool(route is not None and route.require_environment_header)
 
 
 def _ensure_idempotency(
@@ -676,20 +737,85 @@ def _request_header(headers: dict[str, str], name: str) -> str | None:
     return None
 
 
+def _log_targets(project: ProjectView) -> tuple[LogSourceTarget, ...]:
+    """Every declared source, each pinned to where this step starts reading.
+
+    Read **before** the request goes out, so the offsets are the file's length as it
+    was when the step began: a step must not read the previous step's lines, and a
+    source that only ever grows must not be re-read from the beginning every 20 ms.
+
+    `web` and `worker` are not special here any more. They were ids hardcoded in this
+    function, which is how a project came to declare `admin` and never collect it.
+    """
+    return tuple(
+        target.starting_at(file_size(target.path)) for target in project.log_sources()
+    )
+
+
+def _wait_logs_ms(
+    case: CaseFile,
+    contract: Contract,
+    project: ProjectView,
+    path: str,
+    status: int | None,
+) -> int:
+    """How long the sources are given, decided in one place.
+
+    The case's own `wait_logs_ms` wins. Otherwise an endpoint that settles the
+    request asynchronously gets the kernel's fallback, because the two opinions that
+    used to live apart — the collector waiting on the case and the pack demanding a
+    worker line from the contract — meant an async contract with a silent case
+    waited 0 ms and then reported "nothing to check" about the line it never waited
+    for.
+    """
+    declared = case.wait_logs_ms or 0
+    if declared > 0:
+        return declared
+    if _settles_asynchronously(case, contract, project, path, status):
+        return FALLBACK_ASYNC_WAIT_MS
+    return 0
+
+
+def _settles_asynchronously(
+    case: CaseFile,
+    contract: Contract,
+    project: ProjectView,
+    path: str,
+    status: int | None,
+) -> bool:
+    """Whether a consumer is expected to settle this request afterwards.
+
+    The status is part of it, and that is what keeps this honest in both
+    directions: an endpoint declared `async: worker` owes a line when it **accepts**
+    the request and none when it refuses it, because a 4xx queued no work and the
+    consumer never saw the trace. Without that clause every negative case of the
+    reference corpus would be asked for a worker line it was never going to get.
+
+    The last clause is declared, not guessed: it used to be
+    `"/api/ingest" in path or "/api/ledger" in path`.
+    """
+    if (case.wait_logs_ms or 0) > 0:
+        return True
+    if status is None or not 200 <= status < 300:
+        return False
+    return contract.async_mode == "worker" or project.waits_for_async_worker(path)
+
+
 def _pack_context(
     case: CaseFile,
     contract: Contract,
     headers: dict[str, str],
     body: dict[str, Any] | None,
     exchange: HttpExchange,
+    path: str,
     trace_id: str,
     environment: str,
     dimensions: list[str],
     config: HarnessConfig,
     snapshot: LogCollection,
+    awaits_async: bool,
 ) -> PackContext:
-    path = urlparse(exchange.url).path
-    budget = _budget_for(path, config)
+    budget = config.project.budget(path)
     expect_status = case.expect.status
     if isinstance(expect_status, str) and expect_status.isdigit():
         expect_status = int(expect_status)
@@ -706,45 +832,20 @@ def _pack_context(
         expect_status=expect_status,
         expect_code=case.expect.code,
         trace_sent=trace_id,
+        trace_header=config.project.trace_header(),
         environment=environment,
         idempotency_required=contract.idempotency == "header_uuid_v4",
         waives=waives,
         dimensions=dimensions,
         budget_ms=budget.budget,
         fail_ms=budget.fail,
-        web_log_lines=snapshot.web_lines,
-        worker_log_lines=snapshot.worker_lines,
-        logs_incomplete=snapshot.logs_incomplete,
-        require_worker_logs=_require_worker_logs(case, contract, path),
+        logs=snapshot,
+        awaits_async=awaits_async,
         case_kind=case.kind,
         business_rules=list(contract.rules),
         omit_headers=list(case.omit_headers),
+        project=config.project,
     )
-
-
-def _require_worker_logs(case: CaseFile, contract: Contract, path: str) -> bool:
-    if (case.wait_logs_ms or 0) > 0:
-        return True
-    if contract.async_mode == "worker":
-        return True
-    lowered = path.lower()
-    return "/api/ingest" in lowered or "/api/ledger" in lowered
-
-
-def _resolve_log(raw: str) -> Path:
-    path = Path(raw)
-    if path.is_absolute():
-        return path
-    return Path.cwd() / path
-
-
-def _budget_for(path: str, config: HarnessConfig) -> BudgetPair:
-    lowered = path.lower()
-    if "/api/ingest" in lowered or "/api/metering" in lowered:
-        return config.budgets_ms.hot_path
-    if lowered.startswith("/auth/") or "kyc" in lowered or "onboarding" in lowered:
-        return config.budgets_ms.kyc
-    return config.budgets_ms.default
 
 
 def _response_body(text: str) -> Any:
@@ -859,18 +960,25 @@ def _pace_register(
     sleeper: Callable[[float], None] = sleep,
     clock: Callable[[], float] = monotonic,
 ) -> None:
-    if config.register_gap_ms <= 0:
+    """Holds a request back until its declared pacer is free.
+
+    Which routes are throttled, and under which key, is declared per route (V8):
+    an onboarding endpoint that refuses a second call within a couple of seconds
+    used to be a literal path here.
+    """
+    if config.pace_gap_ms <= 0:
         return
-    if urlparse(url).path != "/auth/register":
+    key = config.project.pace_key(urlparse(url).path)
+    if key is None:
         return
     now = clock()
-    last = pacer.get("register")
+    last = pacer.get(key)
     if last is not None:
-        wait = config.register_gap_ms / 1000.0 - (now - last)
+        wait = config.pace_gap_ms / 1000.0 - (now - last)
         if wait > 0:
             sleeper(wait)
             now = clock()
-    pacer["register"] = now
+    pacer[key] = now
 
 
 def execute_round(
@@ -892,8 +1000,9 @@ def execute_round(
         )
     started = perf_counter()
     secrets = secrets or {}
+    project = config.project
     round_file = _load_round_file(round_path)
-    suite = optional_suite(round_file, root)
+    suite = optional_suite(round_file, root, project)
     if suite is not None:
         from heimdall_qa.suite_run import execute_suite_round
 
@@ -909,11 +1018,14 @@ def execute_round(
             mode=mode,
             descriptor=descriptor,
         )
-    cases = _load_included_cases(round_file, root)
-    _reject_todo_status(cases)
-    _require_coverage(cases, root)
+    cases = _load_included_cases(round_file, root, project)
+    _reject_placeholders(cases)
+    _require_coverage(cases, root, project)
     selected = [case for case in cases if _matches_dimensions(case, round_file.dimensions)]
-    prepared = [_prepare_case(case, root, secrets, runs_dir=runs_dir) for case in selected]
+    prepared = [
+        _prepare_case(case, root, secrets, project=project, runs_dir=runs_dir)
+        for case in selected
+    ]
     run_dir = create_run(runs_dir, round_file.id)
     shutil.copy(round_path, run_dir / "round.yaml")
     captures: dict[str, str] = {}
@@ -943,6 +1055,7 @@ def execute_round(
             records,
             started,
             root,
+            project=project,
             human_reject_rate=0.0,
             descriptor=descriptor,
         ),
@@ -952,10 +1065,14 @@ def execute_round(
     return run_dir
 
 
-def optional_suite(round_file: RoundFile, root: Path) -> SuiteFile | None:
+def optional_suite(
+    round_file: RoundFile,
+    root: Path,
+    project: ProjectView | None = None,
+) -> SuiteFile | None:
     if not round_file.suite:
         return None
-    path = resolve_path(root, round_file.suite)
+    path = resolve_path(root, round_file.suite, project)
     if not path.is_file():
         return None
     try:
@@ -977,12 +1094,23 @@ def _load_round_file(round_path: Path) -> RoundFile:
         ) from exc
 
 
-def _load_included_cases(round_file: RoundFile, root: Path) -> list[CaseFile]:
+def _load_included_cases(
+    round_file: RoundFile,
+    root: Path,
+    project: ProjectView | None = None,
+) -> list[CaseFile]:
+    """Every case the round's `include` names, in the order it names them.
+
+    An include is a file (`cases/ingest.yaml`, every case it holds, in its order)
+    or one case in it (`cases/ingest.yaml#ingest-H01`). A selector that names a
+    case the file no longer holds is an error and not a skip: a round that quietly
+    runs eight of its nine cases reports a coverage nobody asked for.
+    """
     loaded: list[CaseFile] = []
     errors: list[str] = []
     for relative in round_file.include:
         try:
-            loaded.append(load_case(resolve_path(root, relative)))
+            loaded.extend(case for _, case in iter_cases(root, [relative], project))
         except _LOAD_ERRORS as exc:
             errors.append(f"{relative}: {exc}")
     if errors:
@@ -995,26 +1123,36 @@ def _load_included_cases(round_file: RoundFile, root: Path) -> list[CaseFile]:
     return loaded
 
 
-def _reject_todo_status(cases: list[CaseFile]) -> None:
-    todos = [
-        f"case {case.id}: expect.status is TODO"
+def _reject_placeholders(cases: list[CaseFile]) -> None:
+    """A run never sends a `TODO`, anywhere in a case.
+
+    `validate` refuses the same thing, and this is the second lock on that door: a
+    run may be started without a prior `validate`, and a `TODO` inside `diff` would
+    otherwise be sent as the literal request body.
+    """
+    found = [
+        f"case {case.id}: {where} is TODO"
         for case in cases
-        if str(case.expect.status).upper() == "TODO"
+        for where in todo_paths(case.model_dump(by_alias=True, exclude_none=True))
     ]
-    if todos:
+    if found:
         raise HarnessError(
             code="ROUND_INVALID",
-            message="round contains TODO expect.status",
-            hint="replace TODO with the expected HTTP status before running",
-            details=tuple(todos),
+            message="round contains TODO placeholders",
+            hint="replace every TODO with the expected value before running",
+            details=tuple(found),
         )
 
 
-def _require_coverage(cases: list[CaseFile], root: Path) -> None:
+def _require_coverage(
+    cases: list[CaseFile],
+    root: Path,
+    project: ProjectView | None = None,
+) -> None:
     missing: list[str] = []
     by_contract: dict[Path, list[CaseFile]] = {}
     for case in cases:
-        by_contract.setdefault(resolve_path(root, case.contract), []).append(case)
+        by_contract.setdefault(resolve_path(root, case.contract, project), []).append(case)
     for contract_path, grouped in by_contract.items():
         contract = _load_contract_file(contract_path)
         present = {case.id for case in grouped}
@@ -1053,12 +1191,16 @@ def _prepare_case(
     root: Path,
     secrets: dict[str, str],
     *,
+    project: ProjectView | None = None,
     runs_dir: Path | None = None,
 ) -> tuple[CaseFile, Contract, dict[str, Any]]:
-    contract = _load_contract_file(resolve_path(root, case.contract))
+    contract = _load_contract_file(resolve_path(root, case.contract, project))
     shared = read_shared_captures(runs_dir) if runs_dir is not None else {}
     _require_auth_secret(contract, secrets, shared)
-    baseline = _load_baseline(resolve_path(root, contract.baseline), contract.baseline)
+    baseline = _load_baseline(
+        resolve_path(root, contract.baseline, project),
+        contract.baseline,
+    )
     return case, contract, baseline
 
 
@@ -1101,8 +1243,8 @@ def _lab_skip_reason(
     if _has_admin_secret(secrets, captures):
         return None
     reason = (
-        "admin_secret missing; add it to secrets.local.yaml and start NokrAPI "
-        "profile admin on :9090. The API key in shared-captures.json is not enough"
+        "admin_secret missing; add it to secrets.local.yaml and start the API's "
+        "admin profile. The API key in shared-captures.json is not enough"
     )
     if contract.auth == "admin":
         return reason
@@ -1115,29 +1257,12 @@ def _lab_skip_reason(
 
 
 def _collect_placeholders(case: CaseFile, contract: Contract) -> set[str]:
-    found = set(_PLACEHOLDER.findall(contract.endpoint))
-    found |= _placeholders_from(case.headers)
-    found |= _placeholders_from(case.diff)
-    found |= _placeholders_from(case.path_values)
-    found |= _placeholders_from(case.generate)
-    return found
-
-
-def _placeholders_from(value: Any) -> set[str]:
-    found: set[str] = set()
-    if value is None:
-        return found
-    if isinstance(value, str):
-        found.update(_PLACEHOLDER.findall(value))
-        return found
-    if isinstance(value, dict):
-        for key, item in value.items():
-            found |= _placeholders_from(str(key))
-            found |= _placeholders_from(item)
-        return found
-    if isinstance(value, list):
-        for item in value:
-            found |= _placeholders_from(item)
+    """Every name this step would need, from the contract and the case together."""
+    found = placeholder_names(contract.endpoint)
+    found |= placeholder_names(case.headers)
+    found |= placeholder_names(case.diff)
+    found |= placeholder_names(case.path_values)
+    found |= placeholder_names(case.generate)
     return found
 
 
@@ -1285,7 +1410,9 @@ def _is_product_fail(result: StepResult, pack_fails: list[str], status_ok: bool)
     if result.status_code >= 500:
         return True
     details = " ".join(item.detail for item in result.packs if item.status == "fail")
-    if "X-Trace-Id" in details or "traceId" in details or "Portuguese" in details:
+    # Correlating is the product's job, so a missing or wrong trace header is a
+    # defect in the product rather than in the case that noticed it.
+    if "trace" in details.lower() or "Portuguese" in details:
         return True
     if not status_ok:
         return True
@@ -1377,6 +1504,7 @@ def _build_summary(
     records: list[RoundStep],
     started: float,
     root: Path,
+    project: ProjectView | None = None,
     human_reject_rate: float = 0.0,
     descriptor: dict[str, str] | None = None,
 ) -> dict[str, Any]:
@@ -1395,7 +1523,7 @@ def _build_summary(
             "fail": sum(len(item.pack_fails) for item in records),
             "warn": sum(len(item.pack_warns) for item in records),
         },
-        "coverage_pct": _coverage_pct(cases, root),
+        "coverage_pct": _coverage_pct(cases, root, project),
         "latency_ms": {
             "p50": _percentile(elapsed, 50),
             "p95": _percentile(elapsed, 95),
@@ -1403,18 +1531,44 @@ def _build_summary(
         "logs_incomplete": sum(1 for item in records if item.logs_incomplete),
         "human_reject_rate": human_reject_rate,
         "review_duration_ms": (perf_counter() - started) * 1000.0,
+        # What answered the value questions: `neutral` when the descriptor declares
+        # no price model, the provider's id when it does. A run whose value checks
+        # were answered neutrally has to say so — `NeutralOracle` asserts that a 2xx
+        # charged what it says it charged, which is a shape and not a price model,
+        # and a reader who took it for the product's arithmetic would be reading a
+        # claim nobody made.
+        "oracle": _oracle_label(project),
         # Which descriptor was in force, and why that one (ADR-01). Precedence
         # with no record is indistinguishable from a mistake.
         "descriptor": descriptor,
     }
 
 
-def _coverage_pct(cases: list[CaseFile], root: Path) -> float:
+def _oracle_label(project: ProjectView | None) -> str:
+    """Which oracle answered the value questions: `neutral`, or the provider's id.
+
+    The id and not the class name, because naming the class would mean *building*
+    the oracle here: a core that imports a provider to write its own summary stops
+    being a core, and a plain round never asks a value question in the first place
+    (only a suite books, and it builds the oracle there). What this field says is
+    what a reader of the run needs — that a run whose value checks were answered
+    neutrally must not be read as a product's arithmetic.
+    """
+    if project is None:
+        return ""
+    return project.provider_id() or "neutral"
+
+
+def _coverage_pct(
+    cases: list[CaseFile],
+    root: Path,
+    project: ProjectView | None = None,
+) -> float:
     included = {case.id for case in cases}
     expand_ids: set[str] = set()
     seen: set[Path] = set()
     for case in cases:
-        contract_path = resolve_path(root, case.contract)
+        contract_path = resolve_path(root, case.contract, project)
         if contract_path in seen:
             continue
         seen.add(contract_path)

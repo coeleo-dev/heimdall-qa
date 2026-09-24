@@ -5,12 +5,15 @@ import httpx
 import pytest
 
 from heimdall_qa.config import HarnessConfig
-from heimdall_qa.config import LogFiles
 from heimdall_qa.errors import HarnessError
+from heimdall_qa.project import ProjectView
 from heimdall_qa.runner import execute_round
+from heimdall_qa.testing import config_for
+from heimdall_qa.testing import project_at
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 EXAMPLE_ROUND = FIXTURES / "rounds" / "example.yaml"
+_DESCRIPTOR = FIXTURES / "qa" / "project.yaml"
 
 
 def _echo_handler(request: httpx.Request) -> httpx.Response:
@@ -29,12 +32,17 @@ def _client(handler) -> httpx.Client:
     )
 
 
-def _config(tmp_path: Path) -> HarnessConfig:
-    web_log = tmp_path / "nokr-web.log"
-    worker_log = tmp_path / "nokr-worker.log"
+def _project(tmp_path: Path) -> ProjectView:
+    """The descriptor in force, with this test's own (empty) log files."""
+    web_log = tmp_path / "web.log"
+    worker_log = tmp_path / "worker.log"
     web_log.write_text("", encoding="utf-8")
     worker_log.write_text("", encoding="utf-8")
-    return HarnessConfig(log_files=LogFiles(web=str(web_log), worker=str(worker_log)))
+    return project_at(_DESCRIPTOR, web=str(web_log), worker=str(worker_log))
+
+
+def _config(tmp_path: Path) -> HarnessConfig:
+    return config_for(_project(tmp_path))
 
 
 def test_execute_round_writes_summary_evidence_verdict_and_latest(tmp_path: Path):
@@ -63,6 +71,8 @@ def test_execute_round_writes_summary_evidence_verdict_and_latest(tmp_path: Path
     assert "logs_incomplete" in summary
     assert summary["human_reject_rate"] == 0
     assert "review_duration_ms" in summary
+    assert "oracle" in summary
+    assert summary["oracle"] == "reference"
     evidence = (run_dir / "evidence.md").read_text(encoding="utf-8")
     assert "echo-H01" in evidence
     verdict = json.loads(

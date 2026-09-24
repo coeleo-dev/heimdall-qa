@@ -1,0 +1,381 @@
+#!/usr/bin/env python3
+"""Move a corpus between one case file per case and one file per area.
+
+`heimdall-qa` reads a case file as a map of case id to case, and a round names a
+file (`cases/ingest.yaml`, every case in it) or one case in that file
+(`cases/ingest.yaml#ingest-H01`). This script is how a corpus written the older way
+— `cases/ingest/ingest-H01.yaml`, one file per case — becomes that shape, and how it
+becomes the older way again, which is the only honest way to claim the move loses
+nothing:
+
+    consolidate-cases --merge --root .
+    consolidate-cases --split --root .
+
+It runs under the harness's environment — the interpreter `./bin/heimdall-qa` uses —
+because the text of a case file is the harness's to decide: `heimdall_qa.document`
+owns that style, so the file this writes is the file `heimdall-qa scaffold` would
+have written.
+
+The order of the cases inside a merged file is **the order the rounds already run
+them in**, never a sort. `ingest-H01` creates the transaction the `ingest-I-replay`
+cases spend, so a file sorted by id runs the replay before the thing it replays and
+fails for a reason the product never had. A round that covers an area whole gets one
+reference back — the file — and a round that runs a subset of an area, or the same
+cases in another order, keeps one selector per case: consolidation shortens the
+writing, it never reroutes a round, and `iter_cases` gives back exactly the sequence
+each round was running before.
+
+A case no round references is still written, last, because a migration that drops a
+test is a migration that deleted a test.
+
+Only the references are rewritten — a round's `include` block, a suite's `case:`
+lines — plus the case files themselves. Everything else is left as a human wrote it,
+and `--merge` followed by `--split` gives back the corpus it started from.
+"""
+
+import argparse
+from collections import OrderedDict
+from pathlib import Path
+import re
+import sys
+
+import yaml
+
+from heimdall_qa.document import dump
+
+#: The directory a corpus keeps its cases in, relative to `--root`.
+CASE_DIR = "cases"
+
+#: Where rounds and suites live. Both are walked recursively; `rounds/group/` is
+#: as much a round as `rounds/` is.
+MANIFEST_DIRS = ("rounds", "suites")
+
+#: `cases/<area>/<case>.yaml`, the shape `--merge` consumes.
+_SPLIT_REF = re.compile(r"^cases/(?P<area>[^/]+)/(?P<case>[^/]+)\.yaml$")
+
+#: `cases/<area>.yaml` with an optional `#<case>`, the shape `--split` consumes.
+_MERGED_REF = re.compile(r"^cases/(?P<area>[^/]+)\.yaml(?:#(?P<case>.+))?$")
+
+_INCLUDE_HEADER = re.compile(r"^include:\s*$")
+_INCLUDE_LINE = re.compile(r"^(?P<indent>\s*)-\s+(?P<ref>\S.*?)\s*$")
+_CASE_LINE = re.compile(r"^(?P<indent>\s*)case:\s+(?P<ref>\S.*?)\s*$")
+
+
+class MigrationError(Exception):
+    """A corpus this script refuses to rewrite, with the reason it refuses."""
+
+
+def manifest_paths(root: Path) -> list[Path]:
+    found: list[Path] = []
+    for directory in MANIFEST_DIRS:
+        base = root / directory
+        if base.is_dir():
+            found.extend(sorted(base.rglob("*.yaml")))
+    return found
+
+
+def area_files(root: Path) -> dict[str, list[str]]:
+    """Every area and the case ids it holds, in disk order."""
+    areas: dict[str, list[str]] = {}
+    base = root / CASE_DIR
+    for entry in sorted(base.iterdir() if base.is_dir() else []):
+        if entry.is_dir():
+            areas[entry.name] = sorted(path.stem for path in entry.glob("*.yaml"))
+    return areas
+
+
+def sequences(root: Path) -> dict[str, list[tuple[str, list[str]]]]:
+    """Per area, the ordered references every round and suite makes to it.
+
+    The label is the file the reference sits in, so a refusal names where to look.
+    """
+    found: dict[str, list[tuple[str, list[str]]]] = {}
+    for path in manifest_paths(root):
+        current: OrderedDict[str, list[str]] = OrderedDict()
+        for _, raw in references(path):
+            match = _SPLIT_REF.match(raw)
+            if match is None:
+                raise MigrationError(
+                    f"{path}: {raw!r} is not a `cases/<area>/<case>.yaml` reference"
+                )
+            current.setdefault(match.group("area"), []).append(match.group("case"))
+        for area, refs in current.items():
+            found.setdefault(area, []).append((str(path), refs))
+    return found
+
+
+def references(path: Path) -> list[tuple[int, str]]:
+    """`(line number, reference)` for every case reference in a round or a suite.
+
+    The `include:` header matters: `dimensions:` is also a list of dashed items, and
+    a script that reads those as case references refuses to run on the first round
+    it meets.
+    """
+    found: list[tuple[int, str]] = []
+    lines = path.read_text(encoding="utf-8").splitlines()
+    index = 0
+    while index < len(lines):
+        if _INCLUDE_HEADER.match(lines[index]):
+            index += 1
+            while index < len(lines) and _INCLUDE_LINE.match(lines[index]):
+                found.append((index, _INCLUDE_LINE.match(lines[index]).group("ref")))
+                index += 1
+            continue
+        match = _CASE_LINE.match(lines[index])
+        if match is not None and match.group("ref").startswith(f"{CASE_DIR}/"):
+            found.append((index, match.group("ref")))
+        index += 1
+    return found
+
+
+def merge_order(root: Path) -> dict[str, list[str]]:
+    """The order each area's cases are written in, proven by its rounds.
+
+    A round that runs an area whole gets one line back only when it runs the area in
+    the order the file holds — and the file holds the order of the first such round.
+    A round that runs the cases in another order, or a subset of them, keeps one
+    selector per case: consolidation must not reorder a round, because the cases of
+    an area share captures and `H01` creating what the `I-*` cases replay is the
+    reason they were written in that order.
+
+    A case no round references is kept — it is still part of the corpus, and a
+    migration that drops it is a migration that deleted a test — but it goes last,
+    because no round has an opinion about where it belongs.
+    """
+    areas = area_files(root)
+    by_area = sequences(root)
+    order: dict[str, list[str]] = {}
+    for area, files in sorted(areas.items()):
+        seen = by_area.get(area, [])
+        _only_known(area, seen, files)
+        whole = [refs for _, refs in seen if len(refs) == len(files)]
+        chosen = whole[0] if whole else _first_seen(seen)
+        order[area] = [*chosen, *(name for name in files if name not in set(chosen))]
+    return order
+
+
+def _only_known(area: str, seen: list[tuple[str, list[str]]], files: list[str]) -> None:
+    """A round that names a case the area does not hold is a corpus defect."""
+    known = set(files)
+    for label, refs in seen:
+        unknown = [ref for ref in refs if ref not in known]
+        if unknown:
+            raise MigrationError(f"{area}: {label} names cases the area does not hold: {unknown}")
+
+
+def _first_seen(seen: list[tuple[str, list[str]]]) -> list[str]:
+    """Every id, in the order the rounds first mention it.
+
+    Only used for an area no round covers whole: nothing runs it as a block, so any
+    order keeps every round doing what it did, and first-seen is the one that reads
+    like the rounds do.
+    """
+    ordered: list[str] = []
+    for _, refs in seen:
+        for item in refs:
+            if item not in ordered:
+                ordered.append(item)
+    return ordered
+
+
+def merge(root: Path) -> int:
+    """Write one file per area, then point the rounds and suites at it.
+
+    Everything is validated and read before a single byte is written: a corpus this
+    script refuses halfway through is a corpus a person has to finish by hand.
+    """
+    order = merge_order(root)
+    manifests = _rewritten(root, merging=True, order=order)
+    written: dict[Path, str] = {}
+    removed: list[Path] = []
+    for area, ids in sorted(order.items()):
+        entries: dict[str, object] = {}
+        for case_id in ids:
+            path = root / CASE_DIR / area / f"{case_id}.yaml"
+            body = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            if body.pop("id", None) != case_id:
+                raise MigrationError(f"{path}: the file and the case id disagree")
+            entries[case_id] = body
+            removed.append(path)
+        written[root / CASE_DIR / f"{area}.yaml"] = dump(entries)
+    _apply({**written, **dict(manifests)})
+    for path in removed:
+        path.unlink()
+    for area in order:
+        (root / CASE_DIR / area).rmdir()
+    print(f"merged {len(order)} areas, {sum(len(ids) for ids in order.values())} cases")
+    return 0
+
+
+def split(root: Path) -> int:
+    """Write one file per case, then point the rounds and suites back at them."""
+    base = root / CASE_DIR
+    areas = (
+        {
+            path.stem: list(yaml.safe_load(path.read_text(encoding="utf-8")) or {})
+            for path in sorted(base.glob("*.yaml"))
+        }
+        if base.is_dir()
+        else {}
+    )
+    manifests = _rewritten(root, merging=False, order=areas)
+    written: dict[Path, str] = {}
+    for area, ids in sorted(areas.items()):
+        data = yaml.safe_load((base / f"{area}.yaml").read_text(encoding="utf-8"))
+        for case_id in ids:
+            payload = {"id": case_id, **(data[case_id] or {})}
+            written[base / area / f"{case_id}.yaml"] = dump(payload)
+    for path in written:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    _apply({**written, **dict(manifests)})
+    for area in areas:
+        (base / f"{area}.yaml").unlink()
+    print(f"split {len(areas)} areas, {sum(len(ids) for ids in areas.values())} cases")
+    return 0
+
+
+def _apply(contents: dict[Path, str]) -> None:
+    for path, text in contents.items():
+        path.write_text(text, encoding="utf-8")
+
+
+def _rewritten(
+    root: Path, *, merging: bool, order: dict[str, list[str]]
+) -> list[tuple[Path, str]]:
+    """Every manifest as it should read, in memory, before anything is written."""
+    return [
+        (path, _rewrite_text(path, path.read_text(encoding="utf-8"), merging=merging, order=order))
+        for path in manifest_paths(root)
+    ]
+
+
+def _rewrite_text(path: Path, text: str, *, merging: bool, order: dict[str, list[str]]) -> str:
+    lines = text.splitlines()
+    out: list[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        if _INCLUDE_HEADER.match(line):
+            out.append(line)
+            index += 1
+            block: list[str] = []
+            while index < len(lines) and _INCLUDE_LINE.match(lines[index]):
+                block.append(lines[index])
+                index += 1
+            out.extend(_rewrite_block(path, block, merging=merging, order=order))
+            continue
+        single = _CASE_LINE.match(line)
+        if single is not None:
+            out.append(_rewrite_case_line(path, single, merging=merging, order=order))
+            index += 1
+            continue
+        out.append(line)
+        index += 1
+    return "\n".join(out) + "\n"
+
+
+def _rewrite_block(
+    path: Path, block: list[str], *, merging: bool, order: dict[str, list[str]]
+) -> list[str]:
+    """A round's whole include list at once, because the merge shortens it."""
+    if not block:
+        return block
+    refs = [_INCLUDE_LINE.match(line).group("ref") for line in block]
+    indent = _INCLUDE_LINE.match(block[0]).group("indent")
+    pattern = _SPLIT_REF if merging else _MERGED_REF
+    if any(pattern.match(ref) is None for ref in refs):
+        raise MigrationError(f"{path}: include holds a reference this script cannot rewrite")
+    rewritten: list[str] = []
+    run_area: str | None = None
+    run_ids: list[str] = []
+    for ref in [*refs, None]:
+        area, ids = _expanded_ref(ref, merging=merging, order=order) if ref else (None, [])
+        if area != run_area:
+            rewritten.extend(_collapse(path, run_area, run_ids, merging=merging, order=order))
+            run_area, run_ids = area, []
+        run_ids.extend(ids)
+    return [f"{indent}- {ref}" for ref in rewritten]
+
+
+def _collapse(
+    path: Path,
+    area: str | None,
+    ids: list[str],
+    *,
+    merging: bool,
+    order: dict[str, list[str]],
+) -> list[str]:
+    """One area's run of references as the references it becomes.
+
+    A run that covers the area whole becomes the single file reference the round
+    now wants; anything else becomes one selector per case, in the round's order.
+    """
+    if area is None:
+        return []
+    if merging and ids == order[area]:
+        return [f"{CASE_DIR}/{area}.yaml"]
+    if not merging:
+        return [f"{CASE_DIR}/{area}/{case_id}.yaml" for case_id in ids]
+    return [f"{CASE_DIR}/{area}.yaml#{case_id}" for case_id in ids]
+
+
+def _rewrite_case_line(
+    path: Path, match: re.Match[str], *, merging: bool, order: dict[str, list[str]]
+) -> str:
+    """A suite's `case:`, which always names one case and always stays one line."""
+    raw = match.group("ref")
+    if merging:
+        split_match = _SPLIT_REF.match(raw)
+        if split_match is None:
+            raise MigrationError(f"{path}: case {raw!r} is not a reference this script knows")
+        return f"{match.group('indent')}case: {CASE_DIR}/{split_match.group('area')}.yaml#{split_match.group('case')}"
+    merged_match = _MERGED_REF.match(raw)
+    if merged_match is None or merged_match.group("case") is None:
+        raise MigrationError(
+            f"{path}: case {raw!r} does not name one case; a suite loop runs one case"
+            " per iteration and cannot expand to a whole area"
+        )
+    return (
+        f"{match.group('indent')}case:"
+        f" {CASE_DIR}/{merged_match.group('area')}/{merged_match.group('case')}.yaml"
+    )
+
+
+def _expanded_ref(
+    raw: str, *, merging: bool, order: dict[str, list[str]]
+) -> tuple[str | None, list[str]]:
+    """One reference as the area it names and the case ids it runs.
+
+    A merged reference without a fragment — `cases/ingest.yaml` — runs every case
+    the file holds, so splitting it expands to the file's order. A reference with a
+    fragment runs exactly the one case it names.
+    """
+    match = (_SPLIT_REF if merging else _MERGED_REF).match(raw)
+    if match is None:
+        return None, []
+    area = match.group("area")
+    case_id = match.group("case")
+    if case_id is not None:
+        return area, [case_id]
+    if merging:
+        return area, []
+    return area, list(order.get(area, []))
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--root", default=".", help="the content root (default: .)")
+    action = parser.add_mutually_exclusive_group(required=True)
+    action.add_argument("--merge", action="store_true", help="one file per area")
+    action.add_argument("--split", action="store_true", help="one file per case")
+    args = parser.parse_args(argv)
+    root = Path(args.root)
+    try:
+        return merge(root) if args.merge else split(root)
+    except MigrationError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,7 @@
+endpoint: GET /toy/items
+dto: toy.ItemsController
+area: toy-items
+auth: none
+idempotency: none
+baseline: baselines/empty.json
+fields: {}

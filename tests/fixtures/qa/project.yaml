@@ -1,19 +1,31 @@
-# Level 2 — a Spring API (the Nokr), reduced to the essentials.
+# Level 2 — a Spring API, reduced to the essentials.
 #
-# Note that `X-Nokr-Environment` and `nk_test_` survive: generalising the harness
-# is not deleting the product's identity, it is moving that identity out of the
-# core and into a file the product's own team reviews.
+# Note that `X-Environment` and `test_key_` survive: generalising the harness is not
+# deleting a product's identity, it is moving that identity out of the core and into
+# a file the product's own team reviews.
+#
+# It mirrors the parts of a real descriptor the harness's own suite exercises:
+# routing by prefix, both credentials, the admin origin, declared log sources and
+# the markers `security.leak` looks for. Tests that need a *different* answer
+# override it here (a second descriptor file) rather than in the core.
 version: 1
 
 project:
-  id: nokr
-  name: Nokr
+  id: demo
+  name: Demo API
+
+# A provider id is a *declared* string: the descriptor says whose price model a probe
+# should ask for, and resolving it is the run's business — a project can be configured
+# before its provider is installed, which is why the core's own fixture names an id no
+# distribution here provides. The tests that check a price model live in the suite of
+# whoever owns that price model, and they bring their own descriptor to say so.
+provider: reference
 
 environments:
   sandbox:
     base_url: http://127.0.0.1:8080
   production:
-    base_url: https://api.nokr.com
+    base_url: https://api.example.com
 
 auth:
   jwt:
@@ -23,17 +35,19 @@ auth:
     header: Authorization
     scheme: bearer
     prefixes:
-      sandbox: "nk_test_"
-      production: "nk_live_"
+      sandbox: "test_key_"
+      production: "live_key_"
   admin:
-    header: X-Nokr-Admin-Secret
+    header: X-Admin-Secret
     scheme: raw
 
 environment_header:
-  name: X-Nokr-Environment
+  name: X-Environment
   values:
     sandbox: sandbox
     production: production
+  # Which namespace `E-isolate` and `E-conflict` collide with.
+  isolation: production
 
 routes:
   - prefix: /platform/
@@ -41,6 +55,7 @@ routes:
     require_environment_header: true
   - prefix: /admin/
     auth: admin
+    target: admin
   - prefix: /api/ingest
     auth: api_key
     budget: fast
@@ -48,9 +63,27 @@ routes:
   - prefix: /api/metering
     auth: api_key
     budget: fast
+  - prefix: /auth/register
+    auth: none
+    budget: long
+    pace_key: register
   - prefix: /auth/
     auth: none
     budget: long
+  # A POST here creates a resource the API refuses to duplicate by name, so the
+  # generated case needs `unique_json`. Declared per route, never matched by path.
+  - prefix: /platform/billable-metrics
+    auth: jwt
+    require_environment_header: true
+    catalog_unique: true
+  - prefix: /platform/entitlements/feature-keys
+    auth: jwt
+    require_environment_header: true
+    catalog_unique: true
+  - prefix: /platform/entitlements/plans
+    auth: jwt
+    require_environment_header: true
+    catalog_unique: true
 
 budgets:
   fast:
@@ -64,14 +97,51 @@ budgets:
     fail: 8000
 
 errors:
-  validation_status: 422
   envelope: spring
   product_packages:
-    - com.nokr
+    - com.example
+  redact:
+    - "test_key_*"
+    - "live_key_*"
 
 trace:
   header: X-Trace-Id
   prefix: "heimdall-"
+
+log_sources:
+  - id: web
+    path: web.log
+    role: sync
+  - id: worker
+    path: worker.log
+    role: async
+  # The third service is declared and, in this fixture, not instrumented: the tests
+  # run no admin JVM, so the trace never reaches `admin.log`. Saying so with
+  # `propagate: false` is the difference between a declared absence and a missing
+  # line — the packs must not fail a project for the first one.
+  - id: admin
+    path: admin.log
+    role: sync
+    propagate: false
+
+targets:
+  admin:
+    base_url: http://127.0.0.1:9090
+
+request_source:
+  kind: bru
+  collection: bru
+
+fixtures:
+  locale: pt_BR
+  email_domain: qa.example.dev
+  generators:
+    cpf:
+      kind: validate_docbr_cpf
+    cnpj:
+      kind: validate_docbr_cnpj
+  field_kinds:
+    document_number: cnpj
 
 contract:
   source: openapi

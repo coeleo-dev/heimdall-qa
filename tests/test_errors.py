@@ -7,13 +7,13 @@ def test_format_cli_includes_code_message_and_hint():
     err = HarnessError(
         code="HTTP_UNREACHABLE",
         message="cannot connect to http://127.0.0.1:8080",
-        hint="start NokrAPI profile web, or point nokr_web in config.yaml",
+        hint="start the API in its web profile, or point the descriptor at it",
     )
     text = format_cli(err)
     assert "error[HTTP_UNREACHABLE]" in text
     assert "cannot connect to http://127.0.0.1:8080" in text
     assert "hint:" in text
-    assert "start NokrAPI" in text
+    assert "start the API in its web profile" in text
 
 
 def test_to_dict_exposes_fields_for_ui():

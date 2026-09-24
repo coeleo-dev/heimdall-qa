@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# A fresh clone, one command from running anything.
+#
+# The harness is three installable pieces and two toolchains: the core, the Spring
+# reader that reads a Java target, and an interpreter and a JDK to run them with. A
+# colleague who clones this repository has to get all five right before the first
+# `heimdall-qa validate`, and every one of them fails in a different way. This script
+# is that checklist, in the order it has to happen, written down once.
+#
+# It is idempotent: run it again after a `git pull` and it installs what is missing.
+# It touches nothing outside `.venv/` and the toolchain caches pip and Maven keep.
+#
+# Usage: bin/bootstrap [--check]
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VENV="$REPO/.venv"
+PYTHON_BIN="${PYTHON:-python3}"
+JAVA_MIN="${JAVA_MIN:-25}"
+CHECK=""
+
+for argument in "$@"; do
+    case "$argument" in
+        --check) CHECK=1 ;;
+        *) echo "usage: bootstrap [--check]" >&2; exit 2 ;;
+    esac
+done
+
+step() { printf '\n== %s\n' "$1"; }
+fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
+
+step "python"
+command -v "$PYTHON_BIN" >/dev/null || fail "no $PYTHON_BIN on PATH"
+"$PYTHON_BIN" - <<'PY' || fail "python 3.12 or newer is required"
+import sys
+
+raise SystemExit(0 if sys.version_info >= (3, 12) else 1)
+PY
+"$PYTHON_BIN" --version
+
+step "java"
+# The fixture is Spring Boot 4 on Java 25 (`examples/spring-fixture/pom.xml`). The
+# harness itself does not need a JDK; the Java *target* the reader reads does.
+if command -v java >/dev/null; then
+    JAVA_VERSION="$(java -version 2>&1 | sed -n 's/.*version "\([0-9]*\).*/\1/p' | head -1)"
+    if [ -n "$JAVA_VERSION" ] && [ "$JAVA_VERSION" -lt "$JAVA_MIN" ]; then
+        echo "java $JAVA_VERSION found; the fixture needs $JAVA_MIN+" >&2
+        echo "the harness still works — only the Java proof target needs the JDK" >&2
+    else
+        java -version 2>&1 | head -1
+    fi
+else
+    echo "no java on PATH: the core runs, the Java fixture does not" >&2
+fi
+
+step "the venv"
+if [ -d "$VENV" ]; then
+    echo "$VENV exists"
+else
+    "$PYTHON_BIN" -m venv "$VENV"
+    echo "created $VENV"
+fi
+
+if [ -n "$CHECK" ]; then
+    "$VENV/bin/python" -c "import heimdall_qa, heimdall_qa_spring" 2>/dev/null \
+        || fail "the venv is missing an install; run bin/bootstrap without --check"
+    echo "core and spring reader import"
+    exit 0
+fi
+
+step "the core and the reader"
+# The reader is its own distribution on purpose (ADR-04): a project that never reads
+# Java never installs it. Editable, so a clone measures the working tree.
+"$VENV/bin/python" -m pip install --quiet --upgrade pip
+# The `dev` extra is pytest: what the suite below needs and a run does not. Installing
+# it here is the difference between a clone that runs and a clone that can be checked.
+"$VENV/bin/python" -m pip install --quiet -e "$REPO[dev]"
+"$VENV/bin/python" -m pip install --quiet -e "$REPO/packages/spring"
+
+step "the skills every agent reads"
+"$REPO/bin/sync-skills"
+
+step "ready"
+"$VENV/bin/heimdall-qa" validate --explain >/dev/null
+cat <<'EOF'
+
+  the demo, with the Java fixture:
+      examples/spring-fixture/demo.sh              # app + review UI on 7878
+      examples/spring-fixture/demo.sh --headless   # app, round, summary
+
+  the same, with no product on disk:
+      examples/toy-provider/gate.sh
+
+  both gates, and the suite itself, before trusting a change:
+      .venv/bin/python -m pytest -q
+      bash examples/spring-fixture/gate.sh
+      bash examples/toy-provider/gate.sh
+EOF

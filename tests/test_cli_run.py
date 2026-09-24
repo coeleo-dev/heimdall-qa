@@ -152,7 +152,9 @@ def test_verbose_unexpected_prints_traceback(monkeypatch, tmp_path: Path, capsys
     def boom(*args, **kwargs):
         raise RuntimeError("synthetic failure")
 
-    monkeypatch.setattr("heimdall_qa.cli.execute_round", boom)
+    #: The seam moved to the operations layer in the MCP refactor: the CLI delegates
+    #: and no longer holds the runner, so this is where the call is intercepted.
+    monkeypatch.setattr("heimdall_qa.operations.execute_round", boom)
     monkeypatch.chdir(tmp_path)
     code = main(
         [

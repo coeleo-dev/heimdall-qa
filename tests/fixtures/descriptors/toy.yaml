@@ -1,4 +1,4 @@
-# Level 0 — the entry ramp. Nine lines, no auth, no logs, no discovery.
+# Level 0 — the entry ramp. Six lines, no auth, no logs, no discovery.
 #
 # If the harness cannot run against this, the claim "works on any REST API" is
 # false. That is why this file is a gate (fase 1.6 turns it into

@@ -1,0 +1,11 @@
+# One round, so one row. A campaign is a manifest of rounds — one row per round, and
+# `endpoint` is the label the campaign report files that round under, not a filter.
+# A round that covers three routes and a campaign that runs three rounds are both
+# ordinary; this example is the first, so the row names the round's first route.
+id: toy-smoke
+environment: local
+rounds:
+  - round: rounds/smoke.yaml
+    endpoint: GET /toy/health
+    matrix: A4
+    auth: none

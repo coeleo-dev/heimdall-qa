@@ -1,11 +1,18 @@
+from collections.abc import Mapping
 from dataclasses import dataclass
 from time import perf_counter
 from typing import Any
-from typing import Mapping
 
 import httpx
 
 from heimdall_qa.errors import HarnessError
+
+#: What to do when nothing answers. The harness cannot know how a project is
+#: started, so it names the two things that are always true: the process is not
+#: listening, or the descriptor points somewhere other than where it listens.
+_UNREACHABLE_HINT = (
+    "start the API, or fix environments[].base_url in the project descriptor"
+)
 
 
 @dataclass(frozen=True)
@@ -35,13 +42,13 @@ def send(
         raise HarnessError(
             code="HTTP_TIMEOUT",
             message=f"timed out connecting to {url}",
-            hint="start NokrAPI profile web, or point nokr_web in config.yaml",
+            hint=_UNREACHABLE_HINT,
         ) from exc
     except httpx.ConnectError as exc:
         raise HarnessError(
             code="HTTP_UNREACHABLE",
             message=f"cannot connect to {url}",
-            hint="start NokrAPI profile web, or point nokr_web in config.yaml",
+            hint=_UNREACHABLE_HINT,
         ) from exc
     elapsed_ms = (perf_counter() - started) * 1000.0
     return HttpExchange(

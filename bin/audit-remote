@@ -1,0 +1,186 @@
+#!/usr/bin/env bash
+# Gate T4 — nothing of the project under review reaches the remote, or this fails.
+#
+# Run from the repository root: `bin/audit-remote`.
+#
+# Four claims, in the order they can fail:
+#
+#   1. the set that would be published carries no path the product owns;
+#   2. no published file names the product, outside the guards that assert its
+#      absence;
+#   3. `src/heimdall_qa/` names no product at all;
+#   4. the core suite passes in the tree as it would ship, measuring that tree.
+#
+# Claims 1 and 2 are the requirement; 3 and 4 are what keep it. A grep only catches
+# the names someone thought of, so the tokens are one list below and not a rule —
+# claim 4 is what catches a provider coming back through a name nobody listed.
+#
+# This file names the product on purpose: it is the guard, and a guard that cannot
+# name what it guards does not guard anything. `ALLOWED` below is the whole of that
+# permission, and any other file that starts naming the product fails claim 2.
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO"
+
+PY="$REPO/.venv/bin/python"
+if [ ! -x "$PY" ]; then
+    PY="$(command -v python3 || true)"
+fi
+[ -n "$PY" ] || {
+    echo "FAIL: no python; run bin/bootstrap first" >&2
+    exit 1
+}
+
+step() { printf '\n== %s\n' "$1"; }
+fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
+
+export HEIMDALL_AUDIT_TREES='providers qa docs'
+export HEIMDALL_AUDIT_TOKENS='nokr|trilho|nk_test_|nk_live_'
+#: The files allowed to name a product. `.gitignore` decides the boundary,
+#: `bin/audit-remote` enforces it, and the three guards assert the product's
+#: absence — an assertion has to spell what it asserts. Everything else is a leak.
+export HEIMDALL_AUDIT_ALLOWED='.gitignore
+bin/audit-remote
+tests/test_agent_protocol.py
+tests/test_skills.py
+tests/test_toy_example.py'
+
+step "claim 1 — the published set carries no product path"
+"$PY" - <<'PY'
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+trees = tuple(os.environ["HEIMDALL_AUDIT_TREES"].split())
+listing = subprocess.run(
+    ["git", "ls-files", "-co", "--exclude-standard"],
+    capture_output=True,
+    text=True,
+    check=True,
+).stdout.splitlines()
+
+# `ls-files -c` also lists what is tracked but gone from the working tree — a case
+# file moved to its provider, most often. Nothing that is absent can be published, so
+# counting it would overstate what this claim read, and a gate that misreports its own
+# coverage is the failure mode this whole script exists to prevent.
+listing = [path for path in listing if Path(path).is_file()]
+
+leaked = [path for path in listing if path.split("/")[0] in trees]
+if leaked:
+    print("\n".join(leaked[:20]), file=sys.stderr)
+    raise SystemExit(
+        f"FAIL: {len(leaked)} path(s) the product owns would be published"
+    )
+print(f"  {len(listing)} files would be published, none under {'/, '.join(trees)}/")
+PY
+
+step "claim 2 — no published file names the product, outside the guards"
+"$PY" - <<'PY'
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+pattern = re.compile(os.environ["HEIMDALL_AUDIT_TOKENS"], re.IGNORECASE)
+allowed = set(os.environ["HEIMDALL_AUDIT_ALLOWED"].splitlines())
+listing = subprocess.run(
+    ["git", "ls-files", "-co", "--exclude-standard"],
+    capture_output=True,
+    text=True,
+    check=True,
+).stdout.splitlines()
+listing = [path for path in listing if Path(path).is_file()]
+
+offenders: list[str] = []
+for path in listing:
+    if path in allowed:
+        continue
+    try:
+        text = open(path, "rb").read().decode("utf-8")
+    except (OSError, UnicodeDecodeError):
+        continue
+    for number, line in enumerate(text.splitlines(), start=1):
+        if pattern.search(line):
+            offenders.append(f"{path}:{number}: {line.strip()}")
+
+if offenders:
+    print("\n".join(offenders[:20]), file=sys.stderr)
+    raise SystemExit(
+        f"FAIL: {len(offenders)} line(s) name the product outside the guards"
+    )
+print(f"  {len(listing)} files read, {len(allowed)} allowed to name it")
+PY
+
+step "claim 3 — src/heimdall_qa/ names no product"
+# Captured rather than tested in a pipe, and deliberately: `grep … | head | grep -q`
+# looks right and is not. `grep -q` exits on the first match, `head` takes SIGPIPE, and
+# under the `pipefail` this file sets the pipeline reports failure — so a core that
+# named the product would have been reported as product-neutral. This is the claim the
+# whole boundary rests on; it does not get to be the one that cannot fail.
+offenders="$(grep -rInE "$HEIMDALL_AUDIT_TOKENS" src/heimdall_qa/ 2>/dev/null | head -20 || true)"
+if [ -n "$offenders" ]; then
+    printf '%s\n' "$offenders" >&2
+    fail "the core names a product; that is the one thing it may never do"
+fi
+echo "  the core is product-neutral"
+
+step "claim 4 — the core suite passes in the tree as it would ship"
+# The directory is per-process, and that is not tidiness. The toy gate runs this gate
+# as one of its claims, so a person who runs `gate.sh` and then this script — or a CI
+# job that does both — has two copies of claim 4 racing to `rm -rf` and refill the
+# same path. The symptom is a handful of unrelated test failures in a suite that
+# passes on its own, which is the most expensive kind of red to chase.
+WORK="${AUDIT_WORK:-/tmp/heimdall-qa-audit-$$}"
+rm -rf "$WORK"
+mkdir -p "$WORK"
+"$PY" - "$WORK" <<'PY'
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+work = Path(sys.argv[1])
+listing = subprocess.run(
+    ["git", "ls-files", "-co", "--exclude-standard", "-z"],
+    capture_output=True,
+    check=True,
+).stdout.split(b"\0")
+
+copied = 0
+for raw in listing:
+    if not raw:
+        continue
+    relative = raw.decode("utf-8")
+    source = Path(relative)
+    if not source.is_file():
+        continue
+    destination = work / relative
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+    copied += 1
+print(f"  materialised {copied} files into {work}")
+PY
+
+# The published tree has no `providers/`, so the suite there either stands on its
+# own or the split is not real. `PYTHONPATH` is deliberate: it makes the copy win
+# over the editable install, so this measures the shipped source and not the
+# working tree that happens to sit beside it.
+cd "$WORK"
+PYTHONPATH="$WORK/src" "$PY" - "$WORK" <<'PY'
+import sys
+from pathlib import Path
+
+import heimdall_qa
+
+work = Path(sys.argv[1]).resolve()
+resolved = Path(heimdall_qa.__file__).resolve()
+if work not in resolved.parents:
+    raise SystemExit(f"FAIL: resolved {resolved}, not the shipped tree at {work}")
+print(f"  measuring {resolved}")
+PY
+PYTHONPATH="$WORK/src" "$PY" -m pytest -q tests || fail "the suite does not pass in the tree that would ship"
+
+printf '\nT4: green\n'

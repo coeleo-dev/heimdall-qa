@@ -1,0 +1,11 @@
+endpoint: POST /toy/items
+dto: toy.ItemsController
+area: toy-items-post
+auth: none
+idempotency: none
+baseline: baselines/item.json
+# The body is a literal in the baseline: this provider has no fields to generate,
+# no required field and no rule, which is why one case covers it. A contract with
+# a required field would pull `N-omit-<field>` in with it, and the toy is meant to
+# be the cheapest possible thing that still runs.
+fields: {}

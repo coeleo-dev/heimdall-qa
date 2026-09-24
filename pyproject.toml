@@ -1,13 +1,43 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "heimdall-qa"
 version = "0.1.0"
-description = "Review harness for the NokrAPI HTTP surface"
+description = "Review harness for the HTTP surface of a REST API"
 readme = "README.md"
+# PEP 639: the identifier, not the filename of the licence text. One expression that
+# both the package metadata and a licence scanner read the same way.
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
+authors = [{ name = "Heimdall QA contributors" }]
+keywords = [
+    "api-testing",
+    "contract-testing",
+    "harness",
+    "http",
+    "mcp",
+    "quality-assurance",
+    "rest",
+    "review",
+]
+# Pre-1.0, and said so rather than implied. The classifier a person filters on when
+# they are deciding whether to depend on this.
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+    "Typing :: Typed",
+]
 dependencies = [
     "pydantic>=2.10",
     "pyyaml>=6",
@@ -20,21 +50,89 @@ dependencies = [
     "validate-docbr>=1.8",
 ]
 
+# Where a reader looks first, and the only URLs the distribution metadata carries.
+# `main` and not `master`: the published branch is a fresh orphan history (see
+# `bin/public-history`), and the local `master` is the archive that is never pushed.
+[project.urls]
+Homepage = "https://github.com/heimdall-qa/heimdall-qa"
+Documentation = "https://github.com/heimdall-qa/heimdall-qa/blob/main/contrib/README.md"
+Repository = "https://github.com/heimdall-qa/heimdall-qa"
+Issues = "https://github.com/heimdall-qa/heimdall-qa/issues"
+Changelog = "https://github.com/heimdall-qa/heimdall-qa/blob/main/CHANGELOG.md"
+
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+# pytest runs the suite and ruff checks the tree CI lints; neither is needed to review
+# an API, which is why both are here and not in the install a user gets.
+dev = ["pytest>=8", "ruff>=0.9"]
+# The MCP server, and only it. A project that never drives the harness from a model
+# never installs this — the same reasoning that made the Java reader its own
+# distribution, applied to a third-party SDK. 2.x is the floor and not a preference:
+# it renamed `FastMCP` to `MCPServer`, and this speaks the newer name.
+mcp = ["mcp>=2"]
 
 [project.scripts]
 heimdall-qa = "heimdall_qa.cli:main"
+heimdall-qa-mcp = "heimdall_qa.mcp.server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-heimdall_qa = ["serve/templates/*.html", "serve/static/*"]
+heimdall_qa = [
+    "serve/templates/*.html",
+    "serve/static/*",
+    # The starter tree `heimdall-qa init` writes. Data rather than strings built in
+    # code, so the suite can run the boilerplate instead of describing it.
+    "templates/**/*",
+    "templates/*",
+]
 
 [tool.pytest.ini_options]
+# The core's own suite, and nothing else. A product's provider is a distribution of
+# its own, with its own `pyproject.toml`, its own suites and its own testpaths;
+# reaching into one from here is how two distributions would quietly become one
+# again.
 pythonpath = ["src"]
 testpaths = ["tests"]
 markers = [
-    "slow: hits localhost NokrAPI; skipped unless HEIMDALL_QA_SLOW=1",
+    "slow: hits a live API on localhost; skipped unless HEIMDALL_QA_SLOW=1",
 ]
+
+[tool.ruff]
+# One opinion, written down, so a contribution and CI agree without an argument. It is
+# deliberately not a formatter: the tree is hand-wrapped prose around hand-written
+# code, and reflowing it would produce a diff nobody asked for.
+line-length = 100
+target-version = "py312"
+# `tests/` and `packages/*/` carry Python too, and a rule that only held in `src/`
+# would be a rule that stops holding at the first file that matters.
+src = ["src", "tests", "packages/spring/src", "packages/spring/tests"]
+# The starter tree `heimdall-qa init` ships is not this project's code.
+extend-exclude = ["src/heimdall_qa/templates"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes — the undefined name this file has already caught twice
+    "I",   # import sorting, so the shape below is enforced and not just habit
+    "UP",  # pyupgrade — the tree is 3.12+ and should read like it
+    "B",   # flake8-bugbear — the ones that are real bugs rather than taste
+]
+ignore = [
+    # Off, and for a reason worth stating. The long lines here are not prose that ran
+    # on: they are payloads. A log line a pack asserts on verbatim, a line of Java
+    # source inside a fixture, a `Literal` listing a product's sections. Wrapping one
+    # to satisfy a column is how a test stops quoting the thing under test. The prose
+    # is wrapped by hand at about the same width as this setting; the exceptions are
+    # the places where wrapping would be a lie.
+    "E501",
+]
+
+[tool.ruff.lint.isort]
+# The house style, enforced rather than merely followed: one import per line. It makes
+# an import's diff a one-line diff, and it is why `known-first-party` is declared —
+# without it the harness's own modules would be sorted as third-party and the tree
+# would churn on the first `--fix`.
+force-single-line = true
+known-first-party = ["heimdall_qa", "heimdall_qa_spring"]

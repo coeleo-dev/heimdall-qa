@@ -1,0 +1,247 @@
+#!/usr/bin/env bash
+# The history that gets published: one root commit of the audited tree, on `main`.
+#
+# `.gitignore` decides what a file list contains; it cannot decide what a *history*
+# contains, and the history is the part a `.gitignore` cannot fix. The commits that
+# produced this harness carry the product it was built against — its cases, its
+# campaigns, its studies — and objects that exist in a pack are on the remote whether
+# or not a branch tip still points at them. Recommitting a cleaned tree on top of them
+# publishes the mess underneath it.
+#
+# So the published branch is an orphan: one commit, no parents, nothing behind it.
+# `master` stays exactly where it is, as the local archive of the work that got here,
+# and it is never pushed. Publishing this branch does not delete, rewrite or move a
+# single commit of it.
+#
+# Usage:
+#   bin/public-history            # build or refresh the `main` branch
+#   bin/public-history --check    # assert it is what it claims to be
+#
+# Overrides: PUBLIC_BRANCH (default `main`), ARCHIVE_BRANCH (default `master`).
+#
+# It runs `bin/audit-remote` first and refuses to build a branch from a tree that gate
+# rejects. That ordering is the point of having both: the gate says the *content* is
+# publishable, this says the *history* is.
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO"
+
+BRANCH="${PUBLIC_BRANCH:-main}"
+ARCHIVE="${ARCHIVE_BRANCH:-master}"
+#: Every branch allowed to exist and hold product: the archive, which is never pushed.
+#: A branch outside this list and outside the published one is a question rather than a
+#: failure — someone made it for a reason, and the reason decides whether it may stay.
+ARCHIVE_BRANCHES="${ARCHIVE_BRANCHES:-master ui-browser}"
+MESSAGE="Heimdall QA 0.1.0 — the first public tree.
+
+A review harness for the HTTP surface of a REST API, published as a single
+commit and on purpose.
+
+The history that produced this harness carried the product it was built
+against — its cases, its campaigns, its studies — and a .gitignore cannot
+unpublish a commit. What ships is the audited tree; bin/audit-remote is what
+says so, and bin/public-history is the only thing that ever wrote this
+branch."
+
+CHECK=""
+for argument in "$@"; do
+    case "$argument" in
+        --check) CHECK=1 ;;
+        *) echo "usage: public-history [--check]" >&2; exit 2 ;;
+    esac
+done
+
+step() { printf '\n== %s\n' "$1"; }
+fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
+
+git rev-parse --git-dir >/dev/null 2>&1 || fail "not a git repository: $REPO"
+
+# The tree the audited set describes, built in a scratch index so the real one — the
+# one holding whatever the author has staged — is never read and never written. This
+# is `git ls-files -co --exclude-standard`, asked a different way: everything present
+# and not ignored.
+#
+# It writes the tree sha to stdout and nothing else, so both modes below can share it.
+build_tree() {
+    local index
+    index="$(mktemp -u "${TMPDIR:-/tmp}/heimdall-public-index.XXXXXX")"
+    # `mktemp -u` leaves the path free and empty, which is what `read-tree --empty`
+    # wants: an index file that does not exist yet is an empty index.
+    GIT_INDEX_FILE="$index" git read-tree --empty
+    GIT_INDEX_FILE="$index" git add --all
+    GIT_INDEX_FILE="$index" git write-tree
+    rm -f "$index"
+}
+
+if [ -n "$CHECK" ]; then
+    step "the branch exists"
+    git rev-parse --verify --quiet "refs/heads/$BRANCH" >/dev/null \
+        || fail "no branch $BRANCH; run bin/public-history with no arguments"
+    echo "  $BRANCH at $(git rev-parse --short "refs/heads/$BRANCH")"
+
+    step "it has no history in common with $ARCHIVE"
+    # The sharp version of "one root commit": sharing a single commit with the archive
+    # would make the product's objects reachable from the published branch, and it
+    # would be reachable even if the tip no longer names them.
+    if git rev-parse --verify --quiet "refs/heads/$ARCHIVE" >/dev/null; then
+        if [ -n "$(git merge-base "$BRANCH" "$ARCHIVE" 2>/dev/null || true)" ]; then
+            fail "$BRANCH shares a commit with $ARCHIVE; the history is not orphaned"
+        fi
+        echo "  no shared commit with $ARCHIVE"
+    else
+        echo "  no $ARCHIVE locally to compare against"
+    fi
+
+    step "no product path appears anywhere in its history"
+    # Every commit, not just the tip: a path that was added and removed is still an
+    # object someone can fetch.
+    leaked="$(git log --pretty=format: --name-only "refs/heads/$BRANCH" \
+        | grep -E '^(providers|qa|docs)/' | sort -u || true)"
+    [ -z "$leaked" ] || {
+        printf '%s\n' "$leaked" >&2
+        fail "the published history names a path the product owns"
+    }
+    echo "  $(git rev-list --count "refs/heads/$BRANCH") commit(s), no product path among them"
+
+    step "no tag carries the product, because a tag is what a clone fetches"
+    # The claim whose absence was a real leak. `e3-freeze` pointed into the archive's
+    # history, and `git clone` fetches tags even with `--single-branch`, so a clone
+    # that asked for `main` received 45 product objects while the branch itself was
+    # spotless. Nothing had been pushed, which is precisely why checking the branch
+    # alone could not see it: the ref that travels is not always the ref you named.
+    for tag in $(git for-each-ref --format='%(refname)' refs/tags); do
+        # Captured, not tested in a pipe. `git rev-list … | grep -q` reads as correct
+        # and is not: `grep -q` exits on the first match, `rev-list` takes SIGPIPE, and
+        # under the `pipefail` this file sets the pipeline reports failure — so the
+        # gate saw a leak and called it clean. A check that can only ever pass is worse
+        # than no check, which is what this claim was for one commit.
+        reached="$(git rev-list --objects "$tag" \
+            | grep -E '(^| )(providers|qa|docs)/' || true)"
+        if [ -n "$reached" ]; then
+            printf '%s\n' "$reached" | head -5 >&2
+            fail "$tag carries the product, and every clone fetches tags"
+        fi
+    done
+    echo "  $(git for-each-ref refs/tags | wc -l) tag(s), none carrying it"
+
+    step "every tag points into the published branch"
+    # A tag on an older root commit leaks nothing — that root is product-free too — so
+    # the claim above cannot see it. It is still wrong, and it was wrong here: this
+    # script writes a *new* root every time it refreshes, so a tag made before a
+    # refresh is silently left pointing at history the branch no longer contains. It
+    # is the same defect as a stale working copy, in the one ref a clone follows
+    # without being asked.
+    for tag in $(git for-each-ref --format='%(refname:short)' refs/tags); do
+        if ! git merge-base --is-ancestor "$tag^{commit}" "refs/heads/$BRANCH" 2>/dev/null; then
+            fail "$tag is not in $BRANCH's history; re-tag it at $BRANCH"
+        fi
+        echo "  $tag -> $(git rev-parse --short "$tag^{commit}")"
+    done
+
+    step "the only branches are the published one and the declared archive"
+    # Not a leak on its own — a branch has to be pushed to leave — but a branch nobody
+    # remembers deciding on is how `git push --all` becomes dangerous without anybody
+    # noticing it became dangerous.
+    for branch in $(git for-each-ref --format='%(refname:short)' refs/heads); do
+        case " $BRANCH $ARCHIVE_BRANCHES " in
+            *" $branch "*) continue ;;
+        esac
+        fail "unexpected branch $branch; publish it, archive it by name, or delete it"
+    done
+    echo "  $BRANCH published; archive: $ARCHIVE_BRANCHES"
+
+    step "its tree is the tree on disk, as it would ship"
+    expected="$(build_tree)"
+    actual="$(git rev-parse "refs/heads/$BRANCH^{tree}")"
+    [ "$expected" = "$actual" ] || fail "the branch is stale; run bin/public-history to refresh it"
+    echo "  $(git ls-tree -r --name-only "refs/heads/$BRANCH" | wc -l) files, identical to the audited tree"
+
+    printf '\npublic history: green\n'
+    exit 0
+fi
+
+step "the content is publishable before the history is written"
+# Quiet on success, loud on failure: the gate's own output is the report a person
+# needs, and echoing a passing gate's four claims here would bury this script's.
+AUDIT_LOG="$(mktemp)"
+if ! "$REPO/bin/audit-remote" >"$AUDIT_LOG" 2>&1; then
+    cat "$AUDIT_LOG" >&2
+    rm -f "$AUDIT_LOG"
+    fail "bin/audit-remote rejected the tree"
+fi
+rm -f "$AUDIT_LOG"
+echo "  bin/audit-remote: green"
+
+step "this is still a draft, and not a published branch"
+# The one irreversible step in the whole procedure, so it is the one thing refused
+# here rather than documented. Regenerating a branch that already exists on a remote
+# does not "refresh" it: it replaces every commit with a new root of a different
+# identity, which breaks every clone, every tag and every fork of it. Only the first
+# push is this script's job. After that the published branch is an ordinary branch and
+# is committed to normally.
+PUBLISHED="$(git for-each-ref --format='%(refname)' "refs/remotes/*/$BRANCH" || true)"
+[ -z "$PUBLISHED" ] || fail \
+    "$BRANCH has been pushed; do not regenerate it — commit to it instead"
+echo "  no remote has $BRANCH yet"
+
+OLD_TIP="$(git rev-parse --verify --quiet "refs/heads/$BRANCH" || true)"
+
+step "building the committed tree"
+TREE="$(build_tree)"
+FILES="$(git ls-tree -r --name-only "$TREE" | wc -l)"
+echo "  $FILES files"
+
+step "writing the root commit"
+# `commit-tree` builds the object without checking anything out and without moving
+# HEAD, so this is safe to run from a dirty working tree on any branch.
+COMMIT="$(printf '%s\n' "$MESSAGE" | git commit-tree "$TREE")"
+echo "  $(git rev-parse --short "$COMMIT")"
+
+step "pointing $BRANCH at it"
+if [ -n "$OLD_TIP" ]; then
+    # Force, and deliberately: the branch is generated, and the only thing a previous
+    # value could hold that this one does not is a leak.
+    git update-ref "refs/heads/$BRANCH" "$COMMIT"
+    echo "  $BRANCH moved from $(git rev-parse --short "$OLD_TIP")"
+else
+    git branch "$BRANCH" "$COMMIT"
+    echo "  $BRANCH created"
+fi
+
+# A tag is the other ref a clone follows without being asked, and re-pointing the
+# branch leaves every tag that marked the previous draft pointing into a root this
+# branch no longer contains — which `--check` then fails on, correctly. Pre-publication
+# the draft moved, so the tags that marked it move with it; the branch being unpublished
+# is exactly what makes that the honest thing to do. `--check`'s claim is the other half:
+# it refuses the day a tag points anywhere else.
+if [ -n "$OLD_TIP" ]; then
+    moved=0
+    for tag in $(git for-each-ref --format='%(refname:short)' refs/tags); do
+        [ "$(git rev-parse "$tag^{commit}")" = "$OLD_TIP" ] || continue
+        if [ "$(git cat-file -t "refs/tags/$tag")" = tag ]; then
+            git tag --force --annotate "$tag" \
+                --message "$(git tag --list --format='%(contents)' "$tag")" \
+                "$COMMIT" >/dev/null
+        else
+            git update-ref "refs/tags/$tag" "$COMMIT"
+        fi
+        echo "  $tag -> $(git rev-parse --short "$COMMIT")"
+        moved=$((moved + 1))
+    done
+    [ "$moved" -eq 0 ] || echo "  $moved tag(s) followed the draft"
+fi
+
+cat <<EOF
+
+  published branch: $BRANCH ($(git rev-parse --short "$COMMIT"), $FILES files)
+  local archive:    $ARCHIVE (untouched, never push it)
+
+  to publish:
+      git remote add origin <url>
+      git push -u origin $BRANCH
+      git push origin --delete <the remote's default branch, if it has one>
+
+  never \`git push --all\` here: that is the one command that publishes $ARCHIVE,
+  and no gate can refuse a push you have already made.
+EOF

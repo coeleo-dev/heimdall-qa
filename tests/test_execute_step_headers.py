@@ -1,18 +1,20 @@
+from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
-from datetime import timezone
 from pathlib import Path
 
 import httpx
 
 from heimdall_qa.config import HarnessConfig
-from heimdall_qa.config import LogFiles
+from heimdall_qa.project import ProjectView
 from heimdall_qa.runner import _generated
 from heimdall_qa.runner import execute_step
 from heimdall_qa.schema.models import CaseFile
 from heimdall_qa.schema.models import Contract
 from heimdall_qa.schema.models import ExpectSpec
 from heimdall_qa.schema.models import FieldSpec
+from heimdall_qa.testing import config_for
+from heimdall_qa.testing import project_at
 
 _FIXED_KEY = "550e8400-e29b-41d4-a716-446655440000"
 _BASELINE = {
@@ -27,7 +29,7 @@ _BASELINE = {
 def _contract() -> Contract:
     return Contract(
         endpoint="POST /api/ingest",
-        dto="com.nokr.domain.metering.ingest.dto.IngestRequest",
+        dto="com.example.domain.metering.ingest.dto.IngestRequest",
         auth="api_key",
         idempotency="header_uuid_v4",
         baseline="baselines/ingest-sum.json",
@@ -48,12 +50,21 @@ def _case(**kwargs) -> CaseFile:
     return CaseFile.model_validate(payload)
 
 
-def _config(tmp_path: Path) -> HarnessConfig:
-    web_log = tmp_path / "nokr-web.log"
-    worker_log = tmp_path / "nokr-worker.log"
+_DESCRIPTOR = Path(__file__).resolve().parent / "fixtures" / "qa" / "project.yaml"
+_PROJECT = project_at(_DESCRIPTOR)
+
+
+def _project(tmp_path: Path) -> ProjectView:
+    """The descriptor in force, with this test's own (empty) log files."""
+    web_log = tmp_path / "web.log"
+    worker_log = tmp_path / "worker.log"
     web_log.write_text("", encoding="utf-8")
     worker_log.write_text("", encoding="utf-8")
-    return HarnessConfig(log_files=LogFiles(web=str(web_log), worker=str(worker_log)))
+    return project_at(_DESCRIPTOR, web=str(web_log), worker=str(worker_log))
+
+
+def _config(tmp_path: Path) -> HarnessConfig:
+    return config_for(_project(tmp_path))
 
 
 def _run(tmp_path: Path, case: CaseFile, captured: list[httpx.Request]) -> None:
@@ -76,7 +87,7 @@ def _run(tmp_path: Path, case: CaseFile, captured: list[httpx.Request]) -> None:
         run_dir=tmp_path / "run",
         step_index=1,
         run_id="piloto",
-        secrets={"api_key": "nk_test_secret"},
+        secrets={"api_key": "test_key_secret"},
     )
 
 
@@ -133,20 +144,20 @@ def test_case_headers_send_environment_conflict(tmp_path: Path):
             kind="E-conflict",
             headers={
                 "X-Idempotency-Key": _FIXED_KEY,
-                "X-Nokr-Environment": "production",
+                "X-Environment": "production",
             },
         ),
         captured,
     )
-    assert _header(captured[0], "X-Nokr-Environment") == "production"
-    assert _header(captured[0], "Authorization") == "Bearer nk_test_secret"
+    assert _header(captured[0], "X-Environment") == "production"
+    assert _header(captured[0], "Authorization") == "Bearer test_key_secret"
 
 
 def test_generated_now_iso_plus_4m_is_about_four_minutes_ahead():
-    before = datetime.now(timezone.utc)
-    raw = _generated("now_iso_plus_4m")
-    parsed = datetime.strptime(raw, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-    after = datetime.now(timezone.utc)
+    before = datetime.now(UTC)
+    raw = _generated("now_iso_plus_4m", _PROJECT)
+    parsed = datetime.strptime(raw, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+    after = datetime.now(UTC)
     expected_min = before + timedelta(minutes=4) - timedelta(seconds=2)
     expected_max = after + timedelta(minutes=4) + timedelta(seconds=2)
     assert expected_min <= parsed <= expected_max

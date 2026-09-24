@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
-import shutil
 from time import perf_counter
 from typing import Any
 
@@ -11,7 +11,13 @@ import httpx
 from heimdall_qa.config import HarnessConfig
 from heimdall_qa.errors import HarnessError
 from heimdall_qa.errors import to_dict
-from heimdall_qa.runner import optional_suite
+from heimdall_qa.http_client import _UNREACHABLE_HINT
+from heimdall_qa.run_store import create_run
+from heimdall_qa.run_store import link_latest
+from heimdall_qa.run_store import write_book
+from heimdall_qa.run_store import write_evidence
+from heimdall_qa.run_store import write_summary
+from heimdall_qa.run_store import write_verdict
 from heimdall_qa.runner import RoundStep
 from heimdall_qa.runner import StepResult
 from heimdall_qa.runner import _auto_verdict
@@ -21,16 +27,11 @@ from heimdall_qa.runner import _load_included_cases
 from heimdall_qa.runner import _load_round_file
 from heimdall_qa.runner import _matches_dimensions
 from heimdall_qa.runner import _prepare_case
-from heimdall_qa.runner import _reject_todo_status
+from heimdall_qa.runner import _reject_placeholders
 from heimdall_qa.runner import _require_coverage
 from heimdall_qa.runner import _round_step
 from heimdall_qa.runner import execute_step
-from heimdall_qa.run_store import create_run
-from heimdall_qa.run_store import link_latest
-from heimdall_qa.run_store import write_book
-from heimdall_qa.run_store import write_evidence
-from heimdall_qa.run_store import write_summary
-from heimdall_qa.run_store import write_verdict
+from heimdall_qa.runner import optional_suite
 from heimdall_qa.schema.models import CaseFile
 from heimdall_qa.suite_run import SuiteRun
 from heimdall_qa.suite_run import VisibleStep
@@ -92,11 +93,12 @@ class RoundSession:
         self._runs_dir = runs_dir
         self._secrets = secrets or {}
         self._round_file = _load_round_file(round_path)
-        cases = _load_included_cases(self._round_file, root)
-        _reject_todo_status(cases)
-        self._suite = optional_suite(self._round_file, root)
+        project = config.project
+        cases = _load_included_cases(self._round_file, root, project)
+        _reject_placeholders(cases)
+        self._suite = optional_suite(self._round_file, root, project)
         if self._suite is None:
-            _require_coverage(cases, root)
+            _require_coverage(cases, root, project)
         self._cases = cases
         selected = [
             case
@@ -104,7 +106,13 @@ class RoundSession:
             if _matches_dimensions(case, self._round_file.dimensions)
         ]
         self._prepared = [
-            _prepare_case(case, root, self._secrets, runs_dir=self._runs_dir)
+            _prepare_case(
+                case,
+                root,
+                self._secrets,
+                project=project,
+                runs_dir=self._runs_dir,
+            )
             for case in selected
         ]
         self._mode = ""
@@ -345,7 +353,7 @@ class RoundSession:
         assert self._run_dir is not None
         records = self._ctx.records if self._ctx is not None else self._records
         if self._ctx is not None:
-            write_book(self._run_dir, self._ctx.book)
+            write_book(self._run_dir, self._ctx.oracle)
         write_summary(
             self._run_dir,
             _build_summary(
@@ -355,6 +363,7 @@ class RoundSession:
                 records,
                 self._started,
                 self._root,
+                project=self._config.project,
                 human_reject_rate=_human_reject_rate(self._human),
             ),
         )
@@ -468,6 +477,6 @@ def _banner_for(result: StepResult) -> dict[str, object] | None:
         HarnessError(
             code=code,
             message=result.error,
-            hint="start NokrAPI profile web, or point nokr_web in config.yaml",
+            hint=_UNREACHABLE_HINT,
         )
     )

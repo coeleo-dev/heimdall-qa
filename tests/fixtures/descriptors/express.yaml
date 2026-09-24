@@ -1,8 +1,11 @@
-# Level 3 — a Node/Express API with nothing of Nokr in it.
+# Level 3 — a Node/Express API with none of a product's vocabulary in it.
 #
 # The boundary test: `scheme: raw` (a direct header value, no `Bearer`) and
-# `format: json-lines` are the only two features the Nokr descriptor does not
-# exercise, and neither one required a new field in the design.
+# `format: json-lines` with `marker_field` are the two features the reference
+# descriptor does not exercise, and neither one required a new field in the
+# design. The timestamp is read out of the record (`field: time`) and the
+# multiline opener is the `{` of a JSON line, so a stray stack trace written as
+# text does not get welded onto the entry above it.
 version: 1
 
 project:
@@ -34,7 +37,6 @@ budgets:
     fail: 5000
 
 errors:
-  validation_status: 400
   envelope: code_message
 
 trace:
@@ -46,6 +48,9 @@ log_sources:
     path: ./logs/app.log
     format: json-lines
     marker_field: requestId
+    role: sync
+    timestamp: { field: time, format: "%Y-%m-%dT%H:%M:%S%z" }
+    multiline: { start: '^\{' }
 
 contract:
   source: openapi

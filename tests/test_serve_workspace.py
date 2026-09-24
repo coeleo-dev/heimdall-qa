@@ -3,20 +3,22 @@ from pathlib import Path
 import httpx
 from fastapi.testclient import TestClient
 
-from heimdall_qa.config import HarnessConfig
-from heimdall_qa.config import LogFiles
 from heimdall_qa.serve.app import create_app
+from heimdall_qa.testing import config_for
+from heimdall_qa.testing import project_at
 from heimdall_qa.workspace import WorkspaceSession
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 H01_ONLY = FIXTURES / "rounds" / "h01-only.yaml"
+_DESCRIPTOR = FIXTURES / "qa" / "project.yaml"
 
 
 def _workspace(tmp_path: Path, *, focus: Path | None = None) -> WorkspaceSession:
     return WorkspaceSession(
         root=FIXTURES,
-        config=HarnessConfig(
-            log_files=LogFiles(
+        config=config_for(
+            project_at(
+                _DESCRIPTOR,
                 web=str(tmp_path / "web.log"),
                 worker=str(tmp_path / "worker.log"),
             )

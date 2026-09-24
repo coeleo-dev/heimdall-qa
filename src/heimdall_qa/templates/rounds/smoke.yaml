@@ -1,0 +1,12 @@
+# The round is the thing you run: `heimdall-qa run rounds/smoke.yaml --mode headless`.
+#
+# `include` names cases and can name a file. `environment` picks a `base_url` from the
+# descriptor, so the same round measures sandbox and production without an edit.
+id: smoke
+suite: suites/smoke.yaml
+mode: headless
+dimensions:
+  - function
+environment: local
+include:
+  - cases/health.yaml#health-H01

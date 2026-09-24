@@ -1,27 +1,13 @@
-bruno_collection: /home/davi/Documentos/bruno/Nokr API - Dev Collection
-nokr_web: http://127.0.0.1:8080
-nokr_admin: http://127.0.0.1:9090
-# `ui` is the human review bind (A.12). It is harness infrastructure, not project
-# data, so it stays here when the project config moves to the descriptor.
+# Harness infrastructure only. The project — origins, auth, routing, budgets, log
+# sources, request sources — is declared in qa/project.yaml, and `--descriptor`
+# overrides that for a single run.
 ui:
   host: 127.0.0.1
   port: 7878
-log_files:
-  web: ../NokrAPI/logs/nokr-web.log
-  worker: ../NokrAPI/logs/nokr-worker.log
-  admin: ../NokrAPI/logs/nokr-admin.log
-budgets_ms:
-  hot_path:
-    budget: 50
-    fail: 1500
-  default:
-    budget: 1500
-    fail: 1500
-  kyc:
-    budget: 8000
-    fail: 8000
 probes:
   ingest_poll_ms: 8000
   ledger_ms: 8000
   overview_ms: 30000
-register_gap_ms: 2000
+# The floor between two requests whose route declares a `pace_key`. The key
+# itself is product data and lives in qa/project.yaml.
+pace_gap_ms: 2000

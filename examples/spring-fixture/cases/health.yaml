@@ -1,0 +1,20 @@
+health-H01:
+  contract: contracts/health.yaml
+  kind: H01
+  gate: auto
+  tags:
+    - function
+  diff: {}
+  expect:
+    status: 200
+health-N-auth:
+  contract: contracts/health.yaml
+  kind: N-auth
+  gate: auto
+  tags:
+    - function
+  diff: {}
+  expect:
+    status: 401
+  omit_headers:
+    - X-Fixture-Token

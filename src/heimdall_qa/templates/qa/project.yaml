@@ -1,0 +1,14 @@
+# The shape a project starts from, and it is deliberately this small.
+#
+# `project.id` is the only one that has to change before the first run, and it has to
+# be a slug (`[a-z0-9-]+`) because it names the run directories. Everything else the
+# harness can work without: a field the descriptor does not declare is a pack that
+# reports *skipped* with a reason, never a guess.
+version: 1
+
+project:
+  id: starter
+
+environments:
+  local:
+    base_url: http://127.0.0.1:8080

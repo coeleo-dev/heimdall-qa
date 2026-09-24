@@ -1,0 +1,13 @@
+id: smoke
+catalog:
+  notes: The toy API has no price model, so there is nothing for an oracle to price.
+steps:
+  - loop:
+      times: 1
+      case: cases/toy-health.yaml#toy-health-H01
+  - loop:
+      times: 1
+      case: cases/toy-items.yaml#toy-items-H01
+  - loop:
+      times: 1
+      case: cases/toy-items-post.yaml#toy-items-post-H01

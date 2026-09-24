@@ -1,0 +1,70 @@
+id: smoke
+catalog:
+  notes: >-
+    The fixture has no price model, so there is nothing for an oracle to price. The
+    order is the whole of the value here: `items-H01` is the 2xx mutation that captures
+    the idempotency key, and every `items-I-replay*` after it spends that capture.
+steps:
+  - loop:
+      times: 1
+      case: cases/health.yaml#health-H01
+  - loop:
+      times: 1
+      case: cases/health.yaml#health-N-auth
+  - loop:
+      times: 1
+      case: cases/fixture-items-id.yaml#fixture-items-id-H01
+  - loop:
+      times: 1
+      case: cases/fixture-items-id.yaml#fixture-items-id-N-auth
+  - loop:
+      times: 1
+      case: cases/fixture-items-id.yaml#fixture-items-id-N-notfound
+  - loop:
+      times: 1
+      case: cases/fixture-items-id.yaml#fixture-items-id-S-bola
+  - loop:
+      times: 1
+      case: cases/items.yaml#items-H01
+  - loop:
+      times: 1
+      case: cases/items.yaml#items-I-new-key
+  - loop:
+      times: 1
+      case: cases/items.yaml#items-I-replay
+  - loop:
+      times: 1
+      case: cases/items.yaml#items-I-replay-conflict
+  - loop:
+      times: 1
+      case: cases/items.yaml#items-I-missing
+  - loop:
+      times: 1
+      case: cases/items.yaml#items-I-format
+  - loop:
+      times: 1
+      case: cases/items.yaml#items-N-omit-name
+  - loop:
+      times: 1
+      case: cases/items.yaml#items-N-omit-label
+  - loop:
+      times: 1
+      case: cases/items.yaml#items-N-omit-code
+  - loop:
+      times: 1
+      case: cases/items.yaml#items-N-over-name
+  - loop:
+      times: 1
+      case: cases/items.yaml#items-N-over-label
+  - loop:
+      times: 1
+      case: cases/items.yaml#items-B-max-name
+  - loop:
+      times: 1
+      case: cases/items.yaml#items-B-max-label
+  - loop:
+      times: 1
+      case: cases/items.yaml#items-N-pattern-code
+  - loop:
+      times: 1
+      case: cases/items.yaml#items-N-auth

@@ -87,7 +87,11 @@ class Contract(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     endpoint: str
-    dto: str
+    #: Provenance only: which DTO the contract was read from. It is optional
+    #: because that is a fact about one target — a contract written by hand, or
+    #: one read from an OpenAPI document, has no DTO to name, and requiring one
+    #: made those targets undeclarable (estudo F3, achado A).
+    dto: str | None = None
     auth: Literal["api_key", "jwt", "admin", "hmac", "none"] = "none"
     idempotency: Literal["header_uuid_v4", "none"] = "none"
     dedup: str | None = None
@@ -155,7 +159,9 @@ class CampaignRound(BaseModel):
 
     round: str
     endpoint: str
-    dto: str
+    #: Copied into the campaign report when the round declares one; optional for
+    #: the same reason `Contract.dto` is.
+    dto: str | None = None
     matrix: MatrixSection
     auth: Literal["api_key", "jwt", "admin", "hmac", "none"] = "none"
     notes: str | None = None

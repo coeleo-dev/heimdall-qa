@@ -1,0 +1,19 @@
+note-H01:
+  contract: contracts/qa-note-post.yaml
+  kind: H01
+  gate: auto
+  tags:
+    - function
+  expect:
+    status: 202
+note-N-omit-note:
+  contract: contracts/qa-note-post.yaml
+  kind: N-omit-note
+  gate: auto
+  tags:
+    - function
+  diff:
+    omit:
+      - note
+  expect:
+    status: 400

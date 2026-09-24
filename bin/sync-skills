@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# Generate the agents' skill directories from `.agents/skills/`, the single source.
+#
+# More than one copy of a skill exists because more than one agent looks in its own
+# place — Cursor reads `.cursor/skills/`, Kiro reads `.kiro/skills/` — and copies
+# drift: the pair in this repository had already diverged, one of them into links
+# that resolved nowhere. So every copy is derived, never edited:
+#
+#   * every file under `.agents/skills/<name>/` is copied verbatim into each target;
+#   * verbatim is safe because every directory sits three levels below the repository
+#     root, so a relative link written for one resolves identically from the others.
+#     That is the whole reason this is a copy and not a rewrite.
+#
+# `tests/test_skills.py` fails if a copy is not identical to the source, so
+# forgetting to run this is a red test rather than a silent divergence.
+#
+# Usage: bin/sync-skills [--check]
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SOURCE="$REPO/.agents/skills"
+CHECK="${1:-}"
+
+#: Where an agent looks, relative to the repository root. One entry per agent that
+#: has no way to be pointed at `.agents/skills/` directly.
+TARGETS=(
+    ".cursor/skills"
+    ".kiro/skills"
+)
+
+if [ ! -d "$SOURCE" ]; then
+    echo "no skills to sync: $SOURCE does not exist" >&2
+    exit 1
+fi
+
+status=0
+for relative in "${TARGETS[@]}"; do
+    TARGET="$REPO/$relative"
+    mkdir -p "$TARGET"
+
+    for skill in "$SOURCE"/*/; do
+        name="$(basename "$skill")"
+        mkdir -p "$TARGET/$name"
+        for file in "$skill"*; do
+            [ -f "$file" ] || continue
+            base="$(basename "$file")"
+            if [ "$CHECK" = "--check" ]; then
+                if ! diff -q "$file" "$TARGET/$name/$base" >/dev/null 2>&1; then
+                    echo "out of sync: $relative/$name/$base" >&2
+                    status=1
+                fi
+            else
+                cp "$file" "$TARGET/$name/$base"
+                echo "synced $relative/$name/$base"
+            fi
+        done
+    done
+
+    # A skill deleted at the source must disappear from the copy, or it keeps firing.
+    for existing in "$TARGET"/*/; do
+        [ -d "$existing" ] || continue
+        name="$(basename "$existing")"
+        if [ ! -d "$SOURCE/$name" ]; then
+            if [ "$CHECK" = "--check" ]; then
+                echo "stale: $relative/$name has no source" >&2
+                status=1
+            else
+                rm -rf "$existing"
+                echo "removed $relative/$name (no source)"
+            fi
+        fi
+    done
+done
+
+exit "$status"

@@ -1,0 +1,7 @@
+toy-items-post-H01:
+  contract: contracts/toy-items-post.yaml
+  kind: H01
+  tags:
+    - function
+  expect:
+    status: 201

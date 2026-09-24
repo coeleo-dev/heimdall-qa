@@ -1,0 +1,14 @@
+id: smoke
+suite: suites/smoke.yaml
+mode: headless
+dimensions:
+  - function
+environment: local
+notes: >-
+  Every case the reader and `coverage.expand` produced for the three routes, plus the
+  one a human had to write: `items-I-replay-conflict`, the same idempotency key with a
+  different body, which is the half of the idempotency contract no family expresses.
+include:
+  - cases/health.yaml
+  - cases/fixture-items-id.yaml
+  - cases/items.yaml

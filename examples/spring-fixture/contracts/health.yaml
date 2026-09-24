@@ -1,0 +1,6 @@
+endpoint: GET /fixture/health
+area: health
+auth: api_key
+baseline: baselines/empty.json
+async: sync
+fields: {}

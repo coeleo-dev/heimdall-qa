@@ -86,14 +86,31 @@
   </details>
   {% endif %}
 
-  <details{% if logs_web %} open{% endif %}>
-    <summary>Logs web</summary>
-    {% if logs_web %}<pre>{{ logs_web }}</pre>{% else %}<p class="muted">nenhuma linha</p>{% endif %}
+  {% if logs_sources %}
+  <details open>
+    <summary>Logs — {{ logs_sources | length }} fonte(s) declarada(s)</summary>
+    {% for source in logs_sources %}
+    <div class="log-source{% if not source.found %} muted{% endif %}">
+      <p>
+        <strong>{{ source.id }}</strong>
+        <span class="muted">{{ source.role }}{% if not source.propagate %} · propagate: false{% endif %} · {{ source.reason }}</span>
+      </p>
+      {% if source.text %}<pre>{{ source.text }}</pre>
+      {% elif not source.propagate %}<p class="muted">o projeto declarou que o trace não chega aqui</p>
+      {% else %}<p class="muted">nenhuma linha para este trace</p>{% endif %}
+    </div>
+    {% endfor %}
   </details>
-  <details{% if logs_worker %} open{% endif %}>
-    <summary>Logs worker</summary>
-    {% if logs_worker %}<pre>{{ logs_worker }}</pre>{% else %}<p class="muted">nenhuma linha</p>{% endif %}
+  {% if logs_timeline | length > 1 %}
+  <details>
+    <summary>Timeline do trace ({{ logs_timeline | length }} entradas, ordenadas pelo carimbo declarado)</summary>
+    <pre>{% for entry in logs_timeline %}{{ entry.at or "sem carimbo" }} [{{ entry.source }}] {{ entry.text }}
+{% endfor %}</pre>
   </details>
+  {% endif %}
+  {% else %}
+  <p class="muted">Nenhuma fonte de log declarada — a evidência é só o HTTP.</p>
+  {% endif %}
 </section>
 {% if view.awaiting_verdict %}
 <form method="post" action="/verdict" class="verdict">

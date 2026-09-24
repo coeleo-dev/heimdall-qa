@@ -1,0 +1,7 @@
+endpoint: GET /toy/health
+dto: toy.HealthController
+area: toy-health
+auth: none
+idempotency: none
+baseline: baselines/empty.json
+fields: {}

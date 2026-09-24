@@ -1,30 +1,29 @@
 from __future__ import annotations
 
+import json
+import shutil
 from dataclasses import asdict
 from dataclasses import dataclass
-import json
 from pathlib import Path
-import shutil
 from time import monotonic
 from time import perf_counter
 from time import sleep
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
 from heimdall_qa.bru_parser import parse_bru
 from heimdall_qa.config import HarnessConfig
+from heimdall_qa.errors import HarnessError
 from heimdall_qa.http_client import send
 from heimdall_qa.jsonpath import MISSING
 from heimdall_qa.jsonpath import lookup
-from heimdall_qa.oracle.book import Book
-from heimdall_qa.oracle.money import require_flat_model
-from heimdall_qa.oracle.money import to_decimal
+from heimdall_qa.money import to_decimal
 from heimdall_qa.packs import PackResult
 from heimdall_qa.packs.values import SurfaceEval
-from heimdall_qa.packs.values import expected_after
-from heimdall_qa.packs.values import surface_matches
 from heimdall_qa.packs.values import values_packs
+from heimdall_qa.project import ProjectView
 from heimdall_qa.run_store import create_run
 from heimdall_qa.run_store import link_latest
 from heimdall_qa.run_store import write_book
@@ -32,18 +31,20 @@ from heimdall_qa.run_store import write_evidence
 from heimdall_qa.run_store import write_probe
 from heimdall_qa.run_store import write_summary
 from heimdall_qa.run_store import write_verdict
+from heimdall_qa.runner import _AUTH_SECRET_KEYS
 from heimdall_qa.runner import RoundStep
 from heimdall_qa.runner import _auto_verdict
 from heimdall_qa.runner import _build_evidence
 from heimdall_qa.runner import _build_summary
 from heimdall_qa.runner import _load_included_cases
 from heimdall_qa.runner import _prepare_case
-from heimdall_qa.runner import _reject_todo_status
+from heimdall_qa.runner import _reject_placeholders
 from heimdall_qa.runner import _response_body
 from heimdall_qa.runner import _round_step
 from heimdall_qa.runner import execute_step
 from heimdall_qa.runner import interpolate
 from heimdall_qa.schema.load import load_case
+from heimdall_qa.schema.load import split_selector
 from heimdall_qa.schema.models import CaseFile
 from heimdall_qa.schema.models import LoopSpec
 from heimdall_qa.schema.models import PollSpec
@@ -108,7 +109,16 @@ def visible_steps(suite: SuiteFile) -> list[VisibleStep]:
 
 
 def loop_label(loop: LoopSpec) -> str:
-    family = Path(loop.case).stem.split("-")[0]
+    """What a suite step calls itself in the queue.
+
+    The family comes from the **case id**, not from the path: with a selector the
+    path is `cases/metering.yaml#metering-H01` and its stem is the file's name, so
+    a label read off the path says `loop metering.yaml#metering ×10` — wrong
+    without failing, which is the worst kind of wrong. A path with no selector
+    names a file that holds one case, and its stem is still the family.
+    """
+    path, case_id = split_selector(loop.case)
+    family = (case_id or Path(path).stem).split("-")[0]
     return f"loop {family} ×{loop.times}"
 
 
@@ -125,8 +135,8 @@ def execute_suite_round(
     mode: str,
     descriptor: dict[str, str] | None = None,
 ) -> Path:
-    cases = _load_included_cases(round_file, root)
-    _reject_todo_status(cases)
+    cases = _load_included_cases(round_file, root, config.project)
+    _reject_placeholders(cases)
     started = perf_counter()
     run_dir = create_run(runs_dir, round_file.id)
     shutil.copy(round_path, run_dir / "round.yaml")
@@ -140,11 +150,18 @@ def execute_suite_round(
         secrets=secrets,
     )
     ctx.execute_all(auto=True)
-    write_book(run_dir, ctx.book)
+    write_book(run_dir, ctx.oracle)
     write_summary(
         run_dir,
         _build_summary(
-            round_file, mode, cases, ctx.records, started, root, descriptor=descriptor
+            round_file,
+            mode,
+            cases,
+            ctx.records,
+            started,
+            root,
+            project=config.project,
+            descriptor=descriptor,
         ),
     )
     write_evidence(run_dir, _build_evidence(ctx.records))
@@ -166,7 +183,6 @@ class SuiteRun:
         captures: dict[str, str] | None = None,
         pacer: dict[str, float] | None = None,
     ) -> None:
-        require_flat_model(str(suite.catalog.get("pricing_model", "FLAT")))
         self.suite = suite
         self.round_file = round_file
         self.root = root
@@ -176,7 +192,8 @@ class SuiteRun:
         self.secrets = secrets
         self.captures = captures if captures is not None else {}
         self.pacer = pacer if pacer is not None else {}
-        self.book = Book()
+        self.oracle = config.project.oracle()
+        self.oracle.require_pricing_model(_pricing_model(suite))
         self.records: list[RoundStep] = []
         self.step_index = 1
         self.photos: dict[str, dict[str, Any]] = {}
@@ -237,9 +254,15 @@ class SuiteRun:
         return surfaces
 
     def run_loop(self, loop: LoopSpec, *, auto: bool) -> LoopOutcome:
-        case = load_case(resolve_path(self.root, loop.case))
+        project = self.config.project
+        relative, case_id = split_selector(loop.case)
+        case = load_case(resolve_path(self.root, relative, project), case_id)
         _case, contract, baseline = _prepare_case(
-            case, self.root, self.secrets, runs_dir=self.run_dir.parent
+            case,
+            self.root,
+            self.secrets,
+            project=project,
+            runs_dir=self.run_dir.parent,
         )
         records: list[RoundStep] = []
         last_dir: Path | None = None
@@ -281,7 +304,7 @@ class SuiteRun:
                         "continue": False,
                     }
             else:
-                self.book.add_metering(
+                self.oracle.add_metering(
                     status_code=result.status_code,
                     body=_step_response(result.step_dir),
                     amount=body.get("amount"),
@@ -345,7 +368,7 @@ class SuiteRun:
     def _compare_probe(
         self, probe: ProbeSpec
     ) -> tuple[list[SurfaceEval], dict[str, Any], dict[str, Any], dict[str, Any]]:
-        oracle_total = self.book.included_total()
+        oracle_total = self.oracle.included_total()
         mapping = self._mapping()
         before_doc = self.photos[probe.id]
         after_doc: dict[str, Any] = {}
@@ -358,8 +381,10 @@ class SuiteRun:
                 surface, before_value, oracle_total, mapping
             )
             after_value = _jsonable(got["value"])
-            expected = expected_after(surface, before_value, oracle_total)
-            matched = surface_matches(surface, before_value, got["value"], oracle_total)
+            expected = self.oracle.expected_after(surface, before_value, oracle_total)
+            matched = self.oracle.matches(
+                surface, before_value, got["value"], oracle_total
+            )
             after_doc[surface.id] = {
                 "jsonpath": surface.jsonpath,
                 "value": after_value,
@@ -418,7 +443,7 @@ class SuiteRun:
         timeout_ms = _surface_timeout(surface, self.config)
         deadline = monotonic() + timeout_ms / 1000.0
         last = self._get_surface(surface, mapping)
-        if surface_matches(surface, before_value, last["value"], oracle_total):
+        if self.oracle.matches(surface, before_value, last["value"], oracle_total):
             return last, False
         while True:
             remaining = deadline - monotonic()
@@ -426,7 +451,7 @@ class SuiteRun:
                 return last, True
             sleep(min(_POLL_INTERVAL_S, remaining))
             last = self._get_surface(surface, mapping)
-            if surface_matches(surface, before_value, last["value"], oracle_total):
+            if self.oracle.matches(surface, before_value, last["value"], oracle_total):
                 return last, False
 
     def _poll_and_book_ingest(
@@ -441,14 +466,16 @@ class SuiteRun:
         self.last_transaction_id = transaction_id
         mapping = self._mapping()
         timeout_ms = poll.timeout_ms or self.config.probes.ingest_poll_ms
-        url = _poll_url(poll, self.config, mapping)
-        headers = _api_headers(self.secrets, self.round_file.environment)
+        url = _poll_url(poll, self.config, mapping, self.round_file.environment)
+        headers = _probe_headers(
+            url, self.secrets, self.round_file.environment, self.config.project
+        )
         polled, ok = _poll_until(
             self.client, url, headers, poll.until_jsonpath, poll.until_not, timeout_ms
         )
         rating = lookup(polled or {}, poll.until_jsonpath)
         rating_status = None if rating is MISSING else str(rating)
-        self.book.add_ingest(
+        self.oracle.add_ingest(
             status_code=http_status,
             transaction_id=transaction_id or None,
             idempotency_key=idempotency,
@@ -463,8 +490,13 @@ class SuiteRun:
         self, surface: SurfaceSpec, mapping: dict[str, str]
     ) -> dict[str, Any]:
         path = interpolate(surface.get, mapping)
-        url = path if str(path).startswith("http") else f"{self.config.nokr_web.rstrip('/')}{path}"
-        headers = _surface_headers(str(path), self.secrets, self.round_file.environment)
+        url = self.config.project.url(str(path), self.round_file.environment)
+        headers = _probe_headers(
+            str(path),
+            self.secrets,
+            self.round_file.environment,
+            self.config.project,
+        )
         exchange = send(self.client, "GET", url, headers=headers)
         body = _response_body(exchange.response_text)
         value = lookup(body, surface.jsonpath) if isinstance(body, dict) else MISSING
@@ -474,55 +506,93 @@ class SuiteRun:
         return {**self.secrets, "transaction_id": self.last_transaction_id}
 
 
+def _pricing_model(suite: SuiteFile) -> str:
+    """The model the suite bills under. Absent means the safe, boring answer."""
+    return str(suite.catalog.get("pricing_model", "FLAT"))
+
+
 def _clone_for_iteration(case: CaseFile, loop: LoopSpec) -> CaseFile:
     generate = dict(case.generate or {})
     generate.update(loop.generate)
     return case.model_copy(update={"generate": generate})
 
 
-def _poll_url(poll: PollSpec, config: HarnessConfig, mapping: dict[str, str]) -> str:
-    path = poll.get
+def _poll_url(
+    poll: PollSpec,
+    config: HarnessConfig,
+    mapping: dict[str, str],
+    environment: str,
+) -> str:
+    path = poll.get or ""
     if not path and poll.bru:
         path = _path_from_bru(poll.bru, config, mapping)
-    path = interpolate(path or "/api/ingest/{{transaction_id}}", mapping)
-    if path.startswith("http"):
-        return path
-    return f"{config.nokr_web.rstrip('/')}{path}"
+    if not path:
+        raise HarnessError(
+            code="POLL_TARGET_MISSING",
+            message="an after_each poll declares neither `get` nor `bru`",
+            hint="declare the url the loop polls, e.g. get: /api/ingest/{{transaction_id}}",
+        )
+    path = interpolate(path, mapping)
+    if str(path).startswith("http"):
+        return str(path)
+    return config.project.url(str(path), environment)
 
 
 def _path_from_bru(bru: str, config: HarnessConfig, mapping: dict[str, str]) -> str:
     path = Path(bru)
     if not path.is_absolute():
-        path = Path(config.bruno_collection) / bru
+        path = config.project.required_request_collection() / bru
     if not path.is_file():
-        return "/api/ingest/{{transaction_id}}"
+        raise HarnessError(
+            code="BRU_MISSING",
+            message=f"poll references a .bru file that does not exist: {path}",
+            hint="fix the after_each.poll.bru path, or declare `get:` instead",
+        )
     parsed = parse_bru(path)
     url = parsed.url.replace("{{base_url}}", "")
     url = url.replace("{{transactionId}}", mapping.get("transaction_id", ""))
     return interpolate(url, mapping)
 
 
-def _api_headers(secrets: dict[str, str], environment: str) -> dict[str, str]:
-    headers = {"X-Nokr-Environment": environment}
-    api_key = secrets.get("api_key")
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-    return headers
-
-
-def _surface_headers(
-    path: str, secrets: dict[str, str], environment: str
+def _probe_headers(
+    target: str,
+    secrets: dict[str, str],
+    environment: str,
+    project: ProjectView,
 ) -> dict[str, str]:
-    headers = {"X-Nokr-Environment": environment}
-    if "/platform/" in path or path.startswith("/platform/"):
-        token = secrets.get("jwt")
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
+    """The headers a probe carries, taken from the credential its route requires.
+
+    A poll reads the same policy a case does: `routes[].auth` names the
+    credential, so the harness never has to be told "polls use the API key".
+    """
+    name = project.auth_name_for(urlparse(target).path)
+    if name is None:
+        return _environment_header(environment, project)
+    return _credential_headers(name, secrets, environment, project)
+
+
+def _credential_headers(
+    auth_name: str,
+    secrets: dict[str, str],
+    environment: str,
+    project: ProjectView,
+) -> dict[str, str]:
+    headers = _environment_header(environment, project)
+    scheme = project.auth_named(auth_name)
+    credential = secrets.get(_AUTH_SECRET_KEYS.get(auth_name, auth_name))
+    if scheme is None or not credential or scheme.scheme not in {"bearer", "raw"}:
         return headers
-    api_key = secrets.get("api_key")
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
+    headers[scheme.header] = (
+        f"Bearer {credential}" if scheme.scheme == "bearer" else credential
+    )
     return headers
+
+
+def _environment_header(environment: str, project: ProjectView) -> dict[str, str]:
+    name = project.environment_header_name()
+    if name is None:
+        return {}
+    return {name: project.environment_value(environment)}
 
 
 def _poll_until(

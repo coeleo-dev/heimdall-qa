@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from pydantic import ValidationError
 import pytest
 import yaml
+from pydantic import ValidationError
 
 from heimdall_qa.schema.models import LoopSpec
 from heimdall_qa.schema.models import ProbeSpec
@@ -11,14 +11,14 @@ from heimdall_qa.validate import validate_round
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 H01_ROUND = FIXTURES / "rounds" / "h01-only.yaml"
-INGEST_CASE = "cases/ingest/ingest-H01.yaml"
+INGEST_CASE = "cases/ingest.yaml#ingest-H01"
 
 
 def _write_values_round(tmp_path: Path, *, times: int = 2, probe: dict | None = None) -> Path:
-    for folder in ("cases/ingest", "contracts", "baselines", "suites"):
+    for folder in ("cases", "contracts", "baselines", "suites"):
         (tmp_path / folder).mkdir(parents=True, exist_ok=True)
-    (tmp_path / "cases" / "ingest" / "ingest-H01.yaml").write_text(
-        (FIXTURES / "cases" / "ingest" / "ingest-H01.yaml").read_text(encoding="utf-8"),
+    (tmp_path / "cases" / "ingest.yaml").write_text(
+        (FIXTURES / "cases" / "ingest.yaml").read_text(encoding="utf-8"),
         encoding="utf-8",
     )
     (tmp_path / "contracts" / "api-ingest-post.yaml").write_text(
@@ -84,11 +84,6 @@ def _write_values_round(tmp_path: Path, *, times: int = 2, probe: dict | None = 
 def test_validate_h01_only_without_suite_steps_still_fails_coverage():
     errors = validate_round(H01_ROUND, FIXTURES)
     assert any("ingest-N-omit-timestamp" in error for error in errors)
-
-
-def test_validate_values_round_at_repo_root_passes():
-    repo = Path(__file__).resolve().parents[1]
-    assert validate_round(repo / "rounds" / "values-10m-7i.yaml", repo) == []
 
 
 def test_values_round_skips_expand_coverage(tmp_path: Path):

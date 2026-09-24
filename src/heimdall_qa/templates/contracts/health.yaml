@@ -1,0 +1,15 @@
+# One endpoint, so that the tree runs before it is understood.
+#
+# `endpoint` and `baseline` are the two required facts; `dto` is provenance and is
+# left out on purpose — name it when a reader read the contract off a DTO, and leave
+# it off when a person wrote the contract or an OpenAPI document produced it.
+#
+# `fields` is empty because this endpoint has no body. A field declared here is a
+# field the harness generates a value for, and every optional field pulls an `O*`
+# case in with it; start with none and add the ones that matter.
+endpoint: GET /health
+area: health
+auth: none
+idempotency: none
+baseline: baselines/empty.json
+fields: {}

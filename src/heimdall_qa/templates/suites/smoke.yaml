@@ -1,0 +1,13 @@
+# A suite is a round that can repeat a case or compare a surface.
+#
+# This starter uses neither, which is the point of shipping it: the shape of a suite
+# is visible before either feature is needed, and `heimdall-qa validate` will say when
+# a step is wrong. Delete this file and point the round's `include:` straight at the
+# case if you would rather start smaller.
+id: smoke
+catalog:
+  notes: "A starter suite — one step, run once. Nothing here prices anything."
+steps:
+  - loop:
+      times: 1
+      case: cases/health.yaml#health-H01

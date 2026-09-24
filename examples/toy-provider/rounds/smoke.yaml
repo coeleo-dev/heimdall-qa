@@ -1,0 +1,10 @@
+id: smoke
+suite: suites/smoke.yaml
+mode: headless
+dimensions:
+  - function
+environment: local
+include:
+  - cases/toy-health.yaml#toy-health-H01
+  - cases/toy-items.yaml#toy-items-H01
+  - cases/toy-items-post.yaml#toy-items-post-H01

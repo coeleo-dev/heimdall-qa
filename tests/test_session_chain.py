@@ -5,8 +5,8 @@ import httpx
 import pytest
 
 from heimdall_qa.config import HarnessConfig
-from heimdall_qa.config import LogFiles
 from heimdall_qa.errors import HarnessError
+from heimdall_qa.project import ProjectView
 from heimdall_qa.runner import _should_uniquify
 from heimdall_qa.runner import _uniquify_json
 from heimdall_qa.runner import execute_step
@@ -14,14 +14,23 @@ from heimdall_qa.schema.models import CaseFile
 from heimdall_qa.schema.models import Contract
 from heimdall_qa.schema.models import ExpectSpec
 from heimdall_qa.schema.models import FieldSpec
+from heimdall_qa.testing import config_for
+from heimdall_qa.testing import project_at
+
+_DESCRIPTOR = Path(__file__).resolve().parent / "fixtures" / "qa" / "project.yaml"
+
+
+def _project(tmp_path: Path) -> ProjectView:
+    """The descriptor in force, with this test's own (empty) log files."""
+    web_log = tmp_path / "web.log"
+    worker_log = tmp_path / "worker.log"
+    web_log.write_text("", encoding="utf-8")
+    worker_log.write_text("", encoding="utf-8")
+    return project_at(_DESCRIPTOR, web=str(web_log), worker=str(worker_log))
 
 
 def _config(tmp_path: Path) -> HarnessConfig:
-    web_log = tmp_path / "nokr-web.log"
-    worker_log = tmp_path / "nokr-worker.log"
-    web_log.write_text("", encoding="utf-8")
-    worker_log.write_text("", encoding="utf-8")
-    return HarnessConfig(log_files=LogFiles(web=str(web_log), worker=str(worker_log)))
+    return config_for(_project(tmp_path))
 
 
 def _case(**kwargs) -> CaseFile:
@@ -38,7 +47,7 @@ def _case(**kwargs) -> CaseFile:
 def _post_contract(**kwargs) -> Contract:
     payload = {
         "endpoint": "POST /platform/billable-metrics",
-        "dto": "com.nokr.domain.metering.catalog.dto.CreateBillableMetricRequest",
+        "dto": "com.example.domain.metering.catalog.dto.CreateBillableMetricRequest",
         "auth": "jwt",
         "idempotency": "header_uuid_v4",
         "baseline": "baselines/billable-metrics-post.json",
@@ -54,7 +63,7 @@ def _put_contract() -> Contract:
     return Contract.model_validate(
         {
             "endpoint": "PUT /platform/billable-metrics/{{billable_metric_id}}",
-            "dto": "com.nokr.domain.metering.catalog.dto.UpdateBillableMetricRequest",
+            "dto": "com.example.domain.metering.catalog.dto.UpdateBillableMetricRequest",
             "auth": "jwt",
             "idempotency": "header_uuid_v4",
             "baseline": "baselines/billable-metrics-put.json",
@@ -280,7 +289,7 @@ def _webhook_patch_contract() -> Contract:
     return Contract.model_validate(
         {
             "endpoint": "PATCH /platform/webhooks/{{webhook_id}}",
-            "dto": "com.nokr.domain.notification.outbound.dto.UpdateWebhookRequest",
+            "dto": "com.example.domain.notification.outbound.dto.UpdateWebhookRequest",
             "auth": "jwt",
             "baseline": "baselines/webhooks-patch.json",
             "fields": {"url": FieldSpec(required=False, json="url")},
@@ -300,7 +309,7 @@ def test_n_notfound_does_not_use_session_path_id(tmp_path: Path):
             expect=ExpectSpec(status=404),
         ),
         contract=_webhook_patch_contract(),
-        baseline={"url": "https://hooks.example/nokr"},
+        baseline={"url": "https://hooks.example/events"},
         captured=captured,
         captures=store,
         status=404,
@@ -322,7 +331,7 @@ def test_s_bola_does_not_use_session_path_id(tmp_path: Path):
             expect=ExpectSpec(status=404),
         ),
         contract=_webhook_patch_contract(),
-        baseline={"url": "https://hooks.example/nokr"},
+        baseline={"url": "https://hooks.example/events"},
         captured=captured,
         captures=store,
         status=404,

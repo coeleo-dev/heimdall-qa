@@ -1,13 +1,58 @@
 import json
+from pathlib import Path
 
+from heimdall_qa.logs.collector import FOUND
+from heimdall_qa.logs.collector import LogCollection
+from heimdall_qa.logs.collector import LogEntry
+from heimdall_qa.logs.collector import SourceRead
+from heimdall_qa.logs.collector import not_declared
 from heimdall_qa.packs import CatalogRule
 from heimdall_qa.packs import PackContext
 from heimdall_qa.packs import PackResult
 from heimdall_qa.packs import run_all
+from heimdall_qa.testing import project_at
+
+#: Packs read routing, auth and leak rules from the project in force, so a unit
+#: test of a pack needs one. This is the same descriptor the CLI resolves.
+_DESCRIPTOR = Path(__file__).resolve().parent / "fixtures" / "qa" / "project.yaml"
+_PROJECT = project_at(_DESCRIPTOR)
 
 
 def _by_id(results: list[PackResult]) -> dict[str, PackResult]:
     return {item.pack_id: item for item in results}
+
+
+def _answered(source_id: str, *lines: str, role: str = "sync") -> SourceRead:
+    """A source that carried the trace, with the lines it carried."""
+    return SourceRead(
+        source_id,
+        role,
+        True,
+        entries=tuple(LogEntry(line, source_id) for line in lines),
+        reason=FOUND,
+    )
+
+
+def _silent(
+    source_id: str,
+    *,
+    role: str = "sync",
+    propagate: bool = True,
+    reason: str = "marker_not_found",
+    truncated: bool = False,
+) -> SourceRead:
+    """A source that has no line, and the declaration that decides what that means."""
+    return SourceRead(
+        source_id,
+        role,
+        propagate,
+        reason=reason,
+        truncated=truncated,
+    )
+
+
+def _logs(*sources: SourceRead) -> LogCollection:
+    return LogCollection(sources)
 
 
 def _ctx(**overrides: object) -> PackContext:
@@ -15,24 +60,26 @@ def _ctx(**overrides: object) -> PackContext:
         "method": "POST",
         "url_path": "/api/ingest",
         "request_headers": {
-            "Authorization": "Bearer nk_test_fixture",
-            "X-Trace-Id": "nokrqa-phase4",
+            "Authorization": "Bearer test_key_fixture",
+            "X-Trace-Id": "heimdall-phase4",
             "X-Idempotency-Key": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
         },
         "request_body": {"event_type": "llm_tokens"},
         "status_code": 202,
-        "response_headers": {"x-trace-id": "nokrqa-phase4", "content-type": "application/json"},
+        "response_headers": {"x-trace-id": "heimdall-phase4", "content-type": "application/json"},
         "response_text": json.dumps({"status": "ACCEPTED"}),
         "elapsed_ms": 12.0,
         "expect_status": 202,
+        "project": _PROJECT,
         "expect_code": None,
-        "trace_sent": "nokrqa-phase4",
+        "trace_sent": "heimdall-phase4",
         "environment": "sandbox",
         "idempotency_required": True,
         "waives": [],
         "dimensions": [],
         "budget_ms": 50,
         "fail_ms": 1500,
+        "logs": not_declared(),
         "case_kind": "H01",
         "business_rules": [],
     }
@@ -78,8 +125,8 @@ def test_issued_raw_key_on_create_key_does_not_fail_security_leak():
             "id": "e257ce03-c471-4735-bce3-339a095aa94d",
             "name": "lab-2",
             "environment": "SANDBOX",
-            "raw_key": "nk_test_viewoncekey",
-            "rawKey": "nk_test_viewoncekey",
+            "raw_key": "test_key_viewoncekey",
+            "rawKey": "test_key_viewoncekey",
         }
     )
     results = _by_id(
@@ -90,8 +137,8 @@ def test_issued_raw_key_on_create_key_does_not_fail_security_leak():
                 expect_status=201,
                 request_headers={
                     "Authorization": "Bearer eyJhbGciOiJIUzI1NiJ9.e30.sig",
-                    "X-Nokr-Environment": "sandbox",
-                    "X-Trace-Id": "nokrqa-phase4",
+                    "X-Environment": "sandbox",
+                    "X-Trace-Id": "heimdall-phase4",
                 },
                 response_text=body,
                 elapsed_ms=12.0,
@@ -104,13 +151,13 @@ def test_issued_raw_key_on_create_key_does_not_fail_security_leak():
     assert results["security.leak"].status == "pass"
 
 
-def test_nk_test_in_error_message_still_fails_security_leak():
+def test_test_key_in_error_message_still_fails_security_leak():
     results = _by_id(
         run_all(
             _ctx(
                 status_code=500,
                 expect_status=201,
-                response_text=json.dumps({"error": "leaked nk_test_secret"}),
+                response_text=json.dumps({"error": "leaked test_key_secret"}),
             )
         )
     )
@@ -126,7 +173,7 @@ def test_issued_jwt_and_api_key_on_register_do_not_fail_security_leak():
                 "SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
             ),
             "refresh_token": "BLdafboHnyAbp4iWQSl-SYJBhJTYsY8VMYq00-lgQd0",
-            "api_key": "nk_test_viewoncekey",
+            "api_key": "test_key_viewoncekey",
             "tenant_id": "e257ce03-c471-4735-bce3-339a095aa94d",
         }
     )
@@ -165,7 +212,7 @@ def test_jwt_in_error_message_still_fails_security_leak():
 
 
 def test_400_envelope_aligned_passes_http_error():
-    body = json.dumps({"error": "timestamp is required", "traceId": "nokrqa-phase4"})
+    body = json.dumps({"error": "timestamp is required", "traceId": "heimdall-phase4"})
     results = _by_id(
         run_all(
             _ctx(
@@ -182,7 +229,7 @@ def test_422_when_expect_201_fails_http_baseline_without_http_error():
     body = json.dumps(
         {
             "error": "Email already registered",
-            "traceId": "nokrqa-phase4",
+            "traceId": "heimdall-phase4",
         }
     )
     results = _by_id(
@@ -215,7 +262,7 @@ _INVALID_EMAIL = CatalogRule(id="INVALID_EMAIL", status=400, code="INVALID_EMAIL
 
 def test_duplicate_email_on_h01_fails_business_rule():
     body = json.dumps(
-        {"error": "Email already registered", "traceId": "nokrqa-phase4"}
+        {"error": "Email already registered", "traceId": "heimdall-phase4"}
     )
     results = _by_id(
         run_all(
@@ -239,7 +286,7 @@ def test_duplicate_email_on_h01_fails_business_rule():
 
 def test_duplicate_email_on_n_rule_passes_business_rule():
     body = json.dumps(
-        {"error": "Email already registered", "traceId": "nokrqa-phase4"}
+        {"error": "Email already registered", "traceId": "heimdall-phase4"}
     )
     results = _by_id(
         run_all(
@@ -262,7 +309,7 @@ def test_duplicate_email_on_n_rule_passes_business_rule():
 
 def test_duplicate_email_on_n_omit_fails_business_rule():
     body = json.dumps(
-        {"error": "Email already registered", "traceId": "nokrqa-phase4"}
+        {"error": "Email already registered", "traceId": "heimdall-phase4"}
     )
     results = _by_id(
         run_all(
@@ -284,71 +331,126 @@ def test_duplicate_email_on_n_omit_fails_business_rule():
     assert "N-omit-email" in results["business.rule"].detail
 
 
-def test_http_success_and_observability_pass_with_web_line():
+def test_http_success_and_observability_pass_with_a_trace_line():
     line = (
         "2026-09-01 14:30:00 [vt] INFO  c.n.Foo [SANDBOX] - "
-        "trace_id: [nokrqa-phase4] - accepted"
+        "trace_id: [heimdall-phase4] - accepted"
     )
     results = _by_id(
-        run_all(
-            _ctx(
-                url_path="/api/users/ext/balance",
-                web_log_lines=[line],
-                require_worker_logs=False,
-            )
-        )
+        run_all(_ctx(url_path="/api/users/ext/balance", logs=_logs(_answered("web", line))))
     )
     assert results["http.success"].status == "pass"
     assert results["observability"].status == "pass"
 
 
-def test_http_success_fails_without_web_log_lines():
-    results = _by_id(run_all(_ctx(url_path="/api/users/ext/balance")))
+def test_a_declared_source_with_no_trace_line_fails_both_log_packs():
+    """`propagate: true` and no line is a product finding, not an absence."""
+    results = _by_id(run_all(_ctx(logs=_logs(_silent("web")))))
+
     assert results["http.success"].status == "fail"
+    assert results["observability"].status == "fail"
+    assert "missing trace_id line in web logs" in results["observability"].detail
 
 
-def test_http_success_fails_on_web_error_line():
+def test_http_success_fails_on_an_error_line_for_the_trace():
     line = (
         "2026-09-01 14:30:00 [vt] ERROR c.n.Foo [SANDBOX] - "
-        "trace_id: [nokrqa-phase4] - boom"
+        "trace_id: [heimdall-phase4] - boom"
     )
-    results = _by_id(run_all(_ctx(web_log_lines=[line], url_path="/api/users/ext/balance")))
+    results = _by_id(
+        run_all(_ctx(logs=_logs(_answered("web", line)), url_path="/api/users/ext/balance"))
+    )
     assert results["http.success"].status == "fail"
+
+
+def test_log_packs_skip_when_no_log_source_is_declared():
+    """An API with no log files has nothing to correlate, so nothing fails.
+
+    The distinction is *unmeasured* versus *incomplete*: the first is a project
+    that never claimed log correlation, the second is one that did and left a gap.
+    """
+    results = _by_id(run_all(_ctx()))
+
+    assert results["http.success"].status == "skipped"
+    assert results["observability"].status == "skipped"
+    assert "no log source declared" in results["observability"].detail
 
 
 def test_observability_fails_on_portuguese_token():
     line = (
         "2026-09-01 14:30:00 [vt] INFO  c.n.Foo [SANDBOX] - "
-        "trace_id: [nokrqa-phase4] - erro ao persistir"
+        "trace_id: [heimdall-phase4] - erro ao persistir"
     )
     results = _by_id(
         run_all(
-            _ctx(
-                url_path="/api/users/ext/balance",
-                web_log_lines=[line],
-                require_worker_logs=False,
-            )
+            _ctx(url_path="/api/users/ext/balance", logs=_logs(_answered("web", line)))
         )
     )
     assert results["observability"].status == "fail"
 
 
-def test_observability_skips_when_worker_logs_missing():
-    line = (
-        "2026-09-01 14:30:00 [vt] INFO  c.n.Foo [SANDBOX] - "
-        "trace_id: [nokrqa-phase4] - accepted"
-    )
+def test_observability_fails_when_the_async_source_never_answered():
+    """The 208 steps, after the fix: what was `skipped` is now a product failure."""
+    line = "2026-09-01 14:30:00 [vt] INFO  c.n.Foo [SANDBOX] - trace_id: [heimdall-phase4] - accepted"
     results = _by_id(
         run_all(
             _ctx(
-                web_log_lines=[line],
-                worker_log_lines=[],
-                require_worker_logs=True,
-                logs_incomplete=True,
+                logs=_logs(_answered("web", line), _silent("worker", role="async")),
+                awaits_async=True,
             )
         )
     )
-    assert results["observability"].status == "skipped"
+
+    assert results["observability"].status == "fail"
+    assert "missing trace_id line in worker logs" in results["observability"].detail
+
+
+def test_observability_skips_when_the_step_expects_no_async_effect():
+    """The same silence, on a step nobody asked the consumer to settle."""
+    line = "2026-09-01 14:30:00 [vt] INFO  c.n.Foo [SANDBOX] - trace_id: [heimdall-phase4] - accepted"
+    results = _by_id(
+        run_all(
+            _ctx(
+                logs=_logs(_answered("web", line), _silent("worker", role="async")),
+                awaits_async=False,
+            )
+        )
+    )
+
+    assert results["observability"].status == "pass"
+
+
+def test_observability_skips_when_the_silent_source_is_not_instrumented():
+    line = "2026-09-01 14:30:00 [vt] INFO  c.n.Foo [SANDBOX] - trace_id: [heimdall-phase4] - accepted"
+    results = _by_id(
+        run_all(
+            _ctx(
+                logs=_logs(
+                    _answered("web", line),
+                    _silent("worker", role="async", propagate=False),
+                ),
+                awaits_async=True,
+            )
+        )
+    )
+
+    assert results["observability"].status == "pass"
+
+
+def test_observability_warns_when_max_tail_bytes_cut_the_read():
+    """The harness cannot say, and neither a product failure nor a pass is honest."""
+    line = "2026-09-01 14:30:00 [vt] INFO  c.n.Foo [SANDBOX] - trace_id: [heimdall-phase4] - accepted"
+    results = _by_id(
+        run_all(
+            _ctx(
+                logs=_logs(_answered("web", line), _silent("worker", role="async", truncated=True)),
+                awaits_async=True,
+            )
+        )
+    )
+
+    assert results["observability"].status == "warn"
+    assert "max_tail_bytes" in results["observability"].detail
 
 
 def test_expect_409_actual_201_skips_http_error():
@@ -360,10 +462,10 @@ def test_expect_409_actual_201_skips_http_error():
                 expect_status=409,
                 request_headers={
                     "Authorization": "Bearer eyJhbGciOiJIUzI1NiJ9.e30.sig",
-                    "X-Nokr-Environment": "sandbox",
-                    "X-Trace-Id": "nokrqa-phase4",
+                    "X-Environment": "sandbox",
+                    "X-Trace-Id": "heimdall-phase4",
                 },
-                response_text=json.dumps({"id": "k1", "raw_key": "nk_test_viewoncekey"}),
+                response_text=json.dumps({"id": "k1", "raw_key": "test_key_viewoncekey"}),
                 elapsed_ms=12.0,
                 fail_ms=2000,
                 budget_ms=2000,
@@ -383,7 +485,7 @@ def test_n_auth_platform_skips_auth_surface_and_fails_baseline_without_trace():
                 url_path="/platform/api-keys",
                 status_code=401,
                 expect_status=401,
-                request_headers={"X-Nokr-Environment": "sandbox", "X-Trace-Id": "nokrqa-phase4"},
+                request_headers={"X-Environment": "sandbox", "X-Trace-Id": "heimdall-phase4"},
                 response_headers={"content-type": "application/json"},
                 response_text=json.dumps(
                     {"error": "Missing JWT in Authorization: Bearer header"}
@@ -409,12 +511,12 @@ def test_platform_h01_without_bearer_fails_auth_surface():
                 url_path="/platform/api-keys",
                 status_code=401,
                 expect_status=201,
-                request_headers={"X-Nokr-Environment": "sandbox", "X-Trace-Id": "nokrqa-phase4"},
-                response_headers={"x-trace-id": "nokrqa-phase4", "content-type": "application/json"},
+                request_headers={"X-Environment": "sandbox", "X-Trace-Id": "heimdall-phase4"},
+                response_headers={"x-trace-id": "heimdall-phase4", "content-type": "application/json"},
                 response_text=json.dumps(
                     {
                         "error": "Missing JWT in Authorization: Bearer header",
-                        "traceId": "nokrqa-phase4",
+                        "traceId": "heimdall-phase4",
                     }
                 ),
                 elapsed_ms=12.0,
@@ -432,7 +534,7 @@ def test_http_error_fails_on_portuguese_bean_validation_message():
     body = json.dumps(
         {
             "error": "tamanho deve ser entre 3 e 50",
-            "traceId": "nokrqa-phase4",
+            "traceId": "heimdall-phase4",
         }
     )
     results = _by_id(
@@ -443,8 +545,8 @@ def test_http_error_fails_on_portuguese_bean_validation_message():
                 expect_status=400,
                 request_headers={
                     "Authorization": "Bearer eyJhbGciOiJIUzI1NiJ9.e30.sig",
-                    "X-Nokr-Environment": "sandbox",
-                    "X-Trace-Id": "nokrqa-phase4",
+                    "X-Environment": "sandbox",
+                    "X-Trace-Id": "heimdall-phase4",
                 },
                 response_text=body,
                 elapsed_ms=12.0,
@@ -465,11 +567,11 @@ def test_mutation_passes_on_i_missing_without_uuid():
             _ctx(
                 status_code=400,
                 expect_status=400,
-                request_headers={"X-Trace-Id": "nokrqa-phase4"},
+                request_headers={"X-Trace-Id": "heimdall-phase4"},
                 response_text=json.dumps(
                     {
                         "error": "Required header 'X-Idempotency-Key' is missing",
-                        "traceId": "nokrqa-phase4",
+                        "traceId": "heimdall-phase4",
                     }
                 ),
                 case_kind="I-missing",
@@ -487,11 +589,11 @@ def test_mutation_passes_on_i_format_without_uuid():
                 status_code=400,
                 expect_status=400,
                 request_headers={
-                    "X-Trace-Id": "nokrqa-phase4",
+                    "X-Trace-Id": "heimdall-phase4",
                     "X-Idempotency-Key": "not-a-uuid-v4",
                 },
                 response_text=json.dumps(
-                    {"error": "X-Idempotency-Key must be UUID v4", "traceId": "nokrqa-phase4"}
+                    {"error": "X-Idempotency-Key must be UUID v4", "traceId": "heimdall-phase4"}
                 ),
                 case_kind="I-format",
             )
@@ -504,7 +606,7 @@ def test_mutation_still_fails_h01_without_uuid():
     results = _by_id(
         run_all(
             _ctx(
-                request_headers={"X-Trace-Id": "nokrqa-phase4"},
+                request_headers={"X-Trace-Id": "heimdall-phase4"},
                 case_kind="H01",
             )
         )
@@ -512,14 +614,14 @@ def test_mutation_still_fails_h01_without_uuid():
     assert results["mutation"].status == "fail"
 
 
-def test_list_prefix_nk_test_does_not_fail_security_leak():
+def test_list_prefix_test_key_does_not_fail_security_leak():
     body = json.dumps(
         [
             {
                 "id": "e257ce03-c471-4735-bce3-339a095aa94d",
                 "name": "lab-2",
                 "environment": "SANDBOX",
-                "prefix": "nk_test_...17vv",
+                "prefix": "test_key_...17vv",
                 "status": "ACTIVE",
             }
         ]
@@ -533,8 +635,8 @@ def test_list_prefix_nk_test_does_not_fail_security_leak():
                 expect_status=200,
                 request_headers={
                     "Authorization": "Bearer eyJhbGciOiJIUzI1NiJ9.e30.sig",
-                    "X-Nokr-Environment": "sandbox",
-                    "X-Trace-Id": "nokrqa-phase4",
+                    "X-Environment": "sandbox",
+                    "X-Trace-Id": "heimdall-phase4",
                 },
                 response_text=body,
                 elapsed_ms=12.0,
@@ -542,10 +644,13 @@ def test_list_prefix_nk_test_does_not_fail_security_leak():
                 budget_ms=2000,
                 idempotency_required=False,
                 case_kind="H01",
-                web_log_lines=[
-                    "2026-09-01 14:30:00 [vt] INFO  c.n.Foo [SANDBOX] - "
-                    "trace_id: [nokrqa-phase4] - listed"
-                ],
+                logs=_logs(
+                    _answered(
+                        "web",
+                        "2026-09-01 14:30:00 [vt] INFO  c.n.Foo [SANDBOX] - "
+                        "trace_id: [heimdall-phase4] - listed",
+                    )
+                ),
             )
         )
     )
@@ -562,7 +667,7 @@ def test_n_omit_events_matching_rule_omit_passes_business_rule():
     body = json.dumps(
         {
             "error": "At least one event type is required",
-            "traceId": "nokrqa-phase4",
+            "traceId": "heimdall-phase4",
         }
     )
     results = _by_id(
@@ -573,8 +678,8 @@ def test_n_omit_events_matching_rule_omit_passes_business_rule():
                 expect_status=400,
                 request_headers={
                     "Authorization": "Bearer eyJhbGciOiJIUzI1NiJ9.e30.sig",
-                    "X-Nokr-Environment": "sandbox",
-                    "X-Trace-Id": "nokrqa-phase4",
+                    "X-Environment": "sandbox",
+                    "X-Trace-Id": "heimdall-phase4",
                 },
                 response_text=body,
                 elapsed_ms=12.0,
@@ -599,7 +704,7 @@ def test_n_pattern_matching_rule_set_passes_business_rule():
     body = json.dumps(
         {
             "error": "Webhook URL must use HTTPS protocol",
-            "traceId": "nokrqa-phase4",
+            "traceId": "heimdall-phase4",
         }
     )
     results = _by_id(
@@ -610,8 +715,8 @@ def test_n_pattern_matching_rule_set_passes_business_rule():
                 expect_status=400,
                 request_headers={
                     "Authorization": "Bearer eyJhbGciOiJIUzI1NiJ9.e30.sig",
-                    "X-Nokr-Environment": "sandbox",
-                    "X-Trace-Id": "nokrqa-phase4",
+                    "X-Environment": "sandbox",
+                    "X-Trace-Id": "heimdall-phase4",
                 },
                 response_text=body,
                 elapsed_ms=12.0,
@@ -635,7 +740,7 @@ def test_n_omit_password_weak_password_still_fails_business_rule():
     body = json.dumps(
         {
             "error": "Password must be at least 8 characters and contain uppercase",
-            "traceId": "nokrqa-phase4",
+            "traceId": "heimdall-phase4",
         }
     )
     results = _by_id(

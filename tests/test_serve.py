@@ -4,13 +4,14 @@ from pathlib import Path
 import httpx
 from fastapi.testclient import TestClient
 
-from heimdall_qa.config import HarnessConfig
-from heimdall_qa.config import LogFiles
 from heimdall_qa.serve.app import create_app
 from heimdall_qa.session import RoundSession
+from heimdall_qa.testing import config_for
+from heimdall_qa.testing import project_at
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 WALK_HN = FIXTURES / "rounds" / "walk-hn.yaml"
+_DESCRIPTOR = FIXTURES / "qa" / "project.yaml"
 
 
 def _handler(web_log: Path):
@@ -23,9 +24,13 @@ def _handler(web_log: Path):
                     "2026-09-01 16:00:00 [vt] INFO  c.n.Qa [SANDBOX] - "
                     f"trace_id: [{trace}] - accepted\n"
                 )
+            #: The API answers with a credential it should not echo, so the page
+            #: has something to prove it redacted. It is planted here and not in a
+            #: committed file on purpose: `validate` refuses a credential in the
+            #: round's own content, and this fixture has to stay valid.
             return httpx.Response(
                 202,
-                json={"status": "ACCEPTED"},
+                json={"status": "ACCEPTED", "api_key": "test_key_plantedkey"},
                 headers={"X-Trace-Id": trace, "Content-Type": "application/json"},
             )
         return httpx.Response(
@@ -38,8 +43,8 @@ def _handler(web_log: Path):
 
 
 def _client(tmp_path: Path) -> TestClient:
-    web_log = tmp_path / "nokr-web.log"
-    worker_log = tmp_path / "nokr-worker.log"
+    web_log = tmp_path / "web.log"
+    worker_log = tmp_path / "worker.log"
     web_log.write_text("", encoding="utf-8")
     worker_log.write_text("", encoding="utf-8")
     http = httpx.Client(
@@ -49,8 +54,8 @@ def _client(tmp_path: Path) -> TestClient:
     session = RoundSession(
         WALK_HN,
         root=FIXTURES,
-        config=HarnessConfig(
-            log_files=LogFiles(web=str(web_log), worker=str(worker_log)),
+        config=config_for(
+            project_at(_DESCRIPTOR, web=str(web_log), worker=str(worker_log))
         ),
         client=http,
         runs_dir=tmp_path / "runs",
@@ -123,8 +128,30 @@ def test_round_page_does_not_leak_planted_api_key(tmp_path: Path):
     client.post("/start", data={"mode": "walk"})
     page = client.get("/round")
     assert page.status_code == 200
-    assert "nk_test_plantedkey" not in page.text
+    assert "test_key_plantedkey" not in page.text
     assert "[REDACTED]" in page.text or "note-H01" in page.text
+
+
+def test_round_page_shows_every_declared_log_source_and_why_it_is_empty(
+    tmp_path: Path,
+):
+    """The page has to say which source owes a line, not render one blank panel.
+
+    A reader who sees an empty log panel cannot tell "the file is not there" from
+    "the project declared the trace does not reach it" — and those two readings
+    lead to opposite conclusions about the product.
+    """
+    client = _client(tmp_path)
+    client.post("/start", data={"mode": "walk"})
+    page = client.get("/round")
+
+    assert page.status_code == 200
+    assert "Logs — 3 fonte(s) declarada(s)" in page.text
+    assert "trace_id: [" in page.text
+    # The worker owes a line (accepted work on an async endpoint) and has none.
+    assert "missing" in page.text.lower() or "nenhuma linha" in page.text
+    # The third source is declared and not instrumented, and says so.
+    assert "o projeto declarou que o trace não chega aqui" in page.text
 
 
 def test_start_page_shows_environment_and_queue_size(tmp_path: Path):

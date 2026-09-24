@@ -17,10 +17,11 @@ has to answer "which descriptor, and is it coherent".
 from dataclasses import dataclass
 from pathlib import Path
 
-from pydantic import ValidationError
 import yaml
+from pydantic import ValidationError
 
 from heimdall_qa.errors import HarnessError
+from heimdall_qa.project import ProjectView
 from heimdall_qa.schema.descriptor import ProjectDescriptor
 
 #: Where a target repo declares its own descriptor.
@@ -120,6 +121,24 @@ def resolve_descriptor(
     return None
 
 
+def resolve_project(
+    root: Path,
+    *,
+    explicit: str | None = None,
+    provider_id: str | None = None,
+) -> "ProjectView":
+    """The view a caller gets when all it has is a root.
+
+    Resolving the descriptor twice would be how two parts of one run end up
+    reading different files, so this is the single entry point: `resolve_descriptor`
+    for the file, `ProjectView` for the questions.
+    """
+    resolved = resolve_descriptor(root, explicit=explicit, provider_id=provider_id)
+    if resolved is None:
+        return ProjectView()
+    return ProjectView(descriptor=resolved.descriptor)
+
+
 def _promote(path: Path, exc: ValidationError) -> HarnessError:
     """Turns the first pydantic error into a `HarnessError` that names its rule."""
     first = exc.errors()[0] if exc.errors() else {}
@@ -133,7 +152,10 @@ def _promote(path: Path, exc: ValidationError) -> HarnessError:
     return HarnessError(
         code=code,
         message=f"{location}: {message}",
-        hint="every rule is listed in docs/estudo-heimdall/02-descriptor-projeto.md §6",
+        hint=(
+            "the rules the descriptor schema enforces are listed in"
+            " contrib/architecture.md, under 'Rules the schema enforces'"
+        ),
     )
 
 

@@ -5,4 +5,4 @@ dimensions:
   - function
 environment: sandbox
 include:
-  - cases/echo/echo-H01.yaml
+  - cases/echo.yaml

@@ -1,53 +1,61 @@
-from urllib.parse import urlparse
 import json
+from pathlib import Path
+from urllib.parse import urlparse
 
 import httpx
 import pytest
 
 from heimdall_qa.config import HarnessConfig
-from heimdall_qa.config import LogFiles
+from heimdall_qa.project import ProjectView
 from heimdall_qa.runner import _pace_register
 from heimdall_qa.runner import execute_step
 from heimdall_qa.schema.models import CaseFile
 from heimdall_qa.schema.models import Contract
 from heimdall_qa.schema.models import ExpectSpec
 from heimdall_qa.schema.models import FieldSpec
+from heimdall_qa.testing import config_for
+from heimdall_qa.testing import project_at
+
+_DESCRIPTOR = Path(__file__).resolve().parent / "fixtures" / "qa" / "project.yaml"
 
 
-def _config(tmp_path, **kwargs) -> HarnessConfig:
-    web_log = tmp_path / "nokr-web.log"
-    worker_log = tmp_path / "nokr-worker.log"
+def _project(tmp_path: Path) -> ProjectView:
+    """The descriptor in force, with this test's own (empty) log files."""
+    web_log = tmp_path / "web.log"
+    worker_log = tmp_path / "worker.log"
     web_log.write_text("", encoding="utf-8")
     worker_log.write_text("", encoding="utf-8")
-    payload = {"log_files": LogFiles(web=str(web_log), worker=str(worker_log))}
-    payload.update(kwargs)
-    return HarnessConfig(**payload)
+    return project_at(_DESCRIPTOR, web=str(web_log), worker=str(worker_log))
 
 
-def test_register_gap_sleeps_on_second_call_only():
+def _config(tmp_path: Path, **settings) -> HarnessConfig:
+    return config_for(_project(tmp_path), **settings)
+
+
+def test_register_gap_sleeps_on_second_call_only(tmp_path: Path):
     slept: list[float] = []
     times = iter([0.0, 0.01, 0.09])
     pacer: dict[str, float] = {}
-    config = HarnessConfig(register_gap_ms=80)
+    config = _config(tmp_path, pace_gap_ms=80)
     url = "http://127.0.0.1:8080/auth/register"
     _pace_register(url, config, pacer, sleeper=slept.append, clock=lambda: next(times))
     _pace_register(url, config, pacer, sleeper=slept.append, clock=lambda: next(times))
     assert slept == pytest.approx([0.07])
 
 
-def test_register_gap_skips_ingest_and_zero_gap():
+def test_register_gap_skips_ingest_and_zero_gap(tmp_path: Path):
     slept: list[float] = []
     pacer: dict[str, float] = {}
     _pace_register(
         "http://127.0.0.1:8080/api/ingest",
-        HarnessConfig(register_gap_ms=80),
+        _config(tmp_path, pace_gap_ms=80),
         pacer,
         sleeper=slept.append,
         clock=lambda: 0.0,
     )
     _pace_register(
         "http://127.0.0.1:8080/auth/register",
-        HarnessConfig(register_gap_ms=0),
+        _config(tmp_path, pace_gap_ms=0),
         pacer,
         sleeper=slept.append,
         clock=lambda: 0.0,
@@ -75,7 +83,7 @@ def test_register_burst_sends_n_times(tmp_path):
     )
     contract = Contract(
         endpoint="POST /auth/register",
-        dto="com.nokr.domain.auth.dto.RegisterRequest",
+        dto="com.example.domain.auth.dto.RegisterRequest",
         auth="none",
         idempotency="none",
         baseline="baselines/auth-register.json",
@@ -104,7 +112,7 @@ def test_saturate_stops_on_until_status_and_uniquifies_json(tmp_path):
         body = (
             {"error": "You already have 5 active sandbox keys.", "traceId": "t"}
             if status == 409
-            else {"id": f"k{len(captured)}", "raw_key": "nk_test_x"}
+            else {"id": f"k{len(captured)}", "raw_key": "test_key_x"}
         )
         return httpx.Response(
             status,
@@ -124,7 +132,7 @@ def test_saturate_stops_on_until_status_and_uniquifies_json(tmp_path):
     )
     contract = Contract(
         endpoint="POST /platform/api-keys",
-        dto="com.nokr.domain.auth.dto.CreateApiKeyRequest",
+        dto="com.example.domain.auth.dto.CreateApiKeyRequest",
         auth="none",
         idempotency="none",
         baseline="baselines/api-keys-post.json",

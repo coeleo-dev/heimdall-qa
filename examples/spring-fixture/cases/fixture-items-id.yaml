@@ -1,0 +1,46 @@
+fixture-items-id-H01:
+  contract: contracts/fixture-items-id.yaml
+  kind: H01
+  gate: auto
+  tags:
+    - function
+  diff: {}
+  expect:
+    status: 200
+  path_values:
+    id: '1'
+fixture-items-id-N-auth:
+  contract: contracts/fixture-items-id.yaml
+  kind: N-auth
+  gate: auto
+  tags:
+    - function
+  diff: {}
+  expect:
+    status: 401
+  omit_headers:
+    - X-Fixture-Token
+  path_values:
+    id: '1'
+fixture-items-id-N-notfound:
+  contract: contracts/fixture-items-id.yaml
+  kind: N-notfound
+  gate: auto
+  tags:
+    - function
+  diff: {}
+  expect:
+    status: 404
+  path_values:
+    id: '1'
+fixture-items-id-S-bola:
+  contract: contracts/fixture-items-id.yaml
+  kind: S-bola
+  gate: auto
+  tags:
+    - function
+  diff: {}
+  expect:
+    status: 404
+  path_values:
+    id: '1'

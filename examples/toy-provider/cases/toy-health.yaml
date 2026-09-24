@@ -1,0 +1,7 @@
+toy-health-H01:
+  contract: contracts/toy-health-get.yaml
+  kind: H01
+  tags:
+    - function
+  expect:
+    status: 200

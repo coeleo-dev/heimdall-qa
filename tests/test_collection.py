@@ -1,5 +1,5 @@
-from pathlib import Path
 import json
+from pathlib import Path
 
 from heimdall_qa.collection import find_node
 from heimdall_qa.collection import index_workspace
