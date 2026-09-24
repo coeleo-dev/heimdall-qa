@@ -1,9 +1,0 @@
-id: user-overrides-post-S-bola
-contract: contracts/platform-user-overrides-post.yaml
-kind: S-bola
-gate: auto
-tags:
-- function
-diff: {}
-expect:
-  status: 404

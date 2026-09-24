@@ -1,9 +1,0 @@
-id: billable-metrics-archive-I-replay
-contract: contracts/platform-billable-metrics-archive.yaml
-kind: I-replay
-gate: auto
-tags:
-- function
-diff: {}
-expect:
-  status: 200

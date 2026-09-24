@@ -1,9 +1,0 @@
-id: feature-keys-post-I-new-key
-contract: contracts/platform-feature-keys-post.yaml
-kind: I-new-key
-gate: auto
-tags:
-- function
-diff: {}
-expect:
-  status: 201

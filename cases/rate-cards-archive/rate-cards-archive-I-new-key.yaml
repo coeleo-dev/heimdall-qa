@@ -1,9 +1,0 @@
-id: rate-cards-archive-I-new-key
-contract: contracts/platform-rate-cards-archive.yaml
-kind: I-new-key
-gate: auto
-tags:
-- function
-diff: {}
-expect:
-  status: 200

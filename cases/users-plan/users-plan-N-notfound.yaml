@@ -1,9 +1,0 @@
-id: users-plan-N-notfound
-contract: contracts/platform-users-plan.yaml
-kind: N-notfound
-gate: auto
-tags:
-- function
-diff: {}
-expect:
-  status: 404

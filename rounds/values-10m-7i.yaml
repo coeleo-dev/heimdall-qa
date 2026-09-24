@@ -1,9 +1,0 @@
-id: values-10m-7i
-suite: suites/values-10m-7i.yaml
-mode: review
-environment: sandbox
-notes: 'A.18 values conference: 10 metering + 7 ingest, probe esperado vs lido. Catalog
-  FLAT unit_amount 0.00003. Do not mix with piloto ingest kinds.'
-include:
-  - cases/metering/metering-H01.yaml
-  - cases/ingest/ingest-H01.yaml

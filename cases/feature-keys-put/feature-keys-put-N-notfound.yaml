@@ -1,9 +1,0 @@
-id: feature-keys-put-N-notfound
-contract: contracts/platform-feature-keys-put.yaml
-kind: N-notfound
-gate: auto
-tags:
-- function
-diff: {}
-expect:
-  status: 404

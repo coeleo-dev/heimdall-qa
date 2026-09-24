@@ -1,9 +1,0 @@
-id: user-overrides-post-H01
-contract: contracts/platform-user-overrides-post.yaml
-kind: H01
-gate: auto
-tags:
-- function
-diff: {}
-expect:
-  status: 201

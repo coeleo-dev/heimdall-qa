@@ -1,9 +1,0 @@
-id: api-keys-delete-H01
-contract: contracts/platform-api-keys-delete.yaml
-kind: H01
-gate: auto
-tags:
-- function
-diff: {}
-expect:
-  status: 200

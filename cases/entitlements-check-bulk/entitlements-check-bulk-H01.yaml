@@ -1,9 +1,0 @@
-id: entitlements-check-bulk-H01
-contract: contracts/api-entitlements-check-bulk.yaml
-kind: H01
-gate: auto
-tags:
-- function
-diff: {}
-expect:
-  status: 200

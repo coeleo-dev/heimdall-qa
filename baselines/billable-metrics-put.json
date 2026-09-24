@@ -1,8 +1,0 @@
-{
-  "property_path": "properties.tokens",
-  "allowed_properties": [
-    "model",
-    "tokens",
-    "prompt"
-  ]
-}

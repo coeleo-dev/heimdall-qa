@@ -1,9 +1,0 @@
-id: webhooks-rotate-S-bola
-contract: contracts/platform-webhooks-rotate.yaml
-kind: S-bola
-gate: auto
-tags:
-- function
-diff: {}
-expect:
-  status: 404

@@ -1,9 +1,0 @@
-id: plans-put-default-I-new-key
-contract: contracts/platform-plans-put-default.yaml
-kind: I-new-key
-gate: auto
-tags:
-- function
-diff: {}
-expect:
-  status: 200

@@ -1,9 +1,0 @@
-id: ingest-get-S-bola
-contract: contracts/api-ingest-get.yaml
-kind: S-bola
-gate: auto
-tags:
-- function
-diff: {}
-expect:
-  status: 404

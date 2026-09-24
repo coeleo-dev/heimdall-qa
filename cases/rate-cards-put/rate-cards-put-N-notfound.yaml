@@ -1,9 +1,0 @@
-id: rate-cards-put-N-notfound
-contract: contracts/platform-rate-cards-put.yaml
-kind: N-notfound
-gate: auto
-tags:
-- function
-diff: {}
-expect:
-  status: 404

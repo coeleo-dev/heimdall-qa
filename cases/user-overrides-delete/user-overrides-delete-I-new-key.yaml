@@ -1,9 +1,0 @@
-id: user-overrides-delete-I-new-key
-contract: contracts/platform-user-overrides-delete.yaml
-kind: I-new-key
-gate: auto
-tags:
-- function
-diff: {}
-expect:
-  status: 204

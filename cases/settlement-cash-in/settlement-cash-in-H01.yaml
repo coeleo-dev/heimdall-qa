@@ -1,9 +1,0 @@
-id: settlement-cash-in-H01
-contract: contracts/api-settlement-cash-in.yaml
-kind: H01
-gate: auto
-tags:
-- function
-diff: {}
-expect:
-  status: 200

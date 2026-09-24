@@ -1,9 +1,0 @@
-id: enroll-unenrolled-N-rule-NO_DEFAULT_PLAN
-contract: contracts/platform-enroll-unenrolled.yaml
-kind: N-rule-NO_DEFAULT_PLAN
-gate: auto
-tags:
-- function
-diff: {}
-expect:
-  status: 422

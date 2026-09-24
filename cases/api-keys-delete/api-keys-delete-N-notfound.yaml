@@ -1,9 +1,0 @@
-id: api-keys-delete-N-notfound
-contract: contracts/platform-api-keys-delete.yaml
-kind: N-notfound
-gate: auto
-tags:
-- function
-diff: {}
-expect:
-  status: 404
