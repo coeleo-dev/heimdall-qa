@@ -39,6 +39,7 @@ from heimdall_qa.errors import HarnessError
 from heimdall_qa.errors import to_dict
 from heimdall_qa.projects import ProjectRef
 from heimdall_qa.projects import ProjectsRegistry
+from heimdall_qa.projects import id_for
 from heimdall_qa.serve import contract
 from heimdall_qa.serve.models import ApiErrorModel
 from heimdall_qa.serve.models import HarnessErrorModel
@@ -168,6 +169,19 @@ class ProjectRequest(BaseModel):
 
 class McpRequest(BaseModel):
     """The MCP switch's whole vocabulary. There is no third position."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+
+
+class DemoRequest(BaseModel):
+    """The demo button's vocabulary, deliberately the same shape as the MCP switch's.
+
+    One binary setting and no path: where the demo is materialized is the server's
+    decision (`demo_root`), and letting the client name a directory would let it name
+    any directory.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -409,6 +423,49 @@ def install_api(app: FastAPI) -> None:
         )
         return contract.mcp_model(state).model_dump(mode="json")
 
+    @app.get("/api/demo")
+    async def demo(request: Request) -> Any:
+        """Whether the bundled demo is up, and where its project landed."""
+        guard = _guard(request)
+        if guard is not None:
+            return guard
+        return await run_in_threadpool(_demo_payload, request)
+
+    @app.post("/api/demo")
+    async def set_demo(request: Request, body: DemoRequest) -> Any:
+        """Flip the demo: bring the mock up and materialize the project, or take it down.
+
+        The same shape as the MCP switch with one extra act. Turning it **on** starts
+        the mock, then copies the sample out pointed at the port that socket actually
+        bound and opens it — because a demo nobody can see is not the feature. Turning
+        it **off** stops the socket and leaves the files, so the project the reviewer was
+        reading, and the runs they made in it, are still there afterwards.
+        """
+        guard = _guard(request)
+        if guard is not None:
+            return guard
+        service = request.app.state.demo
+        if not body.enabled:
+            state = await run_in_threadpool(service.stop)
+            return contract.demo_model(
+                state,
+                root=service.root,
+                project_id=id_for(service.root),
+            ).model_dump(mode="json")
+        state, ref = await run_in_threadpool(service.start, _registry(request))
+        if ref is not None:
+            opened = await _mutate(request, lambda ws: ws.add_project(ref))
+            if isinstance(opened, JSONResponse):
+                # The socket is up but the project could not be opened — the registry
+                # gate refused it, which a shipped sample should never do. The refusal
+                # is the honest answer; a 200 would hide a demo with no tree.
+                return opened
+        return contract.demo_model(
+            state,
+            root=service.root,
+            project_id=id_for(service.root),
+        ).model_dump(mode="json")
+
     @app.get("/api/events")
     async def events(request: Request) -> Any:
         guard = _guard(request)
@@ -497,6 +554,16 @@ def _projects_payload(request: Request) -> dict[str, Any]:
 
 def _mcp_payload(request: Request) -> dict[str, Any]:
     return contract.mcp_model(request.app.state.mcp.state()).model_dump(mode="json")
+
+
+def _demo_payload(request: Request) -> dict[str, Any]:
+    """`GET /api/demo`, with the root and id read off the service that owns them."""
+    service = request.app.state.demo
+    return contract.demo_model(
+        service.state(),
+        root=service.root,
+        project_id=id_for(service.root),
+    ).model_dump(mode="json")
 
 
 async def _open_project(request: Request, raw_root: str) -> Any:

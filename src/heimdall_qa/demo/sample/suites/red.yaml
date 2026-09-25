@@ -1,0 +1,12 @@
+# The plain fail: a case whose expectation the API does not meet. The counter is
+# asked for a 404 it will not give, and `http.baseline` answers `HTTP 200, expected
+# 404`. No 5xx, no warn — the middle of the vocabulary, which is the one a demo
+# built only from green and red would skip.
+id: red
+catalog:
+  notes: >-
+    A status mismatch and nothing else: the case expects 404, the API answers 200.
+steps:
+  - loop:
+      times: 1
+      case: cases/demo-count.yaml#demo-count-wrong-status

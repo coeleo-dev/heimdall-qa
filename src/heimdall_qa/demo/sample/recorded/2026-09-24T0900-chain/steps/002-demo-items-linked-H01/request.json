@@ -1,0 +1,11 @@
+{
+  "method": "POST",
+  "url": "http://127.0.0.1:8130/demo/items",
+  "headers": {
+    "X-Trace-Id": "heimdall-chain-2"
+  },
+  "body": {
+    "name": "widget",
+    "parent_id": "itm_3"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "results": [
+    {
+      "pack_id": "http.baseline",
+      "status": "warn",
+      "detail": "elapsed_ms 124.65780298225582 exceeds budget_ms 40"
+    },
+    {
+      "pack_id": "security.leak",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "pack_id": "performance",
+      "status": "warn",
+      "detail": "elapsed_ms 124.65780298225582 exceeds budget_ms 40"
+    },
+    {
+      "pack_id": "auth.surface",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "pack_id": "mutation",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "pack_id": "observability",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "pack_id": "business.rule",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "pack_id": "http.success",
+      "status": "pass",
+      "detail": ""
+    }
+  ],
+  "logs_incomplete": false
+}

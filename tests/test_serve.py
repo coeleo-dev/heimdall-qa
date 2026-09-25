@@ -39,6 +39,9 @@ _DESCRIPTOR = FIXTURES / "qa" / "project.yaml"
 #: a key off the tree are the same string.
 PROJECT = id_for(FIXTURES)
 NOTE_H01 = keys.for_case(PROJECT, "rounds/walk-hn.yaml", "note-H01")
+WALK_HN_KEY = keys.for_round(PROJECT, "rounds/walk-hn.yaml")
+ORDER_FIRST_KEY = keys.for_round(PROJECT, "rounds/order-first.yaml")
+INTERLEAVED = keys.for_campaign(PROJECT, "interleaved")
 
 
 def _handler(web_log: Path):
@@ -341,3 +344,105 @@ def test_the_done_screen_carries_the_kpis_and_the_run_it_read(tmp_path: Path):
     assert len(screen.session.queue) == 2
     assert [row["case_id"] for row in screen.run.failed_cases] == ["note-H01"]
     assert screen.run.summary["counts"]["fail"] == 1
+
+
+def test_a_round_the_engine_moved_off_still_opens_on_its_kpis(tmp_path: Path):
+    """The KPI pane follows the disk, not the engine's memory of the last unit.
+
+    A campaign of forty rounds used to be able to show exactly one round's numbers —
+    the one the engine finished last, and only until another plan started. Selecting a
+    round back after a detour showed the start card again, so the summary a reviewer
+    had just produced became unreachable. The run is on disk and the tree indexed it,
+    so the pane is the same one whether or not the engine still holds the round.
+    """
+    client = _client(tmp_path)
+    _post(client, "/api/start", scope="round", node=ORDER_FIRST_KEY, mode="review")
+    _post(client, "/api/verdict", status="pass", comment="", continue_round=True)
+
+    # Another plan takes the engine off it, so the round is history and not the plan.
+    _post(client, "/api/start", scope="round", node=WALK_HN_KEY, mode="walk")
+    live = client.app.state.workspace.view().engine.unit_round
+    assert live == "rounds/walk-hn.yaml", "the detour must be a different round"
+
+    _post(client, "/api/select", key=ORDER_FIRST_KEY)
+    screen = _screen(client)
+    assert screen.pane == "done"
+    assert screen.run is not None
+    assert screen.run.unit_kind == "round"
+    assert screen.run.unit_key == ORDER_FIRST_KEY
+    assert screen.run.summary["counts"]["pass"] == 1
+    assert screen.run.run_path.endswith("order-first")
+    # The live walk is parked on its own round's step, and it did not take the pane.
+    assert screen.step is None
+
+
+def test_a_campaign_roll_up_reads_one_row_per_endpoint_from_history(tmp_path: Path):
+    """A campaign gets a table, and the totals are only the numbers that add up.
+
+    Every row is a round's latest run off disk, so a campaign answers with the state of
+    each endpoint even when the engine is somewhere else entirely. Latency is
+    deliberately *not* in the totals: a p95 over a campaign is not the average of forty
+    p95s, and a harness that printed one would be inventing a number it cannot weight.
+    """
+    client = _client(tmp_path)
+    _post(client, "/api/start", scope="round", node=ORDER_FIRST_KEY, mode="review")
+    _post(client, "/api/verdict", status="pass", comment="", continue_round=True)
+
+    _post(client, "/api/select", key=INTERLEAVED)
+    screen = _screen(client)
+    assert screen.pane == "campaign"
+    assert screen.rollup is not None
+    # One row per round the campaign holds, in the tree's own order (the matrices
+    # group the two A4 rounds together, which is what the pane above the table shows).
+    assert screen.rollup.rounds_total == 3
+    assert [row.round_id for row in screen.rollup.units] == [
+        "order-first",
+        "order-third",
+        "order-second",
+    ]
+    # The round that ran carries its own evidence, per row.
+    ran = [row for row in screen.rollup.units if row.found]
+    assert [row.round_id for row in ran] == ["order-first"]
+    assert ran[0].counts["pass"] == 1
+    assert ran[0].latency_ms, "the run that happened keeps its own latency"
+    assert ran[0].run_path
+    assert ran[0].stamp == ran[0].run_path.rsplit("/", 1)[-1]
+    # The additive totals only.
+    assert screen.rollup.rounds_run == 1
+    assert screen.rollup.totals["pass"] == 1
+    assert screen.rollup.totals["not_run"] == 2
+    for invented in ("p50", "p95", "coverage_pct"):
+        assert invented not in screen.rollup.totals
+
+
+def test_a_round_reopened_from_history_lists_the_cases_worth_reopening(tmp_path: Path):
+    """The end-of-run list survives the engine letting go of the run.
+
+    `failed_cases` has two sources: the live queue, which knows which row a step
+    painted, and the run directory, for every round the engine no longer holds. The
+    second is the one this guards, and the key it resolves is the round's own case
+    row — not the step directory's file name.
+    """
+    client = _client(tmp_path)
+    _post(client, "/api/start", mode="walk")
+    _post(client, "/api/verdict", status="pass", comment="", continue_round=True)
+    _post(
+        client,
+        "/api/verdict",
+        status="fail",
+        comment="the copy is a Java class name",
+        continue_round=False,
+    )
+
+    # Move the engine to another round so `walk-hn` is history and not the live plan.
+    _post(client, "/api/start", scope="round", node=ORDER_FIRST_KEY, mode="review")
+    _post(client, "/api/select", key=WALK_HN_KEY)
+    screen = _screen(client)
+
+    assert screen.pane == "done"
+    assert screen.run is not None
+    assert [row["case_id"] for row in screen.run.failed_cases] == ["note-N-omit-note"]
+    row = screen.run.failed_cases[0]
+    assert row["key"] == keys.for_case(PROJECT, "rounds/walk-hn.yaml", "note-N-omit-note")
+    assert row["reason"]
+    assert row["step_dir"]

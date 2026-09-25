@@ -1,0 +1,12 @@
+# A route the descriptor holds to 40 ms and the app takes 120 ms to answer. Nothing
+# here fails: `performance` returns `warn` because the round does not declare the
+# `performance` dimension, and the same case would be a failure on a round that did.
+# That distinction is the reason the budget lives in the descriptor and the dimension
+# lives in the round.
+endpoint: GET /demo/slow
+dto: demo.SlowController
+area: demo-slow
+auth: none
+idempotency: none
+baseline: baselines/empty.json
+fields: {}

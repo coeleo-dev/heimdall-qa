@@ -80,6 +80,28 @@ def registry_path() -> Path:
     return config_home / "heimdall-qa" / "projects.yaml"
 
 
+def data_home() -> Path:
+    """Where the harness keeps data of its own — not configuration, not evidence.
+
+    One thing lives here today: the materialized demo project. It is data rather than
+    configuration because it is not the reviewer's decision — nobody chose a
+    `campaigns/demo.yaml` — and it is not evidence because a run's evidence lives
+    beside the project that ran.
+
+    `$HEIMDALL_QA_DATA` names a directory and wins outright, so a test materializes
+    into a throwaway path instead of the home of whoever runs the suite. A file
+    override would have been the wrong shape here: a caller may want to add a second
+    thing under this directory later, and a variable that points at a file cannot.
+    """
+    override = os.environ.get("HEIMDALL_QA_DATA")
+    if override:
+        return Path(override).expanduser()
+    base = os.environ.get("XDG_DATA_HOME")
+    data_root = Path(base) if base else Path.home() / ".local" / "share"
+    return data_root / "heimdall-qa"
+
+
+
 def id_for(root: Path) -> str:
     """The stable id of a project root: its folder name, then a short path hash.
 

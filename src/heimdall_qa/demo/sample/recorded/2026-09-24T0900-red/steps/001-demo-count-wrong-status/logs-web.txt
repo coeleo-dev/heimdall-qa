@@ -1,0 +1,1 @@
+2026-09-25 18:29:03 [vt] INFO  c.d.DemoApplication - trace_id: [heimdall-red-1] - count read

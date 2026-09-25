@@ -1,0 +1,14 @@
+{
+  "status": 404,
+  "headers": {
+    "date": "Fri, 25 Sep 2026 18:29:00 GMT",
+    "server": "uvicorn",
+    "content-length": "62",
+    "content-type": "application/json",
+    "x-trace-id": "heimdall-smoke-4"
+  },
+  "body": {
+    "error": "no item with id ghost",
+    "traceId": "heimdall-smoke-4"
+  }
+}

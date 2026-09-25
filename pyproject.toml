@@ -95,6 +95,12 @@ heimdall_qa = [
     # code, so the suite can run the boilerplate instead of describing it.
     "templates/**/*",
     "templates/*",
+    # The bundled demo project: descriptor, contracts, cases, suites, rounds,
+    # campaigns and the recorded runs. Shipped for the same reason the starter tree
+    # is — a reviewer who has never run the harness should be able to open a project
+    # that shows every status, and `examples/` is not package data.
+    "demo/sample/**/*",
+    "demo/sample/*",
 ]
 
 [tool.pytest.ini_options]

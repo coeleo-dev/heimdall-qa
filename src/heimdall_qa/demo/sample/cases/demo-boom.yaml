@@ -1,0 +1,15 @@
+# The 5xx. `app.py` answers this route with an unhandled 500 on purpose, and the case
+# still expects 200 — because a corpus written from a specification says what should
+# happen, not what does.
+#
+# `http.baseline` answers `hard fail: HTTP 500`, and the tree counts it on the
+# `http_5xx` axis beside `fail`. The two are deliberately not the same number: a 500
+# is never absorbed into "one more failed case", and a round that produced one reads
+# differently from a round that produced a status mismatch.
+demo-boom-H01:
+  contract: contracts/demo-boom-get.yaml
+  kind: H01
+  tags:
+    - function
+  expect:
+    status: 200

@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
 import { useHarness } from "@/hooks/useHarness";
+import { setDemo } from "@/lib/api";
 import { apiToken } from "@/lib/token";
 import { cn } from "@/lib/utils";
 import type { Bootstrap, VerdictStatus } from "@/types";
@@ -121,10 +122,25 @@ export function App() {
     [toast],
   );
 
+  /**
+   * The command palette's door into the demo.
+   *
+   * One press for what the Server dialog's switch does, so a reviewer who never opens
+   * the dialog can still reach it. It is the same call, not a second path: the server
+   * starts the mock, materializes around the port it bound and opens the project.
+   */
+  const enableDemo = useCallback(
+    () =>
+      collectionAction("Não foi possível abrir a demonstração", async () => {
+        await setDemo(true);
+        await harness.refresh();
+      }),
+    [collectionAction, harness],
+  );
+
   if (!bootstrap) {
     return <BootScreen error={harness.error} hasToken={Boolean(apiToken())} />;
   }
-
   return (
     <div className="flex h-full min-h-0 flex-col">
       <TopBar
@@ -226,6 +242,7 @@ export function App() {
         onCancel={() => void harness.cancel()}
         onRefresh={() => void harness.refresh()}
         onEdit={openSource}
+        onDemo={() => void enableDemo()}
       />
 
       <ServerDialog
@@ -262,7 +279,7 @@ function Pane({
   onFocus: (index: number) => void;
   onEdit: (path: string) => void;
 }) {
-  const { pane, step, run, unit, engine, session, tree, labels } = bootstrap;
+  const { pane, step, run, unit, engine, session, tree, labels, rollup } = bootstrap;
 
   if (pane === "campaign") {
     return (
@@ -272,6 +289,7 @@ function Pane({
         session={session}
         tree={tree}
         labels={labels}
+        rollup={rollup}
         busy={busy}
         nextUnreviewed={bootstrap.next_unreviewed}
         onStart={onStart}

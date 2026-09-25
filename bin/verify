@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# The gate list, in one place.
+#
+# "A change is done when the gates are green, not when the suite is." That sentence is
+# in `CONTRIBUTING.md`, `contrib/README.md`, the pull-request template and the
+# `bin/bootstrap` epilogue, and prose in four places is prose that diverges — the
+# bootstrap epilogue had already lost `examples/spring-fixture/gate.sh`. So the list is
+# written down once, here, and the documents link to it.
+#
+# `--fast` skips the two provider gates (`toy-provider` and `spring-fixture`), which are
+# the slow ones: they build a wheel and, for Spring, a Java fixture with Maven. The
+# core's suite, the reader's suite and the boundary audit always run.
+#
+# Usage: bin/verify [--fast]
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO"
+
+FAST=""
+for argument in "$@"; do
+    case "$argument" in
+        --fast) FAST=1 ;;
+        *) echo "usage: bin/verify [--fast]" >&2; exit 2 ;;
+    esac
+done
+
+PYTHON="$REPO/.venv/bin/python"
+if [ ! -x "$PYTHON" ]; then
+    echo "no $PYTHON: run bin/bootstrap first" >&2
+    exit 1
+fi
+
+step() { printf '\n== %s\n' "$1"; }
+
+step "the core's suite (no product required)"
+"$PYTHON" -m pytest -q
+
+step "the reader's suite (no JVM required)"
+"$PYTHON" -m pytest -q packages/spring
+
+step "the boundary — nothing of a review target is publishable"
+"$REPO/bin/audit-remote"
+
+if [ -n "$FAST" ]; then
+    printf '\n--fast: skipped the toy-provider and spring-fixture gates\n'
+    exit 0
+fi
+
+step "the toy gate — a clean wheel still measures an API"
+bash examples/toy-provider/gate.sh
+
+step "the Java gate — a Spring target, read and then talked to"
+bash examples/spring-fixture/gate.sh
+
+printf '\nall five gates are green\n'

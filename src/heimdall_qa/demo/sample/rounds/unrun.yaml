@@ -1,0 +1,14 @@
+# A valid round nobody has run. It is what `not_reviewed` looks like in the tree:
+# the shape is right, the evidence is absent, and the answer to "how is it" is "ask
+# again after you run it" rather than a green badge.
+id: unrun
+suite: suites/smoke.yaml
+mode: headless
+dimensions:
+  - function
+environment: local
+include:
+  - cases/demo-health.yaml#demo-health-H01
+  - cases/demo-item.yaml#demo-item-H01
+  - cases/demo-count.yaml#demo-count-H01
+  - cases/demo-item-notfound.yaml#demo-item-notfound-H01

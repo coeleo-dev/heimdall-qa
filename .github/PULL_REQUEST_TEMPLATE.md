@@ -24,11 +24,8 @@ goes stale.
 
 ## The gates
 
-- [ ] `.venv/bin/python -m pytest -q` — the core's suite
-- [ ] `.venv/bin/python -m pytest -q packages/spring` — the reader's suite
-- [ ] `bin/audit-remote` — nothing of a review target is publishable
-- [ ] `bash examples/toy-provider/gate.sh` — a clean wheel still measures an API
-- [ ] `bash examples/spring-fixture/gate.sh` — and still reads Java source
+- [ ] `bin/verify` — the five gates, in order (`--fast` skips the two provider gates)
+- [ ] `bin/web` — if this touches `desktop/webapp/`, including the committed bundle
 
 <!-- Cross the ones you ran. Leave the rest unticked and say why they do not apply. -->
 

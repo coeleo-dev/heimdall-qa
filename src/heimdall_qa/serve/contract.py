@@ -13,14 +13,17 @@ guard against the contract drifting than a test that starts a server and greps J
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from heimdall_qa.collection import TreeNode
+from heimdall_qa.demo.runtime import DemoApiState
 from heimdall_qa.engine import EngineView
 from heimdall_qa.mcp.runtime import McpState
 from heimdall_qa.projects import ProjectEntry
 from heimdall_qa.serve import panel
 from heimdall_qa.serve.models import BootstrapModel
+from heimdall_qa.serve.models import DemoModel
 from heimdall_qa.serve.models import EngineEventModel
 from heimdall_qa.serve.models import EngineModel
 from heimdall_qa.serve.models import HarnessErrorModel
@@ -30,6 +33,8 @@ from heimdall_qa.serve.models import ProbeRowModel
 from heimdall_qa.serve.models import ProjectModel
 from heimdall_qa.serve.models import ProjectsModel
 from heimdall_qa.serve.models import QueueItemModel
+from heimdall_qa.serve.models import RollupRunsModel
+from heimdall_qa.serve.models import RoundRunRowModel
 from heimdall_qa.serve.models import RunAggregateModel
 from heimdall_qa.serve.models import SessionModel
 from heimdall_qa.serve.models import SourceFindingModel
@@ -246,6 +251,28 @@ def run_model(wv: WorkspaceView) -> RunAggregateModel | None:
         summary=extra.get("summary", {}) or {},
         failed_cases=list(extra.get("failed_cases", []) or []),
         run_path=str(extra.get("run_path", "")),
+        unit_key=wv.selected.key,
+        unit_label=wv.selected.label,
+        unit_kind=wv.selected.kind,
+    )
+
+
+def rollup_model(wv: WorkspaceView) -> RollupRunsModel | None:
+    """The per-round table behind a roll-up selection, at the roll-up pane only.
+
+    Gated on the pane rather than on the node's kind because the pane is what decides
+    that the client is drawing the roll-up: the one case a roll-up *kind* does not get
+    its table is a campaign the parked plan was started from, which is drawn as the
+    verdict form instead.
+    """
+    if wv.pane != "campaign":
+        return None
+    extra = panel.rollup_extra(wv.selected)
+    return RollupRunsModel(
+        totals={str(key): int(value) for key, value in extra.get("totals", {}).items()},
+        units=[RoundRunRowModel(**row) for row in extra.get("units", [])],
+        rounds_total=int(extra.get("rounds_total", 0)),
+        rounds_run=int(extra.get("rounds_run", 0)),
     )
 
 
@@ -296,6 +323,27 @@ def mcp_model(state: McpState) -> McpModel:
     )
 
 
+def demo_model(state: DemoApiState, *, root: Path, project_id: str) -> DemoModel:
+    """The demo's state, named the same way the MCP one is.
+
+    `root` and `project_id` come from the caller and not the state because they are
+    facts about the *files*, not the socket: the materialized tree exists whether or
+    not the mock is up, and the id is the same one the registry uses, derived from the
+    path so a second launch agrees about which project the demo is.
+    """
+    return DemoModel(
+        enabled=state.enabled,
+        state=state.state,
+        host=state.host,
+        port=state.port,
+        base_url=state.base_url,
+        root=str(root),
+        project_id=project_id,
+        log_path=state.log_path,
+        error=error_model(state.error),
+    )
+
+
 def stream_payload(wv: WorkspaceView) -> dict[str, Any]:
     """The event stream's frame: the engine, plus which screen it belongs to.
 
@@ -328,6 +376,7 @@ def bootstrap_model(wv: WorkspaceView) -> BootstrapModel:
         unit=unit_card_model(wv),
         step=step_model(wv),
         run=run_model(wv),
+        rollup=rollup_model(wv),
         labels=labels_model(),
         next_unreviewed=wv.next_unreviewed.key if wv.next_unreviewed else None,
         pending_key=wv.pending_key,

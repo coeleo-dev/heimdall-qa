@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Ban, FileCode2, Play, RefreshCw, Search, Terminal } from "lucide-react";
+import { Ban, FileCode2, Play, RefreshCw, Search, Sparkles, Terminal } from "lucide-react";
 
 import {
   CommandDialog,
@@ -37,6 +37,7 @@ export function CommandPalette({
   onCancel,
   onRefresh,
   onEdit,
+  onDemo,
 }: {
   bootstrap: Bootstrap;
   open: boolean;
@@ -46,6 +47,8 @@ export function CommandPalette({
   onCancel: () => void;
   onRefresh: () => void;
   onEdit: (path: string) => void;
+  /** Open the bundled demo project, the same act the Server dialog's switch performs. */
+  onDemo: () => void;
 }) {
   const nodes = useMemo(() => flatten(bootstrap.tree), [bootstrap.tree]);
   const failing = useMemo(
@@ -91,6 +94,10 @@ export function CommandPalette({
             <RefreshCw className="size-3" />
             Recarregar a coleção
             <CommandShortcut>R</CommandShortcut>
+          </CommandItem>
+          <CommandItem value="abrir projeto de demonstracao demo" onSelect={() => run(onDemo)}>
+            <Sparkles className="size-3 text-muted-foreground" />
+            Abrir o projeto de demonstração
           </CommandItem>
         </CommandGroup>
 

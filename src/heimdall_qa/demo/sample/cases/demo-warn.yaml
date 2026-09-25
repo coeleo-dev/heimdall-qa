@@ -1,0 +1,10 @@
+# The 200 that is not a clean pass. The API is fine; the log line is a WARN, and
+# `http.success` turns that into a `warn` for the trace. A reviewer reading only the
+# HTTP status would call this green, which is why the pack reads the logs.
+demo-warn-H01:
+  contract: contracts/demo-warn-get.yaml
+  kind: H01
+  tags:
+    - function
+  expect:
+    status: 200

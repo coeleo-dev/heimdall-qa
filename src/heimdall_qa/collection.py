@@ -44,6 +44,25 @@ _RANK = {
 
 
 @dataclass(frozen=True)
+class RoundRun:
+    """A round's latest run directory, and the `summary.json` inside it.
+
+    Read once at index time by the same `find_latest_run` call that decides the round's
+    badge, and carried on the node from there. That is what makes the KPI pane and the
+    campaign roll-up a walk over a tree this session already built rather than a second
+    sweep of `runs/` on every frame — a forty-round campaign would otherwise re-open
+    forty files twice a second to answer a question the index had already answered.
+
+    `summary` is empty for a run that is still in flight (`create_run` makes the
+    directory, `write_summary` fills it at the end), which is the honest way to say
+    "there is a run here and it has no result yet".
+    """
+
+    path: Path
+    summary: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class TreeNode:
     key: str
     kind: NodeKind
@@ -85,6 +104,10 @@ class TreeNode:
     #: mark every one of them. The walk that paints the verdicts is the same walk that
     #: knows the position, so the mark is decided here and shipped rather than guessed.
     live: str = ""
+    #: A round's latest run, for the KPI pane and the roll-up. `None` for everything
+    #: that is not a round, and for a round that has never run. See `RoundRun` for why
+    #: it rides on the node instead of being looked up again by whoever draws it.
+    run: RoundRun | None = None
 
 
 def index_workspace(
@@ -306,8 +329,15 @@ def inspect_round(
         )
     run_dir = find_latest_run(runs_dir, round_file.id)
     status = "not_reviewed"
+    run: RoundRun | None = None
     if run_dir is not None:
-        status = _status_from_run(run_dir)
+        # One read of `summary.json` answers two questions — the badge, and the KPIs the
+        # pane draws — so the run is carried on the node instead of being re-opened by
+        # whoever asks later. An in-flight run has a directory and no summary yet; the
+        # `RoundRun` is still built so the row can say "a run is here, no result yet".
+        summary = _read_json(run_dir / "summary.json")
+        run = RoundRun(path=run_dir, summary=summary)
+        status = _status_from_summary(summary)
         children = _apply_run_status(children, run_dir)
     return TreeNode(
         key=key,
@@ -322,6 +352,7 @@ def inspect_round(
         startable=True,
         environment=round_file.environment,
         project=project_id,
+        run=run,
     )
 
 
@@ -358,6 +389,22 @@ def parent_round(nodes: tuple[TreeNode, ...], key: str) -> TreeNode | None:
         # know, or be trusted to know, which project the case came from.
         return find_node(nodes, keys.for_round(node.project, node.path))
     return None
+
+
+def round_nodes(node: TreeNode) -> tuple[TreeNode, ...]:
+    """Every round at or under `node`, in the tree's own order.
+
+    The list behind a roll-up. A campaign, a folder and a project all answer "which
+    rounds are under me" with this, and the order is the collection's, so the table a
+    reviewer reads and the tree they clicked agree on what comes first instead of
+    each sorting by something else.
+    """
+    if node.kind == "round":
+        return (node,)
+    found: list[TreeNode] = []
+    for child in node.children:
+        found.extend(round_nodes(child))
+    return tuple(found)
 
 
 def find_step_dir(run_dir: Path, case_id: str) -> Path | None:
@@ -532,11 +579,13 @@ def _apply_run_status(children: tuple[TreeNode, ...], run_dir: Path) -> tuple[Tr
     return tuple(updated)
 
 
-def _status_from_run(run_dir: Path) -> str:
-    summary_path = run_dir / "summary.json"
-    if not summary_path.is_file():
-        return "not_reviewed"
-    summary = _read_json(summary_path)
+def _status_from_summary(summary: dict[str, Any]) -> str:
+    """The badge a run's own counts earn, or `not_reviewed` when it wrote none.
+
+    A directory with no `summary.json` — a run still in flight — reads as unread, and
+    not as a pass. That is the same answer `_read_json`'s empty dict earns here, so an
+    in-flight run and a run that never wrote a summary are one case and one branch.
+    """
     counts = summary.get("counts") if isinstance(summary, dict) else None
     if not isinstance(counts, dict):
         return "not_reviewed"

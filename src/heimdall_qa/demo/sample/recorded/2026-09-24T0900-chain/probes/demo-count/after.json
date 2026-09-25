@@ -1,0 +1,11 @@
+{
+  "count": {
+    "jsonpath": "$.count",
+    "value": 4,
+    "status": 200,
+    "body": {
+      "count": 4
+    },
+    "timed_out": false
+  }
+}

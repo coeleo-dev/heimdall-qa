@@ -1,0 +1,13 @@
+# `fields: {}` and a literal path, so this contract demands exactly one case:
+# `demo-health-H01`. A declared required field would pull `N-omit-<field>` in with it,
+# and the demo's green round is meant to be the cheapest thing that runs.
+#
+# `area` is what names the demanded cases. Leave it out and it is derived from the
+# endpoint, which reads worse in a case id than the word the contract is about.
+endpoint: GET /demo/health
+dto: demo.HealthController
+area: demo-health
+auth: none
+idempotency: none
+baseline: baselines/empty.json
+fields: {}

@@ -1,0 +1,26 @@
+# The demo's chain. `demo-items-post-H01` mints the id the API answers with and keeps
+# it; `demo-items-linked-H01` spends it in the next body through `generate: captured.id`.
+#
+# That reduction is the point: the real corpus mints a JWT in A0 and spends it in
+# A1..A4, and both are the same two lines — `capture_response` on the case that
+# mints, `generate: captured.*` on every case that spends. A demo where the second
+# call cannot run without the first is the smallest true instance of it.
+demo-items-post-H01:
+  contract: contracts/demo-items-post.yaml
+  kind: H01
+  tags:
+    - function
+  expect:
+    status: 201
+  capture_response:
+    id: id
+
+demo-items-linked-H01:
+  contract: contracts/demo-items-linked-post.yaml
+  kind: H01
+  tags:
+    - function
+  expect:
+    status: 201
+  generate:
+    parent_id: captured.id

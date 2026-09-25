@@ -18,6 +18,7 @@ from heimdall_qa.workspace import _overlay_queue
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 WALK_HN = FIXTURES / "rounds" / "walk-hn.yaml"
+ORDER_FIRST = FIXTURES / "rounds" / "order-first.yaml"
 H01_ONLY = FIXTURES / "rounds" / "h01-only.yaml"
 TWO_LOOPS = FIXTURES / "rounds" / "two-loops.yaml"
 _DESCRIPTOR = FIXTURES / "qa" / "project.yaml"
@@ -27,6 +28,9 @@ _DESCRIPTOR = FIXTURES / "qa" / "project.yaml"
 PROJECT = id_for(FIXTURES)
 TWO_LOOPS_KEY = keys.for_round(PROJECT, "rounds/two-loops.yaml")
 EXAMPLE_CAMPAIGN = keys.for_campaign(PROJECT, "example-campaign")
+WALK_HN_KEY = keys.for_round(PROJECT, "rounds/walk-hn.yaml")
+ORDER_FIRST_KEY = keys.for_round(PROJECT, "rounds/order-first.yaml")
+INTERLEAVED = keys.for_campaign(PROJECT, "interleaved")
 
 
 def _http() -> httpx.Client:
@@ -416,3 +420,76 @@ def test_the_parked_row_is_named_from_its_position_not_what_is_on_screen(tmp_pat
     assert back.session.pending_index == 1
     assert back.pending_key == second_row
     assert back.pending_key != keys.for_case(PROJECT, "rounds/walk-hn.yaml", "note-H01")
+
+
+def test_a_round_with_history_opens_on_done_though_the_engine_moved_on(tmp_path: Path):
+    """The KPI pane is decided by the disk, not by which unit the engine ran last.
+
+    The pane used to ask the live session for `phase == "done"` and only under
+    `self._is_live(selected)`, so of a campaign's forty rounds exactly one — the last
+    unit, and only until another plan started — could show what its run said. Opening
+    a finished round again showed the start card. The run is indexed on the node, so
+    the pane is `done` for every round that has one.
+    """
+    workspace = _workspace(tmp_path, focus=ORDER_FIRST)
+    workspace.start("round", "review")
+    parked = workspace.wait_settled(timeout=30)
+    assert parked.engine.awaiting
+    workspace.apply_verdict("pass", "", True)
+    settled = workspace.wait_settled(timeout=30)
+    assert settled.selected.run is not None
+    assert settled.pane == "done"
+
+    # A second plan takes the engine off it, so the round is history and not the plan.
+    workspace.select(WALK_HN_KEY)
+    workspace.start("round", "walk")
+    workspace.wait_settled(timeout=30)
+
+    back = workspace.select(ORDER_FIRST_KEY)
+    assert back.pane == "done"
+    assert back.selected.kind == "round"
+    assert back.selected.run is not None
+    assert back.selected.run.summary["counts"]["pass"] == 1
+
+
+def test_a_campaign_roll_up_reads_a_row_per_round_and_only_totals_what_adds_up(
+    tmp_path: Path,
+):
+    """A campaign selection carries the per-endpoint table, not one global number.
+
+    Coverage and latency stay on their rows: the harness does not sum latencies it
+    cannot weight, so there is no campaign p95 to print and the roll-up must not
+    invent one. The totals are the counts, plus the rounds that never ran — the
+    number that answers "how far along is this really".
+    """
+    from heimdall_qa.serve.panel import rollup_extra
+
+    workspace = _workspace(tmp_path, focus=ORDER_FIRST)
+    workspace.start("round", "review")
+    workspace.wait_settled(timeout=30)
+    workspace.apply_verdict("pass", "", True)
+    workspace.wait_settled(timeout=30)
+
+    node = find_node(workspace.view().tree, INTERLEAVED)
+    extra = rollup_extra(node)
+
+    assert extra["rounds_total"] == 3
+    assert extra["rounds_run"] == 1
+    # The tree's own order — grouped by matrix, not the campaign manifest's. The rows
+    # are the nodes the reader is looking at in the pane above, and the manifest's
+    # order is a dependency order for *execution*, not a reading order for the table.
+    assert [row["round_id"] for row in extra["units"]] == [
+        "order-first",
+        "order-third",
+        "order-second",
+    ]
+    assert extra["totals"]["pass"] == 1
+    assert extra["totals"]["not_run"] == 2
+    for invented in ("p50", "p95", "coverage_pct", "latency_ms"):
+        assert invented not in extra["totals"]
+    # And every row keeps its own latency and coverage, empty where it never ran.
+    for row in extra["units"]:
+        assert "latency_ms" in row and "coverage_pct" in row
+    ran = [row for row in extra["units"] if row["found"]]
+    assert [row["round_id"] for row in ran] == ["order-first"]
+    assert ran[0]["latency_ms"]

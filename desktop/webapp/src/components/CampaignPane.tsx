@@ -4,13 +4,15 @@ import { ArrowRight, Boxes, CheckCircle2, Layers, Play, SkipForward, XCircle } f
 
 import { RunProgress } from "@/components/RunProgress";
 import { LiveMark } from "@/components/LiveMark";
+import { KpiStrip } from "@/components/KpiStrip";
+import type { Kpi } from "@/components/KpiStrip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { isOpen, statusColor, statusLabel, statusVariant } from "@/lib/status";
 import { flatten } from "@/lib/tree";
 import { cn } from "@/lib/utils";
-import type { EngineView, Labels, SessionView, TreeNode, UnitCard } from "@/types";
+import type { EngineView, Labels, RollupRuns, SessionView, TreeNode, UnitCard } from "@/types";
 
 /** A roll-up of a campaign or flow: how many endpoints sit in each state.
  *
@@ -23,6 +25,7 @@ export function CampaignPane({
   session,
   tree,
   labels,
+  rollup,
   busy,
   nextUnreviewed,
   onStart,
@@ -33,6 +36,7 @@ export function CampaignPane({
   session: SessionView;
   tree: TreeNode[];
   labels: Labels;
+  rollup: RollupRuns | null;
   busy: boolean;
   nextUnreviewed: string | null;
   onStart: (scope: string, mode: string) => void;
@@ -269,10 +273,166 @@ export function CampaignPane({
         </Button>
       )}
 
+      {/* The history, after the actions: a reviewer opens this card to run something or
+          to find out how it went, and those are two different moments. */}
+      {rollup && rollup.units.length > 0 && (
+        <RollupSection rollup={rollup} labels={labels} onSelect={onSelect} />
+      )}
+
       <p className="text-[11px] text-muted-foreground">
         Um plano de cada vez. O agente não opera esta UI.
       </p>
     </div>
+  );
+}
+
+/**
+ * A campaign's rounds as their run history: additive totals over one row per endpoint.
+ *
+ * The totals are deliberately half the story. Case counts, pack alerts and the number
+ * of rounds that never ran are sums, so they are summed. Coverage and latency are not:
+ * a p95 over forty rounds is not the average of forty p95s, and a harness that printed
+ * one would be inventing a number it cannot weight. Each row carries its own, and the
+ * note under the table says so rather than leaving the reader to wonder.
+ */
+function RollupSection({
+  rollup,
+  labels,
+  onSelect,
+}: {
+  rollup: RollupRuns;
+  labels: Labels;
+  onSelect: (key: string) => void;
+}) {
+  const totals = rollup.totals;
+  const count = (name: string) => totals[name] ?? 0;
+  const kpis: Kpi[] = [
+    { label: "Casos pass", value: String(count("pass")), tone: count("pass") ? "pass" : "muted" },
+    { label: "Casos falhos", value: String(count("fail")), tone: count("fail") ? "fail" : "muted" },
+    { label: "Pulados", value: String(count("skip")), tone: count("skip") ? "warn" : "muted" },
+    {
+      label: "HTTP 5xx",
+      value: String(count("http_5xx")),
+      tone: count("http_5xx") ? "fail" : "muted",
+    },
+    {
+      label: "Instrumento",
+      value: String(count("instrument")),
+      tone: count("instrument") ? "warn" : "muted",
+    },
+    {
+      label: "Packs fail",
+      value: String(count("packs_fail")),
+      tone: count("packs_fail") ? "fail" : "muted",
+    },
+    {
+      label: "Packs warn",
+      value: String(count("packs_warn")),
+      tone: count("packs_warn") ? "warn" : "muted",
+    },
+    {
+      label: "Logs incompletos",
+      value: String(count("logs_incomplete")),
+      tone: count("logs_incomplete") ? "warn" : "muted",
+    },
+    {
+      label: "Sem run",
+      value: String(count("not_run")),
+      tone: count("not_run") ? "warn" : "muted",
+    },
+  ];
+
+  return (
+    <section className="flex flex-col gap-2">
+      <header className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Últimos runs
+        </h2>
+        <span className="text-[11px] text-muted-foreground">
+          {rollup.rounds_run} de {rollup.rounds_total} endpoints com run
+        </span>
+      </header>
+      <p className="text-[11px] text-muted-foreground">
+        Lido do histórico em disco (<code className="font-mono">summary.json</code>), não do
+        run em memória. Cobertura e latências são por endpoint e não somadas.
+      </p>
+      <KpiStrip items={kpis} />
+      {/* The table scrolls inside its own card rather than widening the window: the
+          pane is where a reviewer reads, and a campaign of forty endpoints must not
+          push the app's own layout sideways. */}
+      <div className="overflow-x-auto rounded-md border border-border/70">
+        <table className="w-full min-w-[30rem] border-collapse text-xs">
+          <thead>
+            <tr className="border-b border-border/60 text-left text-[10px] uppercase tracking-wide text-muted-foreground">
+              <th className="px-2 py-1.5 font-medium">Endpoint</th>
+              <th className="px-2 py-1.5 font-medium">Status</th>
+              <th className="px-2 py-1.5 text-right font-medium">Pass</th>
+              <th className="px-2 py-1.5 text-right font-medium">Fail</th>
+              <th className="hidden px-2 py-1.5 text-right font-medium md:table-cell">
+                Cobertura
+              </th>
+              <th className="hidden px-2 py-1.5 text-right font-medium lg:table-cell">p50</th>
+              <th className="hidden px-2 py-1.5 text-right font-medium lg:table-cell">p95</th>
+              <th className="hidden px-2 py-1.5 font-medium xl:table-cell">Run</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rollup.units.map((row) => (
+              <tr
+                key={row.key}
+                onClick={() => onSelect(row.key)}
+                title={
+                  row.found
+                    ? `Abrir ${row.label} e ver os casos que falharam`
+                    : `Abrir ${row.label} — sem run ainda`
+                }
+                className="cursor-pointer border-b border-border/40 transition-colors last:border-0 hover:bg-accent"
+              >
+                <td className="max-w-[16rem] truncate px-2 py-1 font-mono" title={row.label}>
+                  {row.label}
+                  {row.failed > 0 && (
+                    <span className="ml-1.5 text-[10px] text-status-fail">
+                      {row.failed} falha{row.failed > 1 ? "s" : ""}
+                    </span>
+                  )}
+                </td>
+                <td className="px-2 py-1">
+                  <Badge variant={statusVariant(row.status, labels)}>
+                    {statusLabel(row.status, labels)}
+                  </Badge>
+                </td>
+                <td className="px-2 py-1 text-right font-mono tabular-nums">
+                  {row.found ? (row.counts.pass ?? 0) : "—"}
+                </td>
+                <td
+                  className={cn(
+                    "px-2 py-1 text-right font-mono tabular-nums",
+                    row.counts.fail ? "text-status-fail" : "",
+                  )}
+                >
+                  {row.found ? (row.counts.fail ?? 0) : "—"}
+                </td>
+                <td className="hidden px-2 py-1 text-right font-mono tabular-nums md:table-cell">
+                  {row.found ? `${Math.round(row.coverage_pct)}%` : "—"}
+                </td>
+                <td className="hidden px-2 py-1 text-right font-mono tabular-nums lg:table-cell">
+                  {row.found ? `${Math.round(row.latency_ms.p50 ?? 0)} ms` : "—"}
+                </td>
+                <td className="hidden px-2 py-1 text-right font-mono tabular-nums lg:table-cell">
+                  {row.found ? `${Math.round(row.latency_ms.p95 ?? 0)} ms` : "—"}
+                </td>
+                <td
+                  className="hidden max-w-[12rem] truncate px-2 py-1 font-mono text-[10px] text-muted-foreground xl:table-cell"
+                  title={row.run_path || row.stamp}
+                >
+                  {row.stamp || "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

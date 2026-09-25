@@ -1,0 +1,11 @@
+# A route that always fails. The case expects `200`, because that is what a corpus
+# written from a specification would say, and the demo's point is what happens when
+# the API disagrees: a `fail`, and `http_5xx` counted on its own axis — a 500 is never
+# a pass in a reviewer's eyes, even when a case asked for it.
+endpoint: GET /demo/boom
+dto: demo.BoomController
+area: demo-boom
+auth: none
+idempotency: none
+baseline: baselines/empty.json
+fields: {}

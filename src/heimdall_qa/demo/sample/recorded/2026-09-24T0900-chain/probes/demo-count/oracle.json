@@ -1,0 +1,19 @@
+{
+  "catalog": {
+    "notes": "A captured id carried from the first create into the second, with a probe booking the counter before and after."
+  },
+  "book_total": "0",
+  "surfaces": [
+    {
+      "id": "count",
+      "jsonpath": "$.count",
+      "expect": "increase",
+      "before": 2,
+      "after": 4,
+      "delta": "2",
+      "esperado": "> 2",
+      "lido": 4,
+      "timed_out": false
+    }
+  ]
+}

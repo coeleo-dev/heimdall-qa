@@ -1,0 +1,28 @@
+# Two cases over one 404 envelope, and only the second one is red.
+#
+# `demo-item-notfound-H01` asks for the status, gets it, and the `http.error` pack
+# checks the rest of the envelope it can — a non-empty `error` string and a `traceId`
+# matching the header. That passes.
+#
+# `demo-item-notfound-declared` additionally declares `code: ITEM_NOT_FOUND`, which
+# makes `http.error` compare the body's `code` field to it. `app.py` sends no `code`,
+# so the pack answers `error code mismatch` and the step fails. This is the
+# difference the harness is built on: "it answered" and "it answered what the
+# contract promised" are two questions, and the demo shows the case where the first
+# is true and the second is not.
+demo-item-notfound-H01:
+  contract: contracts/demo-item-notfound-get.yaml
+  kind: H01
+  tags:
+    - function
+  expect:
+    status: 404
+
+demo-item-notfound-declared:
+  contract: contracts/demo-item-notfound-get.yaml
+  kind: N-notfound
+  tags:
+    - function
+  expect:
+    status: 404
+    code: ITEM_NOT_FOUND

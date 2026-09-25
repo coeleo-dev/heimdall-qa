@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Copy, FolderPlus, Plug, RefreshCw, Server, Trash2 } from "lucide-react";
+import { Copy, FolderOpen, FolderPlus, Plug, RefreshCw, Server, Sparkles, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -10,15 +10,15 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
-import { ApiRefusal, fetchMcp, fetchProjects, setMcp } from "@/lib/api";
+import { ApiRefusal, fetchDemo, fetchMcp, fetchProjects, setDemo, setMcp } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import type { McpState, ProjectInfo } from "@/types";
+import type { DemoState, McpState, ProjectInfo } from "@/types";
 
 /**
  * What the process behind the window is doing: its own address, the projects it has
- * open, and the MCP server it can carry.
+ * open, and the two things it can carry — the MCP server and the bundled demo.
  *
- * Three things are deliberate here:
+ * Four things are deliberate here:
  *
  * - **The API is always on and is not a switch.** It is the window's own transport
  *   over loopback with a per-run token; a toggle for it would be a toggle for the
@@ -29,6 +29,9 @@ import type { McpState, ProjectInfo } from "@/types";
  *   away from the thing that needs fixing.
  * - **The snippet is only offered while the server is up.** A URL pasted into another
  *   tool that answers nothing is advice to fail later.
+ * - **The demo switch is one press for three acts.** It starts a mock, materializes a
+ *   project around the port that mock bound, and opens it — because a demo nobody can
+ *   see is not the feature. Turning it off stops the socket and keeps the files.
  *
  * Every mutation here returns the whole bootstrap, so `onChanged` is how the tree
  * learns that a project appeared or left — the dialog does not hold a copy of the tree
@@ -49,6 +52,7 @@ export function ServerDialog({
 }) {
   const toast = useToast();
   const [mcp, setMcpState] = useState<McpState | null>(null);
+  const [demo, setDemoState] = useState<DemoState | null>(null);
   const [registry, setRegistry] = useState("");
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [root, setRoot] = useState("");
@@ -56,10 +60,15 @@ export function ServerDialog({
 
   const reload = useCallback(async () => {
     try {
-      const [state, listed] = await Promise.all([fetchMcp(), fetchProjects()]);
+      const [state, listed, demoState] = await Promise.all([
+        fetchMcp(),
+        fetchProjects(),
+        fetchDemo(),
+      ]);
       setMcpState(state);
       setRegistry(listed.registry);
       setProjects(listed.projects);
+      setDemoState(demoState);
     } catch (failure) {
       toast.push({
         title: "Não foi possível ler o servidor",
@@ -69,8 +78,8 @@ export function ServerDialog({
     }
   }, [toast]);
 
-  // Read on open and never on a timer: the MCP state changes when a person flips the
-  // switch, and the project list changes when a person adds one. Both are here.
+  // Read on open and never on a timer: the switches change when a person flips one,
+  // and the project list changes when a person adds one. Both are here.
   useEffect(() => {
     if (open) void reload();
   }, [open, reload]);
@@ -82,6 +91,35 @@ export function ServerDialog({
       setMcpState(await setMcp(!mcp.enabled));
     } catch (failure) {
       toast.push({ title: "Não foi possível ligar o MCP", detail: describe(failure), variant: "error" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleDemo = async () => {
+    if (!demo) return;
+    setBusy(true);
+    try {
+      setDemoState(await setDemo(!demo.enabled));
+      await reload();
+      // The press adds a project to the tree; the tree is the receipt.
+      onChanged();
+    } catch (failure) {
+      toast.push({ title: "Não foi possível abrir a demonstração", detail: describe(failure), variant: "error" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openDemo = async () => {
+    if (!demo?.root) return;
+    setBusy(true);
+    try {
+      await onAddProject(demo.root);
+      await reload();
+      onChanged();
+    } catch (failure) {
+      toast.push({ title: "Não foi possível abrir", detail: describe(failure), variant: "error" });
     } finally {
       setBusy(false);
     }
@@ -151,7 +189,13 @@ export function ServerDialog({
           <section className="flex flex-col gap-2 rounded border border-border p-2.5">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium">MCP</span>
-              <McpSwitch state={mcp} busy={busy} onToggle={() => void toggleMcp()} />
+              <ToggleSwitch
+                enabled={mcp?.enabled ?? false}
+                ready={mcp !== null}
+                busy={busy}
+                label="Servidor MCP embutido"
+                onToggle={() => void toggleMcp()}
+              />
               {mcp && (
                 <span
                   className={cn(
@@ -201,6 +245,63 @@ export function ServerDialog({
                 <pre className="overflow-x-auto rounded bg-muted p-2 font-mono text-[10px] leading-relaxed">
                   {mcp.config_snippet}
                 </pre>
+              </div>
+            )}
+          </section>
+
+          <section className="flex flex-col gap-2 rounded border border-border p-2.5">
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1 text-xs font-medium">
+                <Sparkles className="size-3" /> Demonstração
+              </span>
+              <ToggleSwitch
+                enabled={demo?.enabled ?? false}
+                ready={demo !== null}
+                busy={busy}
+                label="Projeto de demonstração"
+                onToggle={() => void toggleDemo()}
+              />
+              {demo && (
+                <span
+                  className={cn(
+                    "text-[10px]",
+                    demo.state === "running"
+                      ? "text-status-pass"
+                      : demo.state === "error"
+                        ? "text-status-fail"
+                        : "text-muted-foreground",
+                  )}
+                >
+                  {demo.state === "running"
+                    ? `${demo.host}:${demo.port}`
+                    : demo.state === "error"
+                      ? "não subiu"
+                      : "desligado"}
+                </span>
+              )}
+              {demo?.root && !demoOpen(demo, projects) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="ml-auto h-5 shrink-0 gap-1 px-1.5 text-[10px]"
+                  onClick={() => void openDemo()}
+                  disabled={busy}
+                >
+                  <FolderOpen className="size-3" /> Abrir
+                </Button>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Um projeto de exemplo com casos que passam e casos que falham de propósito.
+              Ligado, sobe uma API de mentira em loopback e materializa o projeto em{" "}
+              <code className="font-mono text-[10px]">{demo?.root || "…"}</code>.
+            </p>
+            {demo?.error && (
+              <div className="rounded border border-status-fail/40 bg-status-fail/10 px-2 py-1.5 text-[11px]">
+                <div className="font-medium text-status-fail">{demo.error.message}</div>
+                {demo.error.hint && (
+                  <div className="mt-0.5 text-muted-foreground">{demo.error.hint}</div>
+                )}
               </div>
             )}
           </section>
@@ -290,31 +391,35 @@ export function ServerDialog({
 }
 
 /**
- * The MCP switch.
+ * The switch the dialog's two optional servers share.
  *
- * `role="switch"` rather than a checkbox: it is one binary setting, and a screen
- * reader should say "ligado" or "desligado" rather than read a form control. It
- * reflects the *server's* state, which is why a failed bind leaves it off — the truth
- * is that nothing is listening.
+ * `role="switch"` rather than a checkbox: it is one binary setting, and a screen reader
+ * should say "ligado" or "desligado" rather than read a form control. It reflects the
+ * *server's* state, which is why a failed bind leaves it off — the truth is that
+ * nothing is listening. `ready` is false until the state has been read, so the switch
+ * cannot be flipped into a request the dialog has no answer for.
  */
-function McpSwitch({
-  state,
+function ToggleSwitch({
+  enabled,
+  ready,
   busy,
+  label,
   onToggle,
 }: {
-  state: McpState | null;
+  enabled: boolean;
+  ready: boolean;
   busy: boolean;
+  label: string;
   onToggle: () => void;
 }) {
-  const enabled = state?.enabled ?? false;
   return (
     <button
       type="button"
       role="switch"
       aria-checked={enabled}
-      aria-label="Servidor MCP embutido"
+      aria-label={label}
       onClick={onToggle}
-      disabled={busy || state === null}
+      disabled={busy || !ready}
       className={cn(
         "relative h-4 w-8 shrink-0 rounded-full border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-50",
         enabled ? "border-primary/60 bg-primary/40" : "border-border bg-muted",
@@ -328,6 +433,11 @@ function McpSwitch({
       />
     </button>
   );
+}
+
+/** Whether the demo's project is already one the tree is drawing. */
+function demoOpen(demo: DemoState, projects: ProjectInfo[]): boolean {
+  return projects.some((project) => project.id === demo.project_id && project.open);
 }
 
 async function copy(text: string, toast: ReturnType<typeof useToast>): Promise<void> {

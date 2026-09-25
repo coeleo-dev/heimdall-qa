@@ -45,6 +45,39 @@ dependency in this distribution. The client draws its own screen in a native win
 which is a different thing — see [`contrib/architecture.md`](contrib/architecture.md)
 §9.2.
 
+### A clone, one command
+
+To work *on* the harness rather than just install it, a clone is one idempotent step:
+
+```bash
+git clone <this repository>
+cd heimdall-qa
+bin/bootstrap
+```
+
+`bin/bootstrap` checks the toolchain, creates `.venv`, installs the core, the Spring
+reader and the `mcp` extra, syncs the agent skills, and on a fresh venv it uses
+`--system-site-packages` so the Linux window can see the system GTK. It needs
+**Python 3.12+**, **Node** (only to rebuild the client's bundle — `pip install` never
+needs it) and, for the desktop window on Linux, `python3-gi` and `gir1.2-webkit2-4.1`.
+A JDK is needed only for the Java fixture. On a box with no GTK — a server, a container
+— `bin/bootstrap --no-desktop` skips Node and the GTK checks and installs everything
+the core, the reader and the suite need.
+
+[`contrib/development.md`](contrib/development.md) is the developer's path: the scripts,
+the test tiers, the client build and its committed-bundle rule, and the failure modes
+with their fix.
+
+### Development scripts
+
+| Script | What it does |
+| --- | --- |
+| `bin/bootstrap [--check] [--no-desktop]` | The fresh-clone checklist above. `--check` asserts what is installed and installs nothing. |
+| `bin/web [--check]` | The client's five checks: `npm ci`, typecheck, lint, test, build, and the committed-bundle drift check. `--check` skips the install. |
+| `bin/verify [--fast]` | The five gates in order; `--fast` skips the two provider gates. |
+| `bin/demo` | Materializes the bundled demo project, runs one green and one red round headless, and prints the run paths. |
+| `bin/sync-skills [--check]` | Regenerates `.cursor/skills/` and `.kiro/skills/` from `.agents/skills/`. |
+
 Run it with **no subcommand** to open that window:
 
 ```bash
@@ -462,8 +495,9 @@ between steps and keeps what already ran. Under it, the last few things that hap
 name — counts going up is not feedback when a campaign is 41 rounds.
 
 The **Servidor** dialog is where the process's own state is: the API (always up, on a
-loopback port), the embedded MCP server and its switch, and the projects this client
-knows about — with add and remove.
+loopback port), the embedded MCP server and its switch, the **Demonstração** switch
+that materializes the bundled demo project, and the projects this client knows about —
+with add and remove.
 
 Left is the **collection**: project → folder → campaign → flow → endpoint → case, with
 status, a search box, status chips (failed / 5xx / not reviewed / not ready) and a
@@ -514,6 +548,19 @@ Two modes:
 At the end: the KPIs as a compact strip (pass/fail/skip/5xx, packs, coverage, p50/p95,
 incomplete logs, human rejection rate), **the cases that failed with a link back to
 each step**, and the run path.
+
+The KPIs are read **from the run directory on disk**, not from the engine's memory of
+what it last ran. That is what makes them survive a restart, a reload, and simply
+selecting away and back: an endpoint opens on the KPIs of its latest run whenever that
+run exists, and only a round that has never been run shows nothing.
+
+A **campaign** (or a folder, or a project) gets a roll-up instead: a totals strip —
+pass/fail/skip/5xx, pack alerts, logs incomplete, and how many of its rounds have never
+run — over **one row per endpoint**, each row the round's own latest run with its
+status, counts, coverage and p50/p95, and a link to each case that failed. Coverage and
+latency stay per row and are never summed: a p95 over forty rounds is not the average
+of forty p95s, so the table shows each and claims no campaign number. Selecting a row
+opens that round on its history.
 
 ## Artifacts of a run
 
@@ -577,6 +624,31 @@ and the fixture's own gate then runs them against the built application —
 `bash examples/spring-fixture/gate.sh`. It is what "this harness measured a Java
 project" means in practice, and the two edits it needs are written down in its
 `README.md`.
+
+### The bundled demo
+
+Both examples above are green on purpose, and neither is package data — so neither can
+show a failure from a wheel. The demo can:
+
+```bash
+bin/demo                          # the terminal door
+```
+
+or the **Demonstração** switch in the client's **Servidor** dialog, or **Abrir o
+projeto de demonstração** in `⌘K`. All three do the same thing: start a deterministic
+mock API on an ephemeral loopback port, copy the sample project out of the wheel into
+`$XDG_DATA_HOME/heimdall-qa/demo/`, point its `base_url` at the port the socket
+actually bound, and open it. The sample ships recorded runs, so the tree, the statuses
+and the step review render with nothing running at all.
+
+It carries a *green* path and every deliberate red one — a case expecting a status the
+API will not give (`fail`), `GET /demo/boom` (`http_5xx`), a route past the budget and a
+`WARN` log line (`warn`), a round that fails `validate` (`not_ready`), a campaign row
+pointing at a file that is not there (`missing`) and a round with no run
+(`not_reviewed`) — plus a suite with a `probe_begin`/`probe` pair and a
+`capture_response` → `generate: captured.*` chain. Its own
+[`README.md`](src/heimdall_qa/demo/sample/README.md) says what each case is for and
+which status it produces.
 
 ## Where a product lives
 
@@ -670,13 +742,15 @@ pytest                        # the core's suite
 pytest packages/spring        # the reader's suite, no JVM required
 HEIMDALL_QA_SLOW=1 pytest     # additionally tries a live API on localhost, and
                               # builds the Spring fixture when a JDK is present
+bin/verify                    # all five gates in order; --fast skips the provider ones
 ```
 
 Pytest does not need any API to be running, and does not need a provider installed.
 The Java parity target has the same rule: its `-m slow` half skips without a JDK, and
 its source-reading half never needed one.
 
-CI runs these plus the five gates from [contrib/README.md](contrib/README.md) on Python
-3.12, 3.13 and 3.14, each from `bin/bootstrap` rather than from a hand-written install —
-so a broken clone fails there and not at a colleague's first command. The workflow is
+CI runs these plus the five gates from [contrib/README.md](contrib/README.md) — the
+list `bin/verify` writes down once — on Python 3.12, 3.13 and 3.14, each from
+`bin/bootstrap` rather than from a hand-written install, so a broken clone fails there
+and not at a colleague's first command. The workflow is
 [.github/workflows/ci.yml](.github/workflows/ci.yml).

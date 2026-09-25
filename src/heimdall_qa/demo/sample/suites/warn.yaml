@@ -1,0 +1,16 @@
+# The two warns, and they are different animals: one is a bad log line on a healthy
+# 200 (`http.success`), the other is a slow 200 against the descriptor's budget
+# (`performance`). Both are `warn` and not `fail` because the round does not declare
+# the dimensions that would promote them.
+id: warn
+catalog:
+  notes: >-
+    WARN in the logs, and 120 ms against a 40 ms budget. Neither fails; both are
+    alerts, which is the distinction the warn status exists for.
+steps:
+  - loop:
+      times: 1
+      case: cases/demo-warn.yaml#demo-warn-H01
+  - loop:
+      times: 1
+      case: cases/demo-slow.yaml#demo-slow-H01

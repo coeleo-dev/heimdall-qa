@@ -1,0 +1,12 @@
+# A round that does not validate. The file itself is well-formed YAML and loads, so
+# `not_ready` here is not "the YAML is broken" — it is the harness refusing to run
+# something whose cases it cannot find. `cases/ghost.yaml` does not exist, and the
+# round is the demo's example of a shape that is right and a reference that is not.
+id: not-ready
+suite: suites/smoke.yaml
+mode: headless
+dimensions:
+  - function
+environment: local
+include:
+  - cases/ghost.yaml#ghost-H01

@@ -1,0 +1,45 @@
+{
+  "results": [
+    {
+      "pack_id": "http.baseline",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "pack_id": "security.leak",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "pack_id": "performance",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "pack_id": "auth.surface",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "pack_id": "mutation",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "pack_id": "observability",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "pack_id": "business.rule",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "pack_id": "http.success",
+      "status": "warn",
+      "detail": "logs contain WARN on the happy path"
+    }
+  ],
+  "logs_incomplete": false
+}

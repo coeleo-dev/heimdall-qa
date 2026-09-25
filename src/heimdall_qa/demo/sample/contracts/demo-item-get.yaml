@@ -1,0 +1,11 @@
+# A lookup that finds something. The path is a literal — `itm_1` — and not a
+# `{{id}}` placeholder, on purpose: `resource_id_in_path: true` would demand the
+# `N-notfound` and `S-bola` cases as well, and the demo wants its 404 shape to be its
+# own contract and its own case, named after what it checks.
+endpoint: GET /demo/items/itm_1
+dto: demo.ItemsController
+area: demo-item
+auth: none
+idempotency: none
+baseline: baselines/empty.json
+fields: {}

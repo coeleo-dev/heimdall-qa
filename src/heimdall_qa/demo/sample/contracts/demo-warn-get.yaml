@@ -1,0 +1,11 @@
+# The warn surface. `app.py` answers 200 and appends a WARN line for the trace, and
+# that one line is the whole case: `http.success` reads WARN on a happy path and
+# returns `warn` (`packs/__init__.py`, `_http_success`). The API is healthy; a log is
+# not.
+endpoint: GET /demo/warn
+dto: demo.WarnController
+area: demo-warn
+auth: none
+idempotency: none
+baseline: baselines/empty.json
+fields: {}

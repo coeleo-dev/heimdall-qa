@@ -1,0 +1,8 @@
+{
+  "method": "GET",
+  "url": "http://127.0.0.1:8130/demo/warn",
+  "headers": {
+    "X-Trace-Id": "heimdall-warn-1"
+  },
+  "body": null
+}

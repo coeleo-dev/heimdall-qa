@@ -10,6 +10,7 @@ stands on its own lives here.
 | Document | What it is |
 | --- | --- |
 | [architecture.md](architecture.md) | **Start here.** The seams: descriptor, `ProjectView`, packs, step kinds, oracle, provider discovery, run storage. |
+| [development.md](development.md) | The developer's path: prerequisites, the scripts, the test tiers, the client build, where things live, and the failure modes. |
 
 [`../README.md`](../README.md) is the CLI reference — every command, what it prints,
 and what it exits with. [`../AGENTS.md`](../AGENTS.md) is for an agent working in this
@@ -37,13 +38,21 @@ guard anything.
 
 ## The gates
 
-A change is done when these are green, not when the suite is.
+A change is done when these are green, not when the suite is. `bin/verify` runs the
+list in order and is the one place it is written down; `--fast` skips the two provider
+gates while iterating.
 
 ```bash
 bin/bootstrap                      # once: venv, the core, the reader, the skills
-pytest                             # the core's suite, and it needs no product
-pytest packages/spring             # the reader's suite, and it needs no JVM
-bin/audit-remote                   # nothing the product owns would be published
+bin/verify                         # the five gates, in order
+```
+
+The five, for reference:
+
+```bash
+.venv/bin/python -m pytest -q                       # the core's suite, no product needed
+.venv/bin/python -m pytest -q packages/spring       # the reader's suite, no JVM needed
+bin/audit-remote                      # nothing the product owns would be published
 bash examples/toy-provider/gate.sh    # a clean wheel still measures an API
 bash examples/spring-fixture/gate.sh  # and still reads Java source
 ```

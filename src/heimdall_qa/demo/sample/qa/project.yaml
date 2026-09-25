@@ -1,0 +1,59 @@
+# The descriptor of the bundled demo project.
+#
+# Short on purpose, and the shortness is the point: a project the harness can review
+# needs an origin, a correlation header, a budget and somewhere the log goes. It does
+# not need a provider, a DTO reader or a credential — `app.py` has no auth, so the
+# `auth.surface` pack passes by declaration rather than by measuring a header nobody
+# sends.
+#
+# `base_url` is the one line `materialize_demo` rewrites. The demo's API binds an
+# ephemeral port, so a fixed number here would be a descriptor pointing at nothing
+# about half the times it was materialized.
+version: 1
+
+project:
+  id: demo
+  name: Demo project
+
+environments:
+  local:
+    base_url: http://127.0.0.1:8130
+
+# The header the harness stamps on every request. `app.py` echoes it and writes it
+# into its log line, which is what makes the correlation packs measured instead of
+# skipped — and the demo exists to show measured packs.
+trace:
+  header: X-Trace-Id
+  prefix: "heimdall-"
+
+# Two routes, and the longer prefix is declared first only for readability: the
+# longest matching prefix wins whatever the order here, so `/demo/slow` is held to the
+# slow budget and everything else under `/demo/` to the default one.
+routes:
+  - prefix: /demo/slow
+    auth: none
+    budget: slow
+  - prefix: /demo/
+    auth: none
+    budget: default
+
+# Milliseconds, and the two numbers mean different things. Exceeding `budget` is a
+# warning on a round that does not declare the `performance` dimension; exceeding
+# `fail` is a failure on any round. `/demo/slow` waits 120 ms against a 40 ms budget,
+# which is how a `warn` about time — as opposed to a `warn` about a log line — is
+# reachable without making anyone wait.
+budgets:
+  slow:
+    budget: 40
+    fail: 4000
+  default:
+    budget: 500
+    fail: 4000
+
+# One source, and the whole of the correlation story. `app.py` appends one line per
+# request carrying the trace id, and the default marker is the id itself, so no
+# `marker:` regex is needed — a demo should not need a regex to be read.
+log_sources:
+  - id: web
+    path: ../demo.log
+    format: text

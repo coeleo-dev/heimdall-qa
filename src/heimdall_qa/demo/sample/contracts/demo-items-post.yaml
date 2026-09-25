@@ -1,0 +1,14 @@
+# The create. The body is the baseline's literal and no field is declared, so one case
+# covers the whole endpoint — `demo-items-post-H01`.
+#
+# It is also the head of the demo's chain: that case captures the `id` out of the
+# response, and `demo-chain.yaml`'s case spends it. A chain is how a real corpus
+# carries a minted credential forward, and the `captured.*` generator is the whole
+# mechanism reduced to one key.
+endpoint: POST /demo/items
+dto: demo.ItemsController
+area: demo-items-post
+auth: none
+idempotency: none
+baseline: baselines/item.json
+fields: {}

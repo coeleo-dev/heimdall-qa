@@ -1,0 +1,14 @@
+{
+  "status": 500,
+  "headers": {
+    "date": "Fri, 25 Sep 2026 18:29:01 GMT",
+    "server": "uvicorn",
+    "content-length": "66",
+    "content-type": "application/json",
+    "x-trace-id": "heimdall-boom-1"
+  },
+  "body": {
+    "error": "the demo failed on purpose",
+    "traceId": "heimdall-boom-1"
+  }
+}

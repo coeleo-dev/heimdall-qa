@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { CampaignPane } from "@/components/CampaignPane";
-import type { EngineView, Labels, SessionView, TreeNode, UnitCard } from "@/types";
+import type { EngineView, Labels, RollupRuns, SessionView, TreeNode, UnitCard } from "@/types";
 
 /** What the campaign roll-up shows once a plan is over.
  *
@@ -137,7 +137,7 @@ function engine(overrides: Partial<EngineView>): EngineView {
   };
 }
 
-function renderPane(view: EngineView, live: string) {
+function renderPane(view: EngineView, live: string, rollup: RollupRuns | null = null) {
   const onStart = vi.fn();
   const onSelect = vi.fn();
   render(
@@ -147,6 +147,7 @@ function renderPane(view: EngineView, live: string) {
       session={SESSION}
       tree={tree(live)}
       labels={LABELS}
+      rollup={rollup}
       busy={view.busy}
       nextUnreviewed={null}
       onStart={onStart}
@@ -155,6 +156,59 @@ function renderPane(view: EngineView, live: string) {
   );
   return { onStart, onSelect };
 }
+
+/** Two endpoints, one green and one red, with the additive totals over both. */
+const ROLLUP: RollupRuns = {
+  totals: {
+    pass: 5,
+    fail: 2,
+    skip: 0,
+    http_5xx: 1,
+    instrument: 0,
+    packs_fail: 3,
+    packs_warn: 1,
+    logs_incomplete: 0,
+    not_run: 0,
+  },
+  units: [
+    {
+      key: ROUND_KEY,
+      label: "GET /toy/health",
+      round_id: "smoke",
+      endpoint: "GET /toy/health",
+      run_path: "/runs/2026-09-25T1351-smoke",
+      found: true,
+      status: "pass",
+      counts: { pass: 3, fail: 0, skip: 0, http_5xx: 0, instrument: 0 },
+      packs: { fail: 0, warn: 1 },
+      coverage_pct: 100,
+      latency_ms: { p50: 12, p95: 30 },
+      mode: "review",
+      stamp: "2026-09-25T1351-smoke",
+      logs_incomplete: 0,
+      failed: 0,
+    },
+    {
+      key: "round:proj:rounds/boom.yaml",
+      label: "POST /toy/items",
+      round_id: "items",
+      endpoint: "POST /toy/items",
+      run_path: "/runs/2026-09-25T1352-items",
+      found: true,
+      status: "fail",
+      counts: { pass: 2, fail: 2, skip: 0, http_5xx: 1, instrument: 0 },
+      packs: { fail: 3, warn: 0 },
+      coverage_pct: 50,
+      latency_ms: { p50: 40, p95: 90 },
+      mode: "review",
+      stamp: "2026-09-25T1352-items",
+      logs_incomplete: 0,
+      failed: 2,
+    },
+  ],
+  rounds_total: 2,
+  rounds_run: 2,
+};
 
 describe("CampaignPane", () => {
   it("offers the Start buttons again once the campaign's plan has finished", () => {
@@ -179,5 +233,40 @@ describe("CampaignPane", () => {
     renderPane(engine({ phase: "running", finished: false, busy: true }), "");
 
     expect(screen.getByText(/O plano em andamento é deste item/)).toBeInTheDocument();
+  });
+
+  it("shows the campaign's run history when there is any", () => {
+    renderPane(engine({ phase: "done", finished: true, busy: false }), "", ROLLUP);
+
+    // One row per endpoint, from the roll-up and not from the tree: the tree's rows
+    // carry a badge, and a badge is not a count.
+    expect(screen.getByText("Últimos runs")).toBeInTheDocument();
+    expect(screen.getByText("2 de 2 endpoints com run")).toBeInTheDocument();
+    expect(screen.getByText("GET /toy/health")).toBeInTheDocument();
+    expect(screen.getByText("POST /toy/items")).toBeInTheDocument();
+    // The additive totals are summed; the latencies and coverage are per row and
+    // never summed, which is why the table shows each and the note says so.
+    expect(screen.getByText("Casos pass")).toBeInTheDocument();
+    expect(screen.getByText("Sem run")).toBeInTheDocument();
+    expect(screen.getByText("100%")).toBeInTheDocument();
+    expect(screen.getByText("50%")).toBeInTheDocument();
+    expect(screen.getByText("12 ms")).toBeInTheDocument();
+    expect(screen.getByText("90 ms")).toBeInTheDocument();
+    // And the row says how many cases to reopen without claiming to know their names.
+    expect(screen.getByText("2 falhas")).toBeInTheDocument();
+  });
+
+  it("says nothing about history when no round of the campaign has run", () => {
+    renderPane(engine({ phase: "idle", finished: false, busy: false }), "");
+
+    expect(screen.queryByText("Últimos runs")).not.toBeInTheDocument();
+  });
+
+  it("opens the endpoint a row names when it is clicked", async () => {
+    const { onSelect } = renderPane(engine({ phase: "done", finished: true, busy: false }), "", ROLLUP);
+
+    screen.getByText("POST /toy/items").closest("tr")?.click();
+
+    expect(onSelect).toHaveBeenCalledWith("round:proj:rounds/boom.yaml");
   });
 });

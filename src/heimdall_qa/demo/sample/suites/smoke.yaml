@@ -1,0 +1,20 @@
+# The green round. Four cases, no mutation ordering, nothing red — the baseline a
+# reviewer checks the tree against before believing any red one.
+id: smoke
+catalog:
+  notes: >-
+    The happy path of the demo API: a health read, a lookup that finds, the counter,
+    and one 404 whose envelope is complete. Every one of them is a `pass`.
+steps:
+  - loop:
+      times: 1
+      case: cases/demo-health.yaml#demo-health-H01
+  - loop:
+      times: 1
+      case: cases/demo-item.yaml#demo-item-H01
+  - loop:
+      times: 1
+      case: cases/demo-count.yaml#demo-count-H01
+  - loop:
+      times: 1
+      case: cases/demo-item-notfound.yaml#demo-item-notfound-H01

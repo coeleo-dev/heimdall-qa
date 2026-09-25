@@ -1,0 +1,9 @@
+# One 500, alone, so the demo can show `http_5xx` without a second red beside it.
+id: boom
+suite: suites/boom.yaml
+mode: headless
+dimensions:
+  - function
+environment: local
+include:
+  - cases/demo-boom.yaml#demo-boom-H01

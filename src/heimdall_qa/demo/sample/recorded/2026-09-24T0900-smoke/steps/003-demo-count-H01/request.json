@@ -1,0 +1,8 @@
+{
+  "method": "GET",
+  "url": "http://127.0.0.1:8130/demo/count",
+  "headers": {
+    "X-Trace-Id": "heimdall-smoke-3"
+  },
+  "body": null
+}

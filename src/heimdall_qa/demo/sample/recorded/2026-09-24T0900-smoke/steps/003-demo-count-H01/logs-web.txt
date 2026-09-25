@@ -1,0 +1,1 @@
+2026-09-25 18:29:00 [vt] INFO  c.d.DemoApplication - trace_id: [heimdall-smoke-3] - count read

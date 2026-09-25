@@ -1,0 +1,9 @@
+# A lookup that finds. `itm_1` is declared in `app.py`'s `ITEMS`, so this is a plain
+# 200 and the case exists to be the green half of the 404 pair beside it.
+demo-item-H01:
+  contract: contracts/demo-item-get.yaml
+  kind: H01
+  tags:
+    - function
+  expect:
+    status: 200

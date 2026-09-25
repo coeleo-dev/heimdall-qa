@@ -1,0 +1,11 @@
+# One route, one red: the 500. Kept alone so the demo can point at a run where
+# `http_5xx` is the only number that moved.
+id: boom
+catalog:
+  notes: >-
+    A single case on a route that always answers 500, so `http_5xx` is one and
+    nothing else in the run is.
+steps:
+  - loop:
+      times: 1
+      case: cases/demo-boom.yaml#demo-boom-H01

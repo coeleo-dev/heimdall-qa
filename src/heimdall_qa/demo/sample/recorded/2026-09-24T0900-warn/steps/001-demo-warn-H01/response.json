@@ -1,0 +1,13 @@
+{
+  "status": 200,
+  "headers": {
+    "date": "Fri, 25 Sep 2026 18:29:02 GMT",
+    "server": "uvicorn",
+    "content-length": "15",
+    "content-type": "application/json",
+    "x-trace-id": "heimdall-warn-1"
+  },
+  "body": {
+    "status": "ok"
+  }
+}

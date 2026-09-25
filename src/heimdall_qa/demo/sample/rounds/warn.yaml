@@ -1,0 +1,11 @@
+# The two warns. `function` only: the round does not declare `performance`, which is
+# exactly why the slow route is a warn here and a fail on a round that does.
+id: warn
+suite: suites/warn.yaml
+mode: headless
+dimensions:
+  - function
+environment: local
+include:
+  - cases/demo-warn.yaml#demo-warn-H01
+  - cases/demo-slow.yaml#demo-slow-H01

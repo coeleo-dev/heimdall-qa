@@ -1,0 +1,46 @@
+# The manifest the roll-up is read from, and the demo's whole vocabulary in one place.
+#
+# One row per round, and the endpoints are unique because the schema refuses a
+# duplicate label — which is why the two counter rounds carry different ones. The
+# `rounds/absent.yaml` row is deliberate: a manifest that lists a round nobody wrote
+# is the only way to get a `missing` node, and the roll-up has to survive it.
+#
+# The `rounds/not-ready.yaml` row is deliberate for the same reason. A campaign is a
+# manifest of intentions, and a reviewer who has not run everything yet is the normal
+# state — the table says which rows are `not_reviewed` and which are broken, and it
+# does not refuse to draw because one is.
+id: demo
+environment: local
+rounds:
+  - round: rounds/smoke.yaml
+    endpoint: GET /demo/health
+    matrix: A4
+    auth: none
+  - round: rounds/chain.yaml
+    endpoint: POST /demo/items
+    matrix: A4
+    auth: none
+  - round: rounds/unrun.yaml
+    endpoint: GET /demo/count
+    matrix: A4
+    auth: none
+  - round: rounds/boom.yaml
+    endpoint: GET /demo/boom
+    matrix: B1
+    auth: none
+  - round: rounds/warn.yaml
+    endpoint: GET /demo/warn
+    matrix: B1
+    auth: none
+  - round: rounds/red.yaml
+    endpoint: GET /demo/count (erro esperado)
+    matrix: B1
+    auth: none
+  - round: rounds/not-ready.yaml
+    endpoint: GET /demo/ghost
+    matrix: B1
+    auth: none
+  - round: rounds/absent.yaml
+    endpoint: GET /demo/absent
+    matrix: B1
+    auth: none

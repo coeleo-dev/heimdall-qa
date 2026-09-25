@@ -1,0 +1,10 @@
+# The plain red. A `fail` with no 5xx and no warn, which is the status a demo built
+# only from green and 500 would leave out.
+id: red
+suite: suites/red.yaml
+mode: headless
+dimensions:
+  - function
+environment: local
+include:
+  - cases/demo-count.yaml#demo-count-wrong-status

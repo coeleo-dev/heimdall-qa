@@ -1,0 +1,16 @@
+# The 404 shape, on its own contract and its own area.
+#
+# `app.py` answers this with `{"error": "no item with id ghost", "traceId": "<the
+# request's>"}` and no `code` field. That is what makes the demo's red round red:
+# `demo-item-notfound-H01` asks for the status and passes, and
+# `demo-item-notfound-H01-declared` also asks for the declared business code and
+# fails on the pack that reads it. Two cases, one envelope, and only the second one
+# finds anything wrong — which is the difference between "it answered" and "it
+# answered what the contract promised".
+endpoint: GET /demo/items/ghost
+dto: demo.ItemsController
+area: demo-item-notfound
+auth: none
+idempotency: none
+baseline: baselines/empty.json
+fields: {}

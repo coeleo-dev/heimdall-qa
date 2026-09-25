@@ -1,0 +1,29 @@
+# The probe, and the only numeric surface in the demo.
+#
+# `probe_begin` photographs `/demo/count` before anything runs. The two loops then
+# create two items — `demo-items-post-H01` mints the id, `demo-items-linked` spends
+# it — and the `probe` compares the counter to the photograph: `increase`.
+#
+# Three things are reachable here that no other demo round shows: the `Conferência`
+# step kind in the tree, the probe pause reason on a round in review mode, and the
+# `captured.*` chain that the *from this case on* scope exists to re-run.
+id: chain
+catalog:
+  notes: >-
+    A captured id carried from the first create into the second, with a probe
+    booking the counter before and after.
+steps:
+  - probe_begin: demo-count
+  - loop:
+      times: 1
+      case: cases/demo-items.yaml#demo-items-post-H01
+  - loop:
+      times: 1
+      case: cases/demo-items.yaml#demo-items-linked-H01
+  - probe:
+      id: demo-count
+      surfaces:
+        - id: count
+          get: /demo/count
+          jsonpath: $.count
+          expect: increase

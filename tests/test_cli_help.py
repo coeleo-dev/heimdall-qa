@@ -87,21 +87,27 @@ def test_validate_h01_only_round_cli_fails():
 
 
 def test_fastapi_is_confined_to_serve():
-    """Only the serving layer may depend on the web framework.
+    """Only the serving layer, and the shipped mock it is meant to review, use it.
 
     Measured with `ast` and not by searching for the word: this is a rule about
     *imports*, and a docstring that explains which app the desktop shell reuses is not
     a dependency on it. The substring version flagged that prose and would have kept
     flagging every honest sentence about the framework, which is how a real leak would
     eventually get waved through.
+
+    `demo/app.py` is allowed because it is not harness plumbing: it is the fake
+    product the bundled sample reviews, and it only ever runs while the demo switch is
+    on. The confinement that matters — the core never drives a request through the web
+    framework — still holds for everything else under `src/`.
     """
     src = ROOT / "src" / "heimdall_qa"
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     assert "fastapi" in pyproject.lower()
+    allowed = {"serve", "demo"}
     leaked = [
         str(path.relative_to(src))
         for path in sorted(src.rglob("*.py"))
-        if "serve" not in path.parts and _imports_fastapi(path)
+        if not allowed & set(path.parts) and _imports_fastapi(path)
     ]
     assert leaked == []
 

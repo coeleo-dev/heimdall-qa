@@ -1,0 +1,14 @@
+{
+  "status": 201,
+  "headers": {
+    "date": "Fri, 25 Sep 2026 18:29:01 GMT",
+    "server": "uvicorn",
+    "content-length": "30",
+    "content-type": "application/json",
+    "x-trace-id": "heimdall-chain-1"
+  },
+  "body": {
+    "id": "itm_3",
+    "name": "widget"
+  }
+}

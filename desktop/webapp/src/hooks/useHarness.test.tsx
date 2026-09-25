@@ -114,6 +114,7 @@ function bootstrap(state: EngineView): Bootstrap {
     },
     step: null,
     run: null,
+    rollup: null,
     labels: {
       status_label: {},
       status_pill: {},

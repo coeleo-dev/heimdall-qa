@@ -1,0 +1,12 @@
+# The slow route. The round that includes this case does not declare the
+# `performance` dimension, so `performance` and `http.baseline` both return `warn`:
+# 120 ms against the 40 ms budget the descriptor declares for `/demo/slow`. The
+# same case on a round whose `dimensions:` names `performance` fails instead, and
+# that promotion is the whole content of the dimension.
+demo-slow-H01:
+  contract: contracts/demo-slow-get.yaml
+  kind: H01
+  tags:
+    - function
+  expect:
+    status: 200

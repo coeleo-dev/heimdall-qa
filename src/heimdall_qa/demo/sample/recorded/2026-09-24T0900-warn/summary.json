@@ -1,0 +1,29 @@
+{
+  "round_id": "warn",
+  "mode": "headless",
+  "selection": "",
+  "counts": {
+    "pass": 2,
+    "fail": 0,
+    "skip": 0,
+    "http_5xx": 0,
+    "instrument": 0
+  },
+  "packs": {
+    "fail": 0,
+    "warn": 3
+  },
+  "coverage_pct": 100.0,
+  "latency_ms": {
+    "p50": 63.441242498811334,
+    "p95": 118.53614693391137
+  },
+  "logs_incomplete": 0,
+  "human_reject_rate": 0.0,
+  "review_duration_ms": 133.5842029657215,
+  "oracle": "neutral",
+  "descriptor": {
+    "origin": "target",
+    "path": "qa/project.yaml"
+  }
+}

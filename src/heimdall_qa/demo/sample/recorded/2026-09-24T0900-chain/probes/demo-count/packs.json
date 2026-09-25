@@ -1,0 +1,14 @@
+{
+  "results": [
+    {
+      "pack_id": "values.oracle",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "pack_id": "values.consistency",
+      "status": "pass",
+      "detail": ""
+    }
+  ]
+}

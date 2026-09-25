@@ -1,0 +1,7 @@
+{
+  "status": "fail",
+  "actor": "auto",
+  "comment": "HTTP 200",
+  "continue": true,
+  "cause": "product"
+}

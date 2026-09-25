@@ -1,32 +1,42 @@
 #!/usr/bin/env bash
 # A fresh clone, one command from running anything.
 #
-# The harness is three installable pieces and two toolchains: the core, the Spring
-# reader that reads a Java target, and an interpreter and a JDK to run them with. A
-# colleague who clones this repository has to get all five right before the first
-# `heimdall-qa validate`, and every one of them fails in a different way. This script
-# is that checklist, in the order it has to happen, written down once.
+# The harness is three installable pieces and three toolchains: the core, the Spring
+# reader that reads a Java target, the client's bundle, and an interpreter, a JDK and
+# Node to run and rebuild them. A colleague who clones this repository has to get all
+# of them right before the first `heimdall-qa validate`, and every one fails in a
+# different way. This script is that checklist, in the order it has to happen, written
+# down once.
 #
-# It is idempotent: run it again after a `git pull` and it installs what is missing.
-# It touches nothing outside `.venv/` and the toolchain caches pip and Maven keep.
+# It is idempotent: run it again after a `git pull` and it installs what is missing. It
+# touches nothing outside `.venv/`, `desktop/webapp/node_modules/` and the toolchain
+# caches pip, Maven and npm keep.
 #
-# Usage: bin/bootstrap [--check]
+# Usage: bin/bootstrap [--check] [--no-desktop]
+#
+#   --check        assert what is already installed, install nothing
+#   --no-desktop   skip Node and the GTK checks: the core, the reader and the suite
+#                  work without a window, which is what a server or a CI box wants
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="$REPO/.venv"
+WEBAPP="$REPO/desktop/webapp"
 PYTHON_BIN="${PYTHON:-python3}"
 JAVA_MIN="${JAVA_MIN:-25}"
 CHECK=""
+DESKTOP=1
 
 for argument in "$@"; do
     case "$argument" in
         --check) CHECK=1 ;;
-        *) echo "usage: bootstrap [--check]" >&2; exit 2 ;;
+        --no-desktop) DESKTOP="" ;;
+        *) echo "usage: bootstrap [--check] [--no-desktop]" >&2; exit 2 ;;
     esac
 done
 
 step() { printf '\n== %s\n' "$1"; }
+note() { printf '   %s\n' "$1"; }
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 
 step "python"
@@ -44,27 +54,47 @@ step "java"
 if command -v java >/dev/null; then
     JAVA_VERSION="$(java -version 2>&1 | sed -n 's/.*version "\([0-9]*\).*/\1/p' | head -1)"
     if [ -n "$JAVA_VERSION" ] && [ "$JAVA_VERSION" -lt "$JAVA_MIN" ]; then
-        echo "java $JAVA_VERSION found; the fixture needs $JAVA_MIN+" >&2
-        echo "the harness still works — only the Java proof target needs the JDK" >&2
+        note "java $JAVA_VERSION found; the fixture needs $JAVA_MIN+"
+        note "the harness still works — only the Java proof target needs the JDK"
     else
         java -version 2>&1 | head -1
     fi
 else
-    echo "no java on PATH: the core runs, the Java fixture does not" >&2
+    note "no java on PATH: the core runs, the Java fixture does not"
 fi
 
 step "the venv"
+# The window draws through the system GTK/WebKit on Linux, whose `gi` binding belongs
+# to the *system* Python. A venv on a different interpreter cannot see it, and the
+# failure that produces (`DESKTOP_NO_PYWEBVIEW`) is reported by the shell at the worst
+# moment — so a fresh venv is created with `--system-site-packages` here, which is the
+# one flag whose absence the README documents and this script never applied.
+VENV_ARGS=()
+VENV_NOTE=""
+if [ "$(uname -s)" = "Linux" ] && [ -n "$DESKTOP" ]; then
+    VENV_ARGS+=(--system-site-packages)
+    VENV_NOTE=" (with --system-site-packages)"
+fi
 if [ -d "$VENV" ]; then
     echo "$VENV exists"
 else
-    "$PYTHON_BIN" -m venv "$VENV"
-    echo "created $VENV"
+    "$PYTHON_BIN" -m venv "${VENV_ARGS[@]}" "$VENV"
+    echo "created $VENV$VENV_NOTE"
 fi
 
 if [ -n "$CHECK" ]; then
     "$VENV/bin/python" -c "import heimdall_qa, heimdall_qa_spring" 2>/dev/null \
         || fail "the venv is missing an install; run bin/bootstrap without --check"
-    echo "core and spring reader import"
+    "$VENV/bin/python" -c "import heimdall_qa.demo.sample" 2>/dev/null \
+        || fail "the bundled demo is missing; reinstall the core"
+    echo "core, reader and demo import"
+    if [ -n "$DESKTOP" ]; then
+        [ -f "$REPO/src/heimdall_qa/desktop/webapp/index.html" ] \
+            || fail "the client bundle is absent; run bin/web or npm run build"
+        [ -d "$WEBAPP/node_modules" ] \
+            || fail "desktop/webapp/node_modules is absent; run bin/web"
+        echo "the client bundle and its node_modules are present"
+    fi
     exit 0
 fi
 
@@ -72,10 +102,48 @@ step "the core and the reader"
 # The reader is its own distribution on purpose (ADR-04): a project that never reads
 # Java never installs it. Editable, so a clone measures the working tree.
 "$VENV/bin/python" -m pip install --quiet --upgrade pip
-# The `dev` extra is pytest: what the suite below needs and a run does not. Installing
-# it here is the difference between a clone that runs and a clone that can be checked.
-"$VENV/bin/python" -m pip install --quiet -e "$REPO[dev]"
+# `dev` is pytest; `mcp` is the SDK the embedded MCP server speaks. Installing both
+# here is the difference between a clone that runs and a clone that can be checked and
+# driven by a model.
+"$VENV/bin/python" -m pip install --quiet -e "$REPO[dev,mcp]"
 "$VENV/bin/python" -m pip install --quiet -e "$REPO/packages/spring"
+
+if [ -n "$DESKTOP" ]; then
+    step "node"
+    # Node is needed to *rebuild* the client, never to run it: the built bundle is
+    # committed so `pip install` is enough. Vite 7 wants 20.19+ or 22.12+.
+    if command -v node >/dev/null; then
+        NODE_VERSION="$(node --version | sed -n 's/^v\([0-9]*\).*/\1/p')"
+        if [ -n "$NODE_VERSION" ] && [ "$NODE_VERSION" -lt 20 ]; then
+            note "node $(node --version) is too old for the client build; 20.19+ or 22.12+"
+            note "the harness still runs — only `bin/web` needs it"
+        else
+            node --version
+            step "the client's dependencies"
+            # `ci` and not `install`: the lockfile is the build, and this is where a
+            # clone gets exactly the tree CI does.
+            (cd "$WEBAPP" && npm ci)
+        fi
+    else
+        note "no node on PATH: the committed bundle runs, `bin/web` does not"
+    fi
+
+    if [ "$(uname -s)" = "Linux" ]; then
+        step "the desktop's GTK"
+        if "$VENV/bin/python" -c "import gi" 2>/dev/null; then
+            echo "python3-gi is importable from $VENV"
+        else
+            note "the window needs the system GTK + WebKit2GTK bindings:"
+            note "    sudo apt install python3-gi gir1.2-webkit2-4.1"
+            note "and a venv made with --system-site-packages (this script does that"
+            note "for a fresh one). Until then, \`heimdall-qa serve\` is the same client"
+            note "in a browser and needs none of it, or re-run with --no-desktop."
+        fi
+    fi
+else
+    step "the desktop"
+    note "--no-desktop: skipped Node, the client build and the GTK checks"
+fi
 
 step "the skills every agent reads"
 "$REPO/bin/sync-skills"
@@ -84,15 +152,15 @@ step "ready"
 "$VENV/bin/heimdall-qa" validate --explain >/dev/null
 cat <<'EOF'
 
+  the bundled demo, terminal first:
+      bin/demo                         # materialize it, run one green and one red round
+
+  the whole gate list, in one command:
+      bin/verify                       # add --fast to skip the two provider gates
+
   the demo, with the Java fixture:
-      examples/spring-fixture/demo.sh              # app + review UI on 7878
-      examples/spring-fixture/demo.sh --headless   # app, round, summary
+      examples/spring-fixture/demo.sh
 
   the same, with no product on disk:
       examples/toy-provider/gate.sh
-
-  both gates, and the suite itself, before trusting a change:
-      .venv/bin/python -m pytest -q
-      bash examples/spring-fixture/gate.sh
-      bash examples/toy-provider/gate.sh
 EOF

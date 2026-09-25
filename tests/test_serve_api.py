@@ -16,10 +16,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from heimdall_qa import keys
+from heimdall_qa.demo.sample import DemoService
+from heimdall_qa.projects import ProjectsRegistry
 from heimdall_qa.projects import id_for
 from heimdall_qa.serve import api
 from heimdall_qa.serve.app import create_app
 from heimdall_qa.serve.models import BootstrapModel
+from heimdall_qa.serve.models import DemoModel
 from heimdall_qa.serve.models import RunAggregateModel
 from heimdall_qa.serve.models import StepModel
 from heimdall_qa.serve.models import StreamModel
@@ -108,6 +111,10 @@ def test_bootstrap_validates_against_the_model(tmp_path: Path):
     # than an empty object a client would have to guess about.
     assert model.step is None
     assert model.run is None
+    # And no roll-up: the start pane is a unit card, not a campaign table. `None`
+    # rather than an empty table, so the client can tell "there is no roll-up here"
+    # from "there is one and it has nothing in it".
+    assert model.rollup is None
 
 
 def test_the_contract_refuses_a_field_it_was_not_taught(tmp_path: Path):
@@ -399,3 +406,85 @@ def test_the_revision_moves_when_a_plan_starts(tmp_path: Path):
     assert client.app.state.workspace.engine_revision() == settled
     client.app.state.workspace.cancel()
     client.app.state.workspace.wait_settled(timeout=30)
+
+
+# -- the bundled demo -----------------------------------------------------
+
+
+def _demo_app(tmp_path: Path):
+    """`_app` with a demo the test owns: a throwaway registry and data directory.
+
+    The two are passed in for the reason `create_app` documents — a suite that pressed
+    the button on the real service would write a project into the home of whoever ran
+    it and bind a socket they did not ask for.
+    """
+    demo = DemoService(data_dir=tmp_path / "demo-data")
+    return create_app(
+        session=RoundSession(
+            WALK_HN,
+            root=FIXTURES,
+            config=config_for(
+                project_at(_DESCRIPTOR, web=str(tmp_path / "web.log"), worker=str(tmp_path / "worker.log"))
+            ),
+            client=httpx.Client(transport=httpx.MockTransport(_handler()), timeout=10.0),
+            runs_dir=tmp_path / "runs",
+        ),
+        api_token="test-token",
+        webapp=stub_client(tmp_path),
+        registry=ProjectsRegistry(tmp_path / "projects.yaml"),
+        demo=demo,
+    ), demo
+
+
+def test_the_demo_is_off_until_the_button_is_pressed(tmp_path: Path):
+    """Constructing the app binds nothing: a switch that was already on would be a
+    socket nobody asked for, and a project appearing in the tree uninvited."""
+    app, demo = _demo_app(tmp_path)
+    with TestClient(app, follow_redirects=False) as client:
+        response = client.get("/api/demo", headers=_headers())
+        _busy(response)
+        model = DemoModel.model_validate(response.json())
+        assert model.state == "stopped"
+        assert model.enabled is False
+        assert model.port == 0
+        assert model.root == str(demo.root)
+        # The descriptor does not exist until materialization, and the answer says so
+        # rather than promising a project that is not there.
+        assert not Path(model.root).exists()
+
+
+def test_pressing_the_demo_button_materializes_starts_and_opens(tmp_path: Path):
+    """The whole act: a socket, a project pointed at it, and it in the tree."""
+    app, demo = _demo_app(tmp_path)
+    with TestClient(app, follow_redirects=False) as client:
+        response = client.post("/api/demo", json={"enabled": True}, headers=_headers())
+        _busy(response)
+        model = DemoModel.model_validate(response.json())
+        assert model.enabled is True
+        assert model.port > 0
+        assert model.base_url == f"http://{model.host}:{model.port}"
+        # The descriptor was rewritten to the port the kernel actually chose, not to
+        # the `:0` the runtime asked for.
+        descriptor = Path(model.root) / "qa" / "project.yaml"
+        assert f"base_url: http://127.0.0.1:{model.port}" in descriptor.read_text(
+            encoding="utf-8"
+        )
+        # The shipped evidence landed in an empty `runs/`.
+        assert any((Path(model.root) / "runs").iterdir())
+        # And it is in the tree the client is drawing, under the id the answer names.
+        tree = BootstrapModel.model_validate(
+            client.get("/api/bootstrap", headers=_headers()).json()
+        )
+        assert any(node.key == keys.for_project(model.project_id) for node in tree.tree)
+        # A second press is the same socket, not a second one.
+        again = DemoModel.model_validate(
+            client.post("/api/demo", json={"enabled": True}, headers=_headers()).json()
+        )
+        assert again.port == model.port
+        # Off stops the socket and keeps the files.
+        off = DemoModel.model_validate(
+            client.post("/api/demo", json={"enabled": False}, headers=_headers()).json()
+        )
+        assert off.state == "stopped"
+        assert descriptor.exists()
+        assert demo.root.exists()

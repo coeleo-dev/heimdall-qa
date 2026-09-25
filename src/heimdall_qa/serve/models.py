@@ -261,11 +261,61 @@ class StepModel(ApiModel):
 
 
 class RunAggregateModel(ApiModel):
-    """The end of a run: the KPIs, and the cases worth reopening."""
+    """The end of a run: the KPIs, and the cases worth reopening.
+
+    `unit_key`, `unit_label` and `unit_kind` name the row this aggregate belongs to.
+    They are shipped because a finished round is no longer necessarily the one the
+    engine ran last: the pane can be showing a run from before the app opened, and a
+    screen that took `session.round_id` for the round's name would label it with
+    whatever the engine still remembers — a different round, or an empty string.
+    """
 
     summary: dict[str, Any] = {}
     failed_cases: list[dict[str, Any]] = []
     run_path: str = ""
+    unit_key: str = ""
+    unit_label: str = ""
+    unit_kind: str = ""
+
+
+class RoundRunRowModel(ApiModel):
+    """One round's latest run, as a row of a campaign's roll-up table.
+
+    `found` says a completed run exists; a round whose run is still in flight has a
+    directory and empty counts and must not read as a run that passed. `coverage_pct`
+    and `latency_ms` ride on the *row* and never on a total: the harness cannot weight
+    forty rounds' p95s into one, so it shows each and sums none.
+    """
+
+    key: str
+    label: str
+    round_id: str = ""
+    endpoint: str = ""
+    run_path: str = ""
+    found: bool = False
+    status: str = "not_reviewed"
+    counts: dict[str, int] = {}
+    packs: dict[str, int] = {}
+    coverage_pct: float = 0.0
+    latency_ms: dict[str, float] = {}
+    mode: str = ""
+    stamp: str = ""
+    logs_incomplete: int = 0
+    failed: int = 0
+
+
+class RollupRunsModel(ApiModel):
+    """A campaign, folder, directory or project's rounds, and their additive totals.
+
+    `totals` holds only what can honestly be summed — case counts, pack alerts, runs
+    that never happened. `rounds_total` against `rounds_run` is the "how far along is
+    this really" number no single badge can carry.
+    """
+
+    totals: dict[str, int] = {}
+    units: list[RoundRunRowModel] = []
+    rounds_total: int = 0
+    rounds_run: int = 0
 
 
 class SourceFindingModel(ApiModel):
@@ -380,6 +430,27 @@ class McpModel(ApiModel):
     config_snippet: str = ""
 
 
+class DemoModel(ApiModel):
+    """The bundled demo project, as the Server dialog draws it.
+
+    `state` is the same three-way truth the MCP switch carries, because it is the same
+    kind of thing: a socket this process owns and can fail to bind. `root` is where
+    materialization put the tree, and `project_id` is the id the registry filed it
+    under — the dialog sends neither back, they exist so the reader can see where the
+    demo went and the client can say whether it is already open.
+    """
+
+    enabled: bool
+    state: str
+    host: str
+    port: int
+    base_url: str
+    root: str
+    project_id: str
+    log_path: str = ""
+    error: HarnessErrorModel | None = None
+
+
 class LabelsModel(ApiModel):
     """The review screen's Portuguese words, shipped once per bootstrap.
 
@@ -415,6 +486,10 @@ class BootstrapModel(ApiModel):
     unit: UnitCardModel
     step: StepModel | None = None
     run: RunAggregateModel | None = None
+    #: The per-round table a roll-up selection carries, or `None` when the selection is
+    #: not a roll-up. Shipped here rather than fetched on click because the rows are a
+    #: walk over the tree the same read already built.
+    rollup: RollupRunsModel | None = None
     labels: LabelsModel
     #: The next case the reviewer has not looked at, for the "next" affordance a
     #: campaign ends with. `None` is the honest answer at the end of a campaign.

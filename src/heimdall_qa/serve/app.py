@@ -22,6 +22,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from heimdall_qa.demo.sample import DemoService
 from heimdall_qa.mcp.runtime import DEFAULT_PORT
 from heimdall_qa.mcp.runtime import McpRuntime
 from heimdall_qa.projects import ProjectsRegistry
@@ -33,16 +34,18 @@ from heimdall_qa.workspace import WorkspaceSession
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Let the app come up, and stop the embedded MCP server when it goes down.
+    """Let the app come up, and stop the sockets it owns when it goes down.
 
-    A daemon thread would die with the process anyway; stopping it *here* is what
-    releases the socket before the window exits, so a reviewer who closes and reopens
-    the client does not meet their own stale listener still holding 8765.
+    A daemon thread would die with the process anyway; stopping them *here* is what
+    releases the sockets before the window exits, so a reviewer who closes and reopens
+    the client does not meet their own stale listener still holding 8765 — or the
+    demo's ephemeral port, which is why the demo is stopped in the same place.
     """
     try:
         yield
     finally:
         app.state.mcp.stop()
+        app.state.demo.stop()
 
 
 def create_app(
@@ -53,6 +56,7 @@ def create_app(
     webapp: Path | None = None,
     registry: ProjectsRegistry | None = None,
     mcp_port: int = DEFAULT_PORT,
+    demo: DemoService | None = None,
 ) -> FastAPI:
     """The client over one workspace.
 
@@ -60,9 +64,10 @@ def create_app(
     throwaway directory — including an empty one, which is how `WEBAPP_NOT_BUILT` is
     exercised without moving the real bundle.
 
-    `registry` and `mcp_port` are parameters for the same reason: a test that adds a
-    project must not write into the home of whoever runs the suite, and a test that
-    flips the MCP switch must not fight the real port 8765 for a socket.
+    `registry`, `mcp_port` and `demo` are parameters for the same reason: a test that
+    adds a project must not write into the home of whoever runs the suite, a test that
+    flips the MCP switch must not fight the real port 8765 for a socket, and a test that
+    presses the demo button must not materialize a project into the real data home.
     """
     if workspace is None:
         if session is None:
@@ -88,6 +93,10 @@ def create_app(
     #: when the window opens would be a socket nobody asked for; the reviewer turns it
     #: on from the Server dialog, and it is stopped on shutdown.
     app.state.mcp = McpRuntime(port=mcp_port)
+    #: The bundled demo project, constructed but **not** started. Same rule as the MCP
+    #: server: pressing the button in the Server dialog is what binds a socket and
+    #: materializes the sample, and nothing happens on a window that is merely open.
+    app.state.demo = demo if demo is not None else DemoService()
     #: The JSON surface, registered before the mount so that a mount at `/` cannot
     #: shadow it. See `serve/api.py` for why it needs a token.
     api.install_api(app)

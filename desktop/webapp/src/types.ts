@@ -212,8 +212,70 @@ export interface StepView {
 export interface RunAggregate {
   summary: Record<string, unknown>;
   /** Each failure as a row: the id to read, the verdict, and the node to reopen. */
-  failed_cases: { case_id: string; status: string; key?: string }[];
+  failed_cases: FailedCase[];
   run_path: string;
+  /**
+   * The row this aggregate belongs to. A finished round is no longer necessarily the
+   * one the engine ran last — a campaign roll-up opens any of its rounds — so the
+   * header reads its name from here and not from `session.round_id`, which is
+   * whatever the engine still remembers.
+   */
+  unit_key: string;
+  unit_label: string;
+  unit_kind: string;
+}
+
+/**
+ * One case a finished run decided against.
+ *
+ * `key` is the row to reopen, resolved on the server by walking the round's own cases
+ * forward — a case id cannot name a row of a suite, which lists the same step six
+ * times. `reason` names the packs that decided against it and `step_dir` is the
+ * directory the evidence is in, which is what the row falls back to when the round has
+ * changed shape since the run.
+ */
+export interface FailedCase {
+  case_id: string;
+  status: string;
+  key?: string;
+  reason?: string;
+  step_dir?: string;
+}
+
+/** One round's latest run, as a row of a roll-up table. */
+export interface RoundRunRow {
+  key: string;
+  label: string;
+  round_id: string;
+  endpoint: string;
+  run_path: string;
+  /** A completed run exists. A run still in flight has a path and empty counts. */
+  found: boolean;
+  status: string;
+  counts: Record<string, number>;
+  packs: Record<string, number>;
+  coverage_pct: number;
+  latency_ms: Record<string, number>;
+  mode: string;
+  /** The run directory's name: `<stamp>-<round id>`. */
+  stamp: string;
+  logs_incomplete: number;
+  failed: number;
+}
+
+/**
+ * A campaign, folder, directory or project's rounds, and their additive totals.
+ *
+ * `totals` holds only what can honestly be summed — case counts, pack alerts, runs
+ * that never happened. Coverage and latency ride on each row and are never summed: a
+ * p95 over a campaign is not the average of forty p95s, so the table shows each and
+ * claims none.
+ */
+export interface RollupRuns {
+  totals: Record<string, number>;
+  units: RoundRunRow[];
+  rounds_total: number;
+  rounds_run: number;
 }
 
 /**
@@ -264,6 +326,8 @@ export interface Bootstrap {
   unit: UnitCard;
   step: StepView | null;
   run: RunAggregate | null;
+  /** The per-round table a roll-up selection carries, or `null` for any other pane. */
+  rollup: RollupRuns | null;
   labels: Labels;
   next_unreviewed: string | null;
   /** The tree row a parked plan is waiting on, or `""`. See the server model. */
@@ -310,6 +374,26 @@ export interface McpState {
   state: string;
   error: HarnessError | null;
   config_snippet: string;
+}
+
+/**
+ * The bundled demo project, as the Server dialog draws it.
+ *
+ * The same three-way `state` the MCP switch carries, because it is the same kind of
+ * thing, plus where the materialized tree landed and the id it is registered under.
+ * `root` does not exist until the switch has been on once, so the dialog reads
+ * `state` before promising a path.
+ */
+export interface DemoState {
+  enabled: boolean;
+  state: string;
+  host: string;
+  port: number;
+  base_url: string;
+  root: string;
+  project_id: string;
+  log_path: string;
+  error: HarnessError | null;
 }
 
 export type VerdictStatus = "pass" | "fail" | "fail_stop";

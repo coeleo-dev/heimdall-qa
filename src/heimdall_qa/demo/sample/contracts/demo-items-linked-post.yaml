@@ -1,0 +1,14 @@
+# The second half of the chain, on its own area on purpose.
+#
+# `demo-items-post-H01` and `demo-items-linked-H01` point at the same endpoint, but
+# coverage is counted per contract's `expand()`, and two cases under one area read as
+# 200% — an artefact of the arithmetic, not a finding. Giving the spending case its
+# own area makes each contract expand to exactly one required case and the round
+# report 100%, which is what the demo is trying to show.
+endpoint: POST /demo/items
+dto: demo.ItemsController
+area: demo-items-linked
+auth: none
+idempotency: none
+baseline: baselines/item.json
+fields: {}

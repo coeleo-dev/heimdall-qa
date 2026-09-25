@@ -1,0 +1,13 @@
+# The green round. Headless and dimensioned `function`, which is how every round in
+# this sample that is not deliberately about time is dimensioned.
+id: smoke
+suite: suites/smoke.yaml
+mode: headless
+dimensions:
+  - function
+environment: local
+include:
+  - cases/demo-health.yaml#demo-health-H01
+  - cases/demo-item.yaml#demo-item-H01
+  - cases/demo-count.yaml#demo-count-H01
+  - cases/demo-item-notfound.yaml#demo-item-notfound-H01

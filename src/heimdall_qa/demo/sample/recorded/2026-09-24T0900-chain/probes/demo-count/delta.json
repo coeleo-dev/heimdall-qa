@@ -1,0 +1,9 @@
+{
+  "count": {
+    "before": 2,
+    "after": 4,
+    "esperado": "> 2",
+    "lido": 4,
+    "timed_out": false
+  }
+}

@@ -24,16 +24,20 @@ needed only for the Java fixture — the harness itself does not use one.
 ## Before you open a pull request
 
 ```bash
-pytest                                # the core's suite, needing no product
-pytest packages/spring                # the reader's suite, needing no JVM
-bin/audit-remote                      # nothing the product owns would be published
-bash examples/toy-provider/gate.sh    # a clean wheel still measures an API
-bash examples/spring-fixture/gate.sh  # and still reads Java source (needs a JDK)
+bin/verify                            # the five gates, in order
+bin/verify --fast                     # while iterating: skips the two provider gates
+bin/web                               # if you touched desktop/webapp/
 ```
 
-A change is done when those are green. `bin/audit-remote` is not a formality: it is
-what keeps the boundary real, and it fails if a product path or a product name reaches
-the set that would be published. CI runs all five, so a red job names which claim broke.
+`bin/verify` is the one place the gate list is written down; the five it runs are the
+core's suite, the reader's suite, `bin/audit-remote`, and the `toy-provider` and
+`spring-fixture` gates. `bin/audit-remote` is not a formality: it is what keeps the
+boundary real, and it fails if a product path or a product name reaches the set that
+would be published. CI runs all five, so a red job names which claim broke.
+
+`bin/bootstrap` gets a fresh clone to the point where those run; `bin/demo` shows the
+harness working with no target of your own. [`contrib/development.md`](contrib/development.md)
+has the rest: the test tiers, the client build and the failure modes.
 
 ## The bar
 

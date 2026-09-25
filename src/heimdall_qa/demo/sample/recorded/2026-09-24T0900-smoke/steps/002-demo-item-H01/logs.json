@@ -1,0 +1,22 @@
+{
+  "measured": true,
+  "incomplete": false,
+  "sources": [
+    {
+      "id": "web",
+      "role": "sync",
+      "propagate": true,
+      "found": true,
+      "reason": "found",
+      "truncated": false,
+      "lines": 1
+    }
+  ],
+  "timeline": [
+    {
+      "source": "web",
+      "at": null,
+      "text": "2026-09-25 18:29:00 [vt] INFO  c.d.DemoApplication - trace_id: [heimdall-smoke-2] - item itm_1 read"
+    }
+  ]
+}

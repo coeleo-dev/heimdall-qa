@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from dataclasses import replace
@@ -445,28 +444,6 @@ class WorkspaceSession:
         """The dirty flag, without building a view around it."""
         return self._engine.revision()
 
-    def previous_summary(self, round_id: str, project: ProjectRef) -> dict[str, object] | None:
-        """The round's last whole-round run, for the unit card.
-
-        Read on demand and never on a poll: the card only draws when nothing is
-        running, and a walk over `runs/` twice a second would be a cost the review
-        screen pays for a fact that changes once per run.
-
-        The project comes in rather than being read off `self`, because a round id is
-        only unique inside one project's `runs/` — the same `smoke` exists in both.
-        """
-        run_dir = find_latest_run(project.runs_dir, round_id)
-        if run_dir is None:
-            return None
-        summary_path = run_dir / "summary.json"
-        if not summary_path.is_file():
-            return None
-        try:
-            payload = json.loads(summary_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return None
-        return {**payload, "run_dir": str(run_dir.resolve())}
-
     # -- rendering ---------------------------------------------------------
 
     def view(self) -> WorkspaceView:
@@ -492,14 +469,23 @@ class WorkspaceSession:
             # Read here and not in the template: the card wants the numbers the last
             # run ended with, and a template cannot open a file. Only asked for when
             # the card is actually drawn, which is only when nothing is running.
-            previous=(
-                self.previous_summary(session.round_id, self.owner(selected))
-                if pane == "start" and session.round_id
-                else None
-            ),
+            previous=self._previous_run(selected) if pane == "start" else None,
             error=self._error or session.error,
             pending_key=self._pending_key(engine, row_keys),
         )
+
+    def _previous_run(self, selected: TreeNode) -> dict[str, object] | None:
+        """The selected round's last run, for the unit card's "last time" line.
+
+        Read off the tree's index rather than globbing `runs/` again: `inspect_round`
+        already found the latest run and read its summary to decide the badge, and two
+        sweeps of the same directory is two answers that can disagree. A case selection
+        answers with its round's run, which is what its card has always meant.
+        """
+        node = parent_round(self._tree, selected.key)
+        if node is None or node.run is None or not node.run.summary:
+            return None
+        return {**node.run.summary, "run_dir": str(node.run.path.resolve())}
 
     def _pending_key(self, engine: EngineView, row_keys: dict[int, str]) -> str:
         """The tree row a parked plan is waiting on, or `""`.
@@ -565,8 +551,14 @@ class WorkspaceSession:
             # screen, which is how a failing case is reopened from the end-of-run list.
             if selected.kind == "case" and session.current_step_dir is not None:
                 return "review"
-            if selected.kind == "round" and session.phase == "done":
-                return "done"
+        # A round with a finished run on disk opens on its KPIs, whether or not the
+        # engine still remembers running it. That last clause is the whole fix: the
+        # branch below used to sit inside `self._is_live(selected)` and ask the session
+        # for `phase == "done"`, so of a campaign's forty rounds exactly one — the last
+        # unit, and only until another plan started — could show what its run said. The
+        # answer is on disk and already indexed on the node, so every round gets it.
+        if selected.kind == "round" and _has_summary(selected):
+            return "done"
         if selected.kind == "case" and self._historical_dir is not None:
             return "historical"
         return "start"
@@ -768,6 +760,17 @@ def _default_scope(node: TreeNode) -> str:
             hint="pick a campaign, a flow, a round or a case from the tree",
         )
     return scopes[0]
+
+
+def _has_summary(node: TreeNode) -> bool:
+    """Whether this round has a finished run whose KPIs the pane can draw.
+
+    A run directory exists from the moment a round starts, so "is there a run" is not
+    the question the pane asks — a run with no `summary.json` is a run still in flight,
+    and opening its KPIs would draw a card of zeros over the step a reviewer is
+    watching go out. The summary is what the pane reads, so the summary is the gate.
+    """
+    return node.run is not None and bool(node.run.summary)
 
 
 def _overlay_queue(

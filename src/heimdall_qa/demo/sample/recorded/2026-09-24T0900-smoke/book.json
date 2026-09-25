@@ -1,0 +1,46 @@
+{
+  "included": [],
+  "excluded": [
+    {
+      "source": "metering",
+      "included": false,
+      "exclusion": "no_amount",
+      "amount": null,
+      "http_status": 200,
+      "transaction_id": null,
+      "idempotency_key": null,
+      "rating_status": null
+    },
+    {
+      "source": "metering",
+      "included": false,
+      "exclusion": "no_amount",
+      "amount": null,
+      "http_status": 200,
+      "transaction_id": null,
+      "idempotency_key": null,
+      "rating_status": null
+    },
+    {
+      "source": "metering",
+      "included": false,
+      "exclusion": "no_amount",
+      "amount": null,
+      "http_status": 200,
+      "transaction_id": null,
+      "idempotency_key": null,
+      "rating_status": null
+    },
+    {
+      "source": "metering",
+      "included": false,
+      "exclusion": null,
+      "amount": null,
+      "http_status": 404,
+      "transaction_id": null,
+      "idempotency_key": null,
+      "rating_status": null
+    }
+  ],
+  "total": "0"
+}

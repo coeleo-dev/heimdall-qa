@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# The bundled demo, terminal first.
+#
+# The Server dialog's demo button and the command palette both do the same thing this
+# does: start a mock on an ephemeral loopback port, materialize the sample project
+# around the port the socket actually bound, and leave the runs on disk. This script is
+# that act without a window, which is what a CI box or an agent has — and it prints the
+# run directories, because a path is what the next step (`heimdall-qa last-run`, a
+# reviewer, an agent reading the evidence) needs.
+#
+# It runs one round that passes (`smoke`) and one that is supposed to fail (`red`), so
+# a green summary and a red one are both visible in the output. The other rounds ship
+# in the same project: `boom` (a 5xx), `warn` (a WARN log line and a slow route) and
+# `chain` (a `probe_begin`/`probe` pair and a captured-value chain).
+#
+# The project is materialized under the same data home the client uses, so pressing
+# the demo button afterwards opens what this already built, runs and all.
+#
+# Usage: bin/demo
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PYTHON="$REPO/.venv/bin/python"
+
+if [ ! -x "$PYTHON" ]; then
+    echo "no $PYTHON: run bin/bootstrap first" >&2
+    exit 1
+fi
+
+PYTHONPATH="$REPO/src${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON" - <<'PY'
+"""Start the demo API, materialize the sample, run a green and a red round."""
+
+import json
+
+import httpx
+
+from heimdall_qa import operations
+from heimdall_qa.demo.sample import DemoService
+from heimdall_qa.projects import ProjectsRegistry
+
+#: The rounds this prints: one the packs pass, one they are meant to fail. The second
+#: is the point — a demo that only shows green shows nothing a reviewer needs.
+ROUNDS = (("rounds/smoke.yaml", "green"), ("rounds/red.yaml", "red on purpose"))
+
+
+def main() -> int:
+    service = DemoService()
+    state, ref = service.start(ProjectsRegistry())
+    if not state.enabled or ref is None:
+        print(f"the demo API did not start: {state.error or state.state}")
+        return 1
+
+    print(f"demo API   {state.base_url}")
+    print(f"project    {ref.root}")
+    print(f"registry   {ProjectsRegistry().path}")
+    print()
+
+    settings = operations.resolve_settings(ref.root, runs_dir=ref.runs_dir)
+    with httpx.Client(timeout=10.0) as client:
+        for round_path, note in ROUNDS:
+            run_dir = operations.run_round(settings, round_path, client=client, mode="headless")
+            summary = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
+            counts = summary.get("counts", {})
+            outcome = "pass" if counts.get("fail", 0) == 0 else "fail"
+            print(f"{outcome:4}  {note:14}  {run_dir}")
+
+    service.stop()
+    print()
+    print("the evidence is under the paths above; `heimdall-qa` opens the same project")
+    return 0
+
+
+raise SystemExit(main())
+PY

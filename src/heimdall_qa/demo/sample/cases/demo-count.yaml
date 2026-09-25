@@ -1,0 +1,22 @@
+# The counter, twice: once as the surface a probe moves, once as the deliberate
+# status mismatch.
+#
+# `demo-count-H01` is the loop's own case and passes. `demo-count-wrong-status` asks
+# for a 404 the API will not give — `http.baseline` answers `HTTP 200, expected 404`
+# — and it is the demo's plain `fail`: no 5xx, no envelope question, just a case
+# whose expectation the API does not meet.
+demo-count-H01:
+  contract: contracts/demo-count-get.yaml
+  kind: H01
+  tags:
+    - function
+  expect:
+    status: 200
+
+demo-count-wrong-status:
+  contract: contracts/demo-count-get.yaml
+  kind: H01
+  tags:
+    - function
+  expect:
+    status: 404

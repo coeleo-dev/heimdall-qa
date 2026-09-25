@@ -1,0 +1,12 @@
+# The probe and the chain. The suite does the ordering: `probe_begin`, two creates,
+# `probe`. `include:` lists the cases the suite reaches so the round validates against
+# the same files it will run.
+id: chain
+suite: suites/chain.yaml
+mode: headless
+dimensions:
+  - function
+environment: local
+include:
+  - cases/demo-items.yaml#demo-items-post-H01
+  - cases/demo-items.yaml#demo-items-linked-H01

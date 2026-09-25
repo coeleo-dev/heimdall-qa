@@ -1,0 +1,16 @@
+# The counter, and the one numeric surface in the demo — which is what the probe
+# needs. A `probe` compares `before` to `after` with `increase`, `unchanged` or
+# `exact`, and the neutral oracle does that arithmetic on numbers: `$.status` is a
+# string no comparison can weigh, and a probe over one would be a probe that cannot
+# be read.
+#
+# Its contract is also where the deliberate `fail` lives: `demo-count-wrong-status`
+# asks for a 404 the API will not give, and the harness answers `HTTP 200, expected
+# 404` without a 5xx anywhere near it.
+endpoint: GET /demo/count
+dto: demo.CountController
+area: demo-count
+auth: none
+idempotency: none
+baseline: baselines/empty.json
+fields: {}

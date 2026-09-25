@@ -1,0 +1,40 @@
+{
+  "results": [
+    {
+      "pack_id": "http.baseline",
+      "status": "fail",
+      "detail": "HTTP 200, expected 404"
+    },
+    {
+      "pack_id": "security.leak",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "pack_id": "performance",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "pack_id": "auth.surface",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "pack_id": "mutation",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "pack_id": "observability",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "pack_id": "business.rule",
+      "status": "pass",
+      "detail": ""
+    }
+  ],
+  "logs_incomplete": false
+}

@@ -1,6 +1,7 @@
 import type {
   ApiError,
   Bootstrap,
+  DemoState,
   McpState,
   ProjectsResponse,
   RunAggregate,
@@ -193,4 +194,21 @@ export function fetchMcp(): Promise<McpState> {
  */
 export function setMcp(enabled: boolean): Promise<McpState> {
   return post<McpState>("/api/mcp", { enabled });
+}
+
+/** Whether the bundled demo project is up, and where its tree was materialized. */
+export function fetchDemo(): Promise<DemoState> {
+  return call<DemoState>("/api/demo");
+}
+
+/**
+ * Flip the bundled demo.
+ *
+ * Turning it on starts the mock and materializes the sample project around the port it
+ * bound, so the answer names a `root` and a `project_id` that the tree now holds —
+ * the caller refreshes the bootstrap to draw it. Turning it off stops the socket and
+ * leaves the files, which is why the answer still carries both.
+ */
+export function setDemo(enabled: boolean): Promise<DemoState> {
+  return post<DemoState>("/api/demo", { enabled });
 }
