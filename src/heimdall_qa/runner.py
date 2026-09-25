@@ -793,12 +793,23 @@ def _settles_asynchronously(
 
     The last clause is declared, not guessed: it used to be
     `"/api/ingest" in path or "/api/ledger" in path`.
+
+    What the endpoint says outranks what its prefix says. A `routes[]` entry is a
+    prefix, so `async: true` on `/api/ingest` covers the read that returns a
+    transaction, the dry run that settles nothing, and the ingest that queues the
+    work — three endpoints, one answer. The contract is the only place that can tell
+    them apart, and `async` there is tri-valued for exactly that: `worker`, `sync`,
+    or absent to inherit the prefix. Leaving `sync` unable to win made the specific
+    declaration unreachable, and every synchronous endpoint under an async prefix
+    owed a consumer line that was never coming.
     """
     if (case.wait_logs_ms or 0) > 0:
         return True
     if status is None or not 200 <= status < 300:
         return False
-    return contract.async_mode == "worker" or project.waits_for_async_worker(path)
+    if contract.async_mode is not None:
+        return contract.async_mode == "worker"
+    return project.waits_for_async_worker(path)
 
 
 def _pack_context(
@@ -1507,11 +1518,18 @@ def _build_summary(
     project: ProjectView | None = None,
     human_reject_rate: float = 0.0,
     descriptor: dict[str, str] | None = None,
+    selection: str = "",
 ) -> dict[str, Any]:
     elapsed = [item.elapsed_ms for item in records]
     return {
         "round_id": round_file.id,
         "mode": mode,
+        # Which slice of the round ran: empty for the whole round, `case-<id>` for a
+        # single case, `from-<id>` for a case and everything after it. It is here and
+        # in the run directory's name because a partial run's counts are not the
+        # round's verdict, and a reader who took them for one would be reading a
+        # coverage nobody claimed.
+        "selection": selection,
         "counts": {
             "pass": sum(1 for item in records if item.verdict == "pass"),
             "fail": sum(1 for item in records if item.verdict == "fail"),

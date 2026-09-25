@@ -5,7 +5,8 @@
 #
 # Six claims, in the order they can fail:
 #
-#   1. a clean wheel installs, with no provider of any name and no browser anywhere;
+#   1. a clean wheel installs, with no provider of any name and no browser
+#      automation anywhere;
 #   2. the harness runs against the toy API using nothing but that wheel;
 #   3. the run is navigable (`runs/latest`);
 #   4. discovery reads the live OpenAPI document and the tree it writes reviews
@@ -43,10 +44,25 @@ rm -rf "$GATE"
 python3 -m venv "$GATE"
 "$GATE/bin/pip" -q install "$WHEEL"
 
-step "claim 1 — no provider, no browser"
+step "claim 1 — no provider, no browser automation"
 "$GATE/bin/python" -c "import heimdall_qa; print('core:', heimdall_qa.__file__)"
-if "$GATE/bin/python" -c "import playwright" 2>/dev/null; then
-    echo "FAIL: playwright is installed in the core's environment" >&2
+# What is forbidden is *browser automation*, and the check names modules rather than a
+# category. Playwright and axe drive a real browser to test a frontend; no part of
+# reviewing an API needs one, and a core that pulled one in would have become the
+# browser harness of ADR-11 in disguise. A webview is a different thing: the desktop
+# client draws this harness's own screen in a native window and automates nothing, so
+# `webview` is deliberately absent from this list and must not be added to it.
+BROWSER_AUTOMATION=$("$GATE/bin/python" - <<'PY'
+import importlib.util
+
+print(", ".join(
+    name for name in ("playwright", "axe_playwright_python", "selenium")
+    if importlib.util.find_spec(name) is not None
+))
+PY
+)
+if [ -n "$BROWSER_AUTOMATION" ]; then
+    echo "FAIL: browser automation in the core's environment: $BROWSER_AUTOMATION" >&2
     exit 1
 fi
 # Asked of the entry point group rather than of a name: a provider is a distribution

@@ -1,0 +1,17 @@
+# The smallest contract that is also a chain: one POST, no declared fields, so the
+# only coverage kind it demands is `chain-H01`.
+#
+# It exists for `from_case`, and for the reason that scope exists at all: `capture`
+# is how a later case receives something an earlier one minted, so a case that spends
+# a capture cannot be run alone. `chain-H01` mints `chain_id` from its own response
+# and `chain-H01-linked` spends it, which is the smallest round where "run from here"
+# and "run just this case" can be told apart by evidence and not by intent.
+endpoint: POST /qa/chain
+dto: com.example.qa.ChainRequest
+auth: none
+idempotency: none
+baseline: baselines/empty.json
+fields: {}
+rules: []
+live_only_rules: []
+p_gaps: []

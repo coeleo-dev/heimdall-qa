@@ -1,0 +1,318 @@
+@import "tailwindcss";
+/* Self-hosted, and that is not a detail. The harness works offline and the client is
+   opened from a bundle inside a Python wheel; a `fonts.googleapis.com` import would
+   turn "no network" into "wrong typeface" the first time someone reviewed a run on a
+   plane. `@fontsource` ships the woff2 files and Vite bundles them. */
+@import "@fontsource-variable/inter";
+
+/* The app is dark, full stop. A light theme would need every token below to be
+   written twice, and the review screen is a tool someone leaves open next to a
+   terminal — the terminal won that argument already. */
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.5rem;
+
+  /* A neutral family with one degree of blue in it rather than pure grey. Two greys
+     side by side read as dirty; a cast this small is invisible alone and makes the
+     whole window read as one surface instead of several. */
+  --background: oklch(0.16 0.008 265);
+  --foreground: oklch(0.94 0.004 265);
+
+  --card: oklch(0.197 0.008 265);
+  --card-foreground: oklch(0.94 0.004 265);
+
+  --popover: oklch(0.218 0.009 265);
+  --popover-foreground: oklch(0.94 0.004 265);
+
+  --primary: oklch(0.63 0.17 264);
+  --primary-foreground: oklch(0.99 0 0);
+
+  --secondary: oklch(0.27 0.009 265);
+  --secondary-foreground: oklch(0.94 0.004 265);
+
+  --muted: oklch(0.255 0.009 265);
+  --muted-foreground: oklch(0.69 0.012 265);
+
+  --accent: oklch(0.295 0.011 265);
+  --accent-foreground: oklch(0.97 0.004 265);
+
+  --destructive: oklch(0.58 0.2 25);
+  --destructive-foreground: oklch(0.98 0 0);
+
+  --border: oklch(0.283 0.009 265);
+  --border-strong: oklch(0.36 0.012 265);
+  --input: oklch(0.32 0.009 265);
+  --ring: oklch(0.6 0.15 264);
+
+  /* The four verdict/status colours, kept apart from `destructive`/`primary` because
+     they mean review outcomes and must not follow a theme change. */
+  --status-pass: oklch(0.73 0.16 152);
+  --status-fail: oklch(0.66 0.2 25);
+  --status-warn: oklch(0.8 0.14 85);
+  --status-skip: oklch(0.62 0.01 265);
+  --status-http: oklch(0.66 0.16 300);
+
+  /* What "something is happening right now" looks like: the live dot, the running
+     progress bar, the selected unit. Separate from `primary` so that a link and a
+     moving run never wear the same colour. */
+  --live: oklch(0.76 0.14 205);
+
+  --sidebar: oklch(0.178 0.008 265);
+  --statusbar: oklch(0.202 0.008 265);
+
+  /* Two elevations only. A desktop tool that shadows everything looks like a web
+     page; shadows here are for what floats over the window, and nothing else. */
+  --shadow-raise: 0 1px 2px 0 oklch(0 0 0 / 0.3);
+  --shadow-float: 0 10px 30px -12px oklch(0 0 0 / 0.55), 0 2px 6px -2px oklch(0 0 0 / 0.4);
+}
+
+@theme inline {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --radius-sm: calc(var(--radius) - 3px);
+  --radius-md: calc(var(--radius) - 1px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-status-pass: var(--status-pass);
+  --color-status-fail: var(--status-fail);
+  --color-status-warn: var(--status-warn);
+  --color-status-skip: var(--status-skip);
+  --color-status-http: var(--status-http);
+  --color-live: var(--live);
+
+  --color-sidebar: var(--sidebar);
+  --color-statusbar: var(--statusbar);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    /* A desktop window is not a document: the page never scrolls, panes do. Letting
+       the body scroll is how a sticky header stops being sticky. */
+    overflow: hidden;
+    font-size: 13px;
+    /* Inter's own optical sizing, so a 10px label and a 16px title are both drawn for
+       the size they are. Without it the small type is the big type scaled down. */
+    font-optical-sizing: auto;
+  }
+
+  ::selection {
+    @apply bg-primary/30;
+  }
+
+  /* Every focusable thing gets the same ring. `:focus-visible` only, because a mouse
+     click should not paint a ring around what it just hit. */
+  :focus-visible {
+    outline: 2px solid color-mix(in oklab, var(--ring) 80%, transparent);
+    outline-offset: 1px;
+  }
+}
+
+@layer components {
+  /* One thin scrollbar everywhere, sized for a mouse rather than hidden — a pane with
+     more evidence than screen is normal here, and "is there more?" must be answerable
+     at a glance. */
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--foreground) 22%, transparent) transparent;
+  }
+  .scroll-thin::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--foreground) 22%, transparent);
+    border-radius: 9999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  .scroll-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* The tree's guides. An indentation guide is how a 70-round campaign stays
+     readable; without it the eye loses the level at the third nesting. */
+  .tree-guide {
+    background-image: linear-gradient(
+      to right,
+      color-mix(in oklab, var(--border) 70%, transparent) 0 1px,
+      transparent 1px
+    );
+    background-repeat: no-repeat;
+    background-size: 1px 100%;
+  }
+
+  /* Numbers that line up while they move. Every counter, clock and pass/fail tally
+     changes under the reader's eye, and proportional digits make them jitter. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* One horizontal ruler for a whole pane.
+     The header, the scrolling body and the strips pinned under it used to carry their
+     own copy of `max-w-4xl` and their own padding, which is three chances to disagree
+     and — on a wide window — a narrow column of HTTP evidence with a third of the
+     screen empty on either side. A pane is read at whatever width the window has, so
+     the column grows with it and stops at a width a body of JSON is still readable at.
+     One class, applied to all three, is what makes them line up. */
+  .pane-column {
+    width: 100%;
+    max-width: 80rem;
+    margin-inline: auto;
+    padding-inline: clamp(0.75rem, 1.5vw, 2rem);
+  }
+  /* For the panes whose content is a request next to a response, or a table: the
+     evidence wants the width, and reading it does not get harder at 1700px. */
+  .pane-column-wide {
+    max-width: 112rem;
+  }
+
+  /* The running indicator. A dot that breathes is the cheapest honest way to say
+     "this is still going" — a spinner says the same thing but costs the reader a
+     word, and there are three of these on screen at once during a campaign. */
+  .live-dot {
+    position: relative;
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: var(--live);
+  }
+  .live-dot::after {
+    content: "";
+    position: absolute;
+    inset: -0.25rem;
+    border-radius: 9999px;
+    border: 1px solid var(--live);
+    animation: live-pulse 1.6s ease-out infinite;
+  }
+
+  /* The run's own progress, as a bar. The track is always drawn, so the bar never
+     appears from nowhere and shift the row it lives in. */
+  .progress-track {
+    position: relative;
+    overflow: hidden;
+    border-radius: 9999px;
+    background: color-mix(in oklab, var(--foreground) 10%, transparent);
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 9999px;
+    transition: width 240ms cubic-bezier(0.2, 0, 0, 1);
+  }
+  /* Work is happening and the total is not known yet. A sweep reads as "in flight"
+     where a bar at 60% would read as a measurement. */
+  .progress-sweep::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklab, var(--live) 85%, transparent),
+      transparent
+    );
+    animation: sweep 1.4s ease-in-out infinite;
+  }
+
+  /* A segment whose case is on the wire. The bar says how far the run has got; this is
+     the one pixel that says *where* it is, and it has to be legible at 1.5px tall —
+     so it is a travelling highlight rather than a colour, which the verdict already
+     owns. */
+  .segment-live::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklab, var(--live) 90%, white 10%),
+      transparent
+    );
+    animation: sweep 1.2s ease-in-out infinite;
+  }
+
+  /* A pane arriving. Short enough to feel like the app answering, not like a
+     transition someone is waiting for. */
+  .pane-in {
+    animation: pane-in 140ms ease-out;
+  }
+}
+
+@keyframes live-pulse {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.7);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+@keyframes sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes pane-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The one place a reduced-motion reader is owed a different app: the pulse and the
+   sweep are the two animations that run for the length of a campaign. */
+@media (prefers-reduced-motion: reduce) {
+  .live-dot::after,
+  .progress-sweep::before,
+  .segment-live::after,
+  .pane-in {
+    animation: none;
+  }
+}

@@ -1,0 +1,33 @@
+# Three rounds whose only job is to be ordered.
+#
+# The tree groups rounds into one folder per matrix, so it renders the two A4 rounds
+# together: `order-first`, `order-third`, then `order-second`. This manifest
+# interleaves the matrices (A4, B1, A4) and reads `order-first`, `order-second`,
+# `order-third`.
+#
+# That difference is the whole reason `plan_for` opens the campaign file. In a real
+# campaign the order is a dependency — A0 mints the JWT that A1..A4 spend — and a plan
+# that depended on the manifests' habit of grouping by matrix would one day run
+# authenticated rounds against no credential.
+#
+# The rounds are deliberately tiny and separate from the shared fixtures: pinning the
+# order in a campaign that referenced `walk-hn` would take `walk-hn` out of the orphan
+# set `test_collection.py` checks.
+id: interleaved
+environment: sandbox
+rounds:
+  - round: rounds/order-first.yaml
+    endpoint: POST /qa/echo
+    dto: com.example.qa.EchoRequest
+    matrix: A4
+    auth: none
+  - round: rounds/order-second.yaml
+    endpoint: POST /qa/note
+    dto: com.example.qa.NoteRequest
+    matrix: B1
+    auth: none
+  - round: rounds/order-third.yaml
+    endpoint: POST /qa/chain
+    dto: com.example.qa.ChainRequest
+    matrix: A4
+    auth: none

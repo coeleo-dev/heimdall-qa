@@ -56,7 +56,13 @@ From the repository root, with a wheel built by `python -m build` or
 python -m venv /tmp/gate
 /tmp/gate/bin/pip install dist/heimdall_qa-*.whl
 /tmp/gate/bin/python -c "import heimdall_qa"   # the core, on its own
-/tmp/gate/bin/python -c "import playwright" && echo "should have failed"   # no browser, ever
+/tmp/gate/bin/python -c "
+import importlib.util
+assert not any(importlib.util.find_spec(n) for n in ('playwright', 'axe_playwright_python', 'selenium'))
+"                                                                          # no browser automation
+# A webview is not automation: the desktop client draws this harness's own screen in a
+# native window and drives nothing. What is banned is Playwright and axe, which steer a
+# real browser to test a frontend — and no part of reviewing an API needs one.
 /tmp/gate/bin/python -c "
 from importlib.metadata import entry_points
 assert not list(entry_points(group='heimdall_qa.providers')), 'a provider came with the wheel'

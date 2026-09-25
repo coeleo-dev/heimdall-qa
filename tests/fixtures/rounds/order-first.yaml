@@ -1,0 +1,9 @@
+# A round that exists to be ordered. `campaigns/interleaved.yaml` explains why.
+id: order-first
+suite: suites/unused.yaml
+mode: review
+dimensions:
+  - function
+environment: sandbox
+include:
+  - cases/echo.yaml

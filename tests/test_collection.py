@@ -1,17 +1,24 @@
 import json
 from pathlib import Path
 
+from heimdall_qa import keys
 from heimdall_qa.collection import find_node
 from heimdall_qa.collection import index_workspace
 from heimdall_qa.collection import inspect_round
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
+#: The id these tests index under. Not a real registry id — nothing derives it from a
+#: path here — but the index and the lookups below have to agree on *something*, and
+#: going through `keys` is what keeps this file from being a second implementer of the
+#: key format.
+PROJECT = "fixtures"
+
 
 def test_index_workspace_groups_campaign_and_orphans():
-    tree = index_workspace(FIXTURES, FIXTURES / "runs-missing")
-    keys = [node.key for node in tree]
-    assert "campaign:example-campaign" in keys
+    tree = index_workspace(FIXTURES, FIXTURES / "runs-missing", project_id=PROJECT)
+    keys_seen = [node.key for node in tree]
+    assert keys.for_campaign(PROJECT, "example-campaign") in keys_seen
     labels = {node.label: node for node in tree}
     assert "example-campaign" in labels
     campaign = labels["example-campaign"]
@@ -31,8 +38,8 @@ def test_index_workspace_groups_campaign_and_orphans():
 
 
 def test_missing_round_is_missing_and_not_startable():
-    tree = index_workspace(FIXTURES, FIXTURES / "no-runs")
-    missing_campaign = find_node(tree, "campaign:missing-round")
+    tree = index_workspace(FIXTURES, FIXTURES / "no-runs", project_id=PROJECT)
+    missing_campaign = find_node(tree, keys.for_campaign(PROJECT, "missing-round"))
     assert missing_campaign is not None
     round_node = missing_campaign.children[0].children[0]
     assert round_node.status == "missing"

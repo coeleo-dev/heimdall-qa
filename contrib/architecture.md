@@ -614,13 +614,21 @@ incomplete — is the reason the collector has two constructors instead of one.
 ```
 runs/<stamp>-<round-id>/
   round.yaml      the round as it was, for the record
-  summary.json    counts, packs, coverage, latency, descriptor origin, oracle
+  summary.json    counts, packs, coverage, latency, descriptor origin, oracle, selection
   evidence.md     the same story as prose
   book.json       what the oracle priced, and every exclusion by name
   steps/NNN-<id>/ request, response, packs, logs, verdict
   probes/<id>/    before, after, delta, oracle
 runs/latest -> <the last run>
 ```
+
+A partial run appends `~<selection>` to the directory name (`~case-note-H01`,
+`~from-note-H01`) and writes the same string into `summary.json` as `selection`, empty
+for a whole round. The `~` is the separator the dedup suffix already used, so a partial
+run is a run of that round and not *the* run of it: `find_latest_run(round_id)`
+compares the whole tail, and the round's canonical status stays the whole round's. A
+reviewer can therefore run a single case without the tree losing track of what the
+round itself last did.
 
 `summary.json` names the oracle as `"neutral"` or as the provider's id, because a run
 whose value checks were answered neutrally is a shape and not a price model, and a
@@ -637,25 +645,334 @@ is Etapa 2. Today `summary.json` plus `steps/*/` is the contract.
 
 ## 9. The review UI
 
-`heimdall-qa serve` binds `127.0.0.1:7878` and refuses anything else. It is a screen
+`heimdall-qa` with no subcommand opens the client in a native window, in the same
+process as an API on an ephemeral loopback port; `heimdall-qa serve` is the same API
+and the same bundle on `127.0.0.1:7878`, for a remote box or for devtools. Both refuse
+a bind that is not localhost. It is a screen
 for a human to judge a run, not a test of a frontend: it is not optional, it is the
 reason the harness exists in this shape at all.
 
-- One process reviews one HTTP round at a time (`ROUND_BUSY` otherwise).
+- **One process runs one plan at a time** (`ROUND_BUSY` otherwise). A plan is an
+  ordered list of units — the rounds a campaign, a flow or a single case adds up to —
+  and the invariant that used to be "one round at a time" is the same one, stated at
+  the size the screen actually works in.
+- **A run is not held by the request that starts it.** A request starts a plan and
+  answers; a worker thread walks it; the client is told as it goes over
+  Server-Sent Events. Closing the tab does not stop a campaign, and a 30-second probe
+  is a spinner rather than a browser waiting on a socket.
+- **A plan waiting for a human outranks the selection.** While the engine is parked on
+  a step, the detail pane shows that step whatever the tree has selected. A campaign's
+  roll-up offers a Cancel and no verdict form, and a walk over 41 rounds has to be
+  answerable from where the reviewer already is. The strip keeps the "where am I" —
+  unit i/n, step j/m, the case, the clock — and the roll-up is back the moment the
+  plan is not waiting.
+- **The tree is re-indexed when the plan has something new to say**, on a unit
+  boundary and at the end, not on every poll: a round that just finished is only on
+  disk by then, and a campaign's roll-up would otherwise read "not reviewed" for every
+  round it had already walked. Globbing `runs/` twice a second would be a cost the
+  review screen does not need to pay.
 - An unparseable round does not start (`ROUND_INVALID`); a parseable but incomplete
-  one appears as not ready.
+  one appears as not ready, and a plan that contains one skips it with the reason the
+  collection already worked out instead of silently leaving a hole.
 - The server replays nothing that was already replayed: a completed step is reopened
   from disk.
 - **Agents never call port 7878.** They read the run directory.
 
 Its copy is in Portuguese; its code, CLI output and documentation are in English.
 
+### 9.1 Granularity
+
+The screen offers six scopes, and which ones exist for a node is one table
+(`plan.scopes_for`), shared by the buttons that are drawn and the plan that has to
+honour them. It answers from the node and not from its kind, because one kind needs
+the distinction:
+
+| Selected | Scopes | What runs |
+| --- | --- | --- |
+| project | — | nothing: "every project I registered" is bigger than a button should answer |
+| folder (real, under `campaigns/`) | `directory` | every campaign under that subtree |
+| campaign | `campaign` | every round the manifest lists, in the order it lists them |
+| flow (a matrix) | `folder` | the rounds of that matrix |
+| round | `round` | that round |
+| case | `case`, `case_forward` | that case; or that case and everything after it |
+| step of a suite round | `round` | that round — a suite step has no case scope (below) |
+
+**A step of a suite round is not a case.** The tree shows a suite round's visible
+steps — `loop chain ×2`, `probe two-loops` — and the run's queue is keyed by the same
+labels, so they read like cases. They are not: a loop is a count and a probe is a
+comparison against a baseline the loops left behind, and both only mean something
+inside the sequence that holds them. `scopes_for` therefore offers the round and
+nothing narrower, the card says why in words, and `plan_for` resolves that button back
+to the round so it cannot run something other than what it names. A round written with
+`include:` has real cases and keeps both case scopes.
+
+Where a case's own buttons live follows from the same fact. A case that has already
+been reviewed is never drawn as a unit card again — selecting it reopens its step,
+which is the point — so `case` and `case_forward` are also drawn on the step's own
+read-only bar. Without that, a red case inside a green round could not be run alone.
+
+`case_forward` is not a convenience. `capture` is how a later case receives a value an
+earlier one minted, so a case that spends a capture cannot run alone — the smallest
+scope that still works is the case that mints it, and forward. Re-deriving the
+credential behind the author's back would be the runner inventing a setup the corpus
+never declared.
+
+Two facts follow from running a slice instead of a round, and both are deliberate:
+
+- **The order is read from the campaign manifest**, not inferred from the tree. The
+  tree groups rounds into one folder per matrix; a campaign that interleaves matrices
+  would be reordered by a tree traversal, and the capture chains of §7 would break
+  with a wall of 401s that look like a product defect.
+- **A partial run never passes for the round.** Its directory is named
+  `<stamp>-<round id>~case-<id>` (or `~from-<id>`), which `find_latest_run` does not
+  accept as the round's, and its `summary.json` carries a `selection` naming the
+  slice. The round's status stays the whole round's, which is the only thing it can
+  honestly be. The cost is that a case run on its own is not marked in the tree; the
+  unit card lists it as a partial run instead.
+- **Coverage is checked against the whole round**, before any selection narrows it. A
+  subset may legitimately skip kinds it does not include; it may never relax the
+  round's own coverage check, or selecting a subset would be a way to start a round
+  the harness has already refused.
+
+### 9.2 One renderer, now a desktop client — ADR-05, superseding ADR-04
+
+ADR-04 fixed the review UI as server-rendered Jinja with zero external dependencies
+and rejected the SPA with one specific argument, not an aesthetic one:
+
+> SPA (React/Vue) — reescreve 739 linhas por interatividade que não existe; traz
+> toolchain para dentro do harness
+
+**That premise is what changed.** The review screen is now the project's primary
+interface, and it has to carry an editor: a command palette, tree and panel chrome
+that behaves like an application rather than a document, and Monaco over the YAML a
+reviewer writes. "Interactivity that does not exist" is no longer the case, and the
+toolchain came in the moment an editor did. What ADR-04 protected is kept; what it
+rejected on evidence is revised on evidence.
+
+The rule that survives is the one that mattered: **one renderer.** ADR-04's target
+was never "Jinja", it was "not two renderers". So:
+
+- **The renderer is now the desktop client** — a React + Tailwind + shadcn/ui SPA,
+  with Monaco for code. Jinja is retired, not kept alive beside it: a server template
+  and a client component describing the same panel is exactly the drift ADR-04
+  refused, and running both "for a while" is how that drift becomes permanent. The
+  transition is bounded by the phase plan in §9.5 and ends by deleting `templates/`,
+  `static/style.css` and `static/app.js`.
+- **The data boundary becomes a declared contract.** It used to be
+  `panel.fragment_context()`, a loose `dict[str, Any]` shaped like HTML (`body_open`,
+  `scope_labels`, `case_prefix`). The client cannot read that; it needs models. Those
+  live in `serve/models.py` as Pydantic types, `serve/contract.py` translates the
+  panel payloads into them, and `serve/panel.py` keeps being the one place that reads
+  a step directory off disk. The reading is not duplicated — that would be the second
+  source of truth this section exists to prevent — and the translation is a separate
+  module precisely so that "what the screen shows" and "what the client is promised"
+  are two things that can be read side by side.
+- **Feedback stops being a poll.** `GET /panel` and its 500 ms interval are replaced
+  by `GET /api/events`, a Server-Sent Events stream carrying the engine's phase,
+  unit index, feed events and `awaiting_verdict`. One stream, pushed, instead of a
+  request every half second that mostly finds nothing changed.
+- **The shell is native.** `heimdall-qa desktop` opens a pywebview window onto a
+  loopback uvicorn, and this is what makes the app feel like an app rather than a tab.
+  pywebview is a core dependency; it is not browser *automation*, and the difference
+  is load-bearing (see §10).
+
+**The costs this accepts, stated rather than discovered later:**
+
+- Node enters the maintainer's toolchain and CI. The built bundle is committed, so
+  `pip install` never runs npm — the same contract a lockfile has, with a CI job that
+  rebuilds and fails on drift.
+- pywebview is not pure `pip` on Linux: it needs a system webview (GTK + WebKit2GTK,
+  or Qt WebEngine). That is a real onboarding cost and it is why a missing backend
+  has to fail with the `apt install …` line and not an `ImportError`.
+- That system binding belongs to the *system* Python: `python3-gi` ships
+  `_gi.cpython-<the system's version>.so`, so a venv on a different Python — 3.14 from
+  a version manager, say — cannot import it whatever `pip` installs, and needs a Python
+  the distro's packages match, or `--system-site-packages`. The refusal message names
+  `sys.executable` for this reason: which interpreter is short is the one fact neither
+  the reader's shell nor the traceback supplies.
+- The distributed wheel grows by the client bundle and Monaco.
+- `README.md`'s promise of "no browser dependency" is amended, not deleted: what it
+  guaranteed was that reviewing an API never required driving one. That still holds.
+
+Two invariants are untouched by all of this, and a change that breaks either is wrong
+regardless of how good the screen looks: **agents read the run directory, never the
+port** (`AGENTS.md`), and **`serve/bind.py` still refuses any host but loopback**.
+
+One thing the shell must not do is outlive its plan badly. Closing the window does
+not silently kill a campaign in flight — the engine owns the plan, not the window,
+which is the same rule that made "closing the tab does not stop a campaign" true.
+
+### 9.3 The client talks HTTP to its own process
+
+The desktop shell **does not import FastAPI**; it starts the server and points a
+window at it. `tests/test_cli_help.py::test_fastapi_is_confined_to_serve` stays as it
+is and keeps holding, which is the cheapest proof that the shell and the server are
+genuinely two things.
+
+A JSON API that mutates on loopback is reachable by any page the host's browser
+loads, so every `/api/*` route requires a per-run token and checks `Origin`. The HTML
+forms escaped this by accident; a JSON surface has to do it on purpose.
+
+### 9.4 The review UI's shape after the change
+
+The screen keeps the structure the corpus already knows, because it was arrived at by
+reviewing hundreds of steps and not by taste:
+
+- the collection as a tree, with the status filters and the search box;
+- the five scopes of `plan.scopes_for`, and the rule that a suite step is not a case;
+- the verdict bar with `A` / `R` / `Shift+R` / `/` / `J` / `K`;
+- the unit card, the campaign roll-up, and the end-of-run KPIs.
+
+What changes is how it is drawn and how fast it answers.
+
+### 9.5 The transition is bounded
+
+| Phase | What landed | What still existed then |
+| --- | --- | --- |
+| 0 | ADR-05, packaging fix, gate hygiene | Jinja |
+| 1 | `/api` + models + SSE, tested | Jinja (still the UI) |
+| 2–3 | the SPA reaching parity, read-first | Jinja (still served) |
+| 4 | `heimdall-qa desktop` | Jinja (still served) |
+| 5 | Monaco editing, save/validate | Jinja (still served) |
+| 6 | **Jinja, `style.css` and `app.js` deleted** | one renderer |
+
+The debt is paid: at the end of phase 6 the only renderer is the client, `serve/app.py`
+mounts nothing else, and the retired page routes are a 404 asserted by
+`tests/test_desktop_shell.py`. Two facts from the phases are worth keeping, because
+each one is a claim that was written down before it was true and then measured:
+
+- **The client is two languages wide, not a hundred.** The plan accepted Monaco as a
+  cost; the `monaco-editor` barrel import would also have registered all ~120 basic
+  languages and shipped a hundred chunks nobody can reach. Only the JSON service and
+  the YAML tokenizer are wired, which is 2.5 MB instead of 4.0 MB of assets.
+- **The core suite never needs the bundle.** Every API test builds its app against
+  `stub_client`, so `pytest` on a clone with no Node is green — the same claim the
+  `clone` job makes about a product-less install.
+
+### 9.6 Execution lives in the core
+
+`plan.py` and `engine.py` sit in the core, not in `serve/`, though only the UI uses
+them today. They know nothing about HTTP or HTML: a plan is a list of units, and the
+engine owns one worker thread, one writer to `runs/`, and the verdict handoff. The CLI
+and the MCP surface of §9.7 call the same functions, and the rule that the core never
+imports `serve` stays intact.
+
+### 9.7 Many projects, real folders, and an MCP server in the window
+
+Three features arrived together because each one is a question about *which root the
+client is looking at*, and answering them separately would have produced three answers.
+
+**The tree is multi-root.** A reviewer working across an API and the library that
+consumes it has two collections, and re-launching the app to switch between them is
+the friction that ends with nobody using the tree. So the roots are remembered in
+`~/.config/heimdall-qa/projects.yaml` (`$HEIMDALL_QA_REGISTRY` overrides, which is what
+keeps the suite hermetic), and the tree draws all of them:
+
+```
+project → directory → campaign → flow → round → case
+```
+
+The registry is the reviewer's organisation and not the project's, which is why it
+lives in the home directory and never in a commit. Three decisions carry it:
+
+- **The id is the folder name plus a short hash of the resolved path.** A bare name
+  collides the moment somebody has two checkouts of one repository; a bare path is
+  unreadable in a log line or a tree key. The pair is stable, legible and unique.
+- **Registering demands that the directory look like a project** — `qa/project.yaml`,
+  or `campaigns/` and `rounds/`. This is the one place the harness grows what it reads,
+  and accepting `/` or `$HOME` by accident would turn a slip in a file dialog into a
+  very slow index over a home directory.
+- **A key is qualified by project**: `campaign:<pid>:<cid>`, `round:<pid>:<rel>`,
+  `directory:<pid>:<rel>` and so on, built only by `keys.py`. Before multi-root the
+  literals were scattered through `collection.py`, `plan.py` and `workspace.py`; they
+  are now constructed in one module, because a format with seven call sites is a format
+  that drifts.
+
+**Folders are real directories under `campaigns/`.** `Nova pasta` creates one;
+`Mover para…` moves a campaign into one. The new kind is `directory` — *not* `folder`,
+which already means the grouping by matrix inside a campaign and keeps meaning it. Two
+consequences are load-bearing: the walk under `campaigns/` is `rglob`, so a campaign in
+a subdirectory is indexed like any other; and empty directories are kept, so a folder
+that was just created is visible immediately and has somewhere to receive a campaign.
+Only campaigns move, because the first path component is what decides a document's kind
+— a round moved out of `rounds/` would silently turn the editor against another loader.
+A campaign's key comes from its own `id:` field, so moving the file changes neither the
+key nor the selection, and the entries in its manifest are relative to the content root,
+so it does not break its own references either. Git sees one rename.
+
+**The MCP server can run inside the client.** Driving the harness from a model used to
+mean a second process with its own working directory and its own idea of which project
+it was looking at; with the window open, the two would each index the collection and
+neither would see the other's runs. `mcp/runtime.py` runs `streamable_http_app()` under
+a `uvicorn.Server` the class owns — `MCPServer.run` builds its own and keeps no
+reference, so a switch built on it would turn on and never off — on loopback, asserted
+by the same `assert_local_bind` that `serve` and `desktop` pass through. A missing `mcp`
+extra is a *state*, not a crash: `MCP_EXTRA_MISSING` with the `pip install` line reaches
+the dialog instead of taking the window down.
+
+The three share one invariant: **the engine is still a single worker**, so `ROUND_BUSY`
+is global rather than per project. There is no second worker to run your other project
+while this one walks, and pretending otherwise would be a promise the run directory
+cannot keep — one `runs/latest` per project is already the reason a run is not shared.
+
+### 9.8 A run waiting for a verdict is not a modal
+
+The first version of the parked-run rule read well and behaved badly: while
+`engine.awaiting` was set, `_pane` returned `review` for *every* selection, so the
+window was pinned to the step under review and the tree stopped answering. The rule that
+replaced it is narrower — the parked step holds the pane only while the selection is the
+plan that owns it (the round being walked, its cases, or the node the plan started from);
+anything else opens what was selected, and `WorkspaceView.pending_key` names the row to
+jump back to, which the strip offers as **Ir ao passo em espera** whenever it is not on
+screen. The run is still the authority on what is *pending*; it is no longer the
+authority on what the reviewer is allowed to look at.
+
+Two client-side rules keep that from being undone by the event stream:
+
+- **A click outranks an older read.** The bootstrap arrives over SSE and a selection is a
+  request/response; when a frame written before a click lands after it, the pane snaps
+  back to the previous node. `useHarness` stamps each mutation with an epoch and drops
+  any read issued before the last applied one, so the stream catches up to the reviewer
+  rather than the reverse.
+- **One tooltip layer, not nine hundred.** The tree marks rows with `data-tip` and a
+  single `TipLayer` at the root answers `pointerover`/`focusin`; a Radix tooltip per row
+  is a per-row subscription on a list whose whole point is to be long.
+- **A finished plan is not a running one.** `plan_label` outlives the plan — the strip
+  names the last one — so a roll-up that asked "is a plan running in this item?" by
+  label kept answering yes to a campaign that had just ended: the live card stayed, the
+  Start buttons stayed behind "a plan is already running here", and the elapsed clock
+  kept climbing, until the process restarted. The predicate now requires
+  `!engine.finished`, and `RunEngine._end` is the one place a terminal phase is set, so
+  the clock stops with the phase it belongs to.
+
+### 9.9 Indexing reads each file once per change
+
+`WorkspaceSession.refresh()` parses every contract, case, round, suite and campaign to
+build the tree, and a campaign is free to include the same round twice. Measured on a
+179-file workspace where 70 rounds referenced a shared set, one refresh was 1,059 YAML
+parses and 13,775 `model_validate` calls — 7.1 seconds, once per case that finished,
+which is the pause that reads as "the window froze". `schema/load.py` now keys the raw
+mapping and the validated model on `(path, mtime_ns, size)`, so the second reader of a
+file gets a deep copy (mappings) or the model itself (validated), and the same refresh
+costs ~120 ms. The content is still trusted to change: the stamp is the filesystem's, so
+an edit invalidates both entries without anyone remembering to. Handing out one validated
+model to many callers is safe because nothing in this codebase assigns to a field of a
+loaded model — the one place that needs a variation calls `model_copy`; the mutable list
+`load_cases` returns is wrapped fresh for that reason. Both caches drop wholesale past a
+thousand entries, which costs one re-parse of whatever is in use and cannot leave a stale
+entry behind.
+
 ---
 
 ## 10. What is deliberately absent
 
-- **No browser.** The step kind was removed in Etapa 1 and preserved on the tag
-  `e3-freeze`. When it returns it returns as a provider, never as core code.
+- **No browser automation.** The step kind was removed in Etapa 1 and preserved on the
+  tag `e3-freeze`. When it returns it returns as a provider, never as core code. This
+  is a different thing from the desktop shell of §9.2, and the difference is the one
+  that matters: Playwright and axe *drive a browser to test a frontend*, and no part
+  of reviewing an API should ever need one. pywebview *displays this harness's own
+  screen* and automates nothing. The gate that checks this checks for `playwright`
+  and `axe`, not for a webview.
 - **No test runner integration.** This is not pytest's job and it does not report to
   it. A round is a review with a human at the end.
 - **No schema of a product's business rules.** Rules are `rules[]` in a contract, and
@@ -663,3 +980,7 @@ Its copy is in Portuguese; its code, CLI output and documentation are in English
 - **No guessing.** When the descriptor does not say, the harness skips with a reason.
   The alternative — a default that looks like a fact — is how a sandbox case ends up
   running against production.
+- **No remote anything.** The registry of §9.7 is one machine's organisation, not a
+  team's: it lives in the user's home, the MCP server binds loopback and is switched on
+  by hand, and there is no account, no sync and no service to run. The deployment story
+  is a `pip install` and a window.

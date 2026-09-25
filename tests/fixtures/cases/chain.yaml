@@ -1,0 +1,26 @@
+# Two cases where the second cannot run without the first.
+#
+# `chain-H01` mints `chain_id` from the response of the API; `chain-H01-linked`
+# spends it in its own body. That is the shape of every authentication chain — A0
+# mints the JWT, A1..A4 spend it — reduced to two cases and no credential.
+chain-H01:
+  contract: contracts/qa-chain-post.yaml
+  kind: H01
+  gate: auto
+  tags:
+    - function
+  expect:
+    status: 202
+  capture_response:
+    chain_id: id
+
+chain-H01-linked:
+  contract: contracts/qa-chain-post.yaml
+  kind: H01
+  gate: auto
+  tags:
+    - function
+  expect:
+    status: 202
+  generate:
+    parent_id: captured.chain_id

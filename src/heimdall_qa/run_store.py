@@ -17,13 +17,25 @@ def create_run(
     runs_dir: Path,
     round_id: str,
     *,
+    label: str | None = None,
     now: datetime | None = None,
 ) -> Path:
+    """A fresh run directory, named so a partial run cannot pass for the round.
+
+    `label` is the selection (`case-<id>`, `from-<id>`) and it rides in the name
+    after a `~`, the separator the `~2` dedup suffix already uses. That is what keeps
+    a single-case run from becoming *the* run of its round: `campaign._RUN_DIR` reads
+    the name as `<stamp>-<round id>` with an optional `~N`, and
+    `find_latest_run(round_id)` compares the whole tail, so `auth-register~case-H01`
+    does not answer for `auth-register`. The round's own status stays the whole
+    round's, which is the only thing it can honestly be.
+    """
     stamp = (now or datetime.now()).strftime("%Y-%m-%dT%H%M")
-    path = runs_dir / f"{stamp}-{round_id}"
+    base = f"{stamp}-{round_id}" if not label else f"{stamp}-{round_id}~{label}"
+    path = runs_dir / base
     extra = 2
     while path.exists():
-        path = runs_dir / f"{stamp}-{round_id}~{extra}"
+        path = runs_dir / f"{base}~{extra}"
         extra += 1
     path.mkdir(parents=True)
     return path

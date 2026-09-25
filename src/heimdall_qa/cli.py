@@ -12,6 +12,7 @@ from heimdall_qa.discovery import render_report
 from heimdall_qa.errors import HarnessError
 from heimdall_qa.errors import format_cli
 from heimdall_qa.findings import explain
+from heimdall_qa.mcp.runtime import DEFAULT_PORT as DEFAULT_MCP_PORT
 from heimdall_qa.operations import Settings
 from heimdall_qa.operations import build_workspace
 from heimdall_qa.operations import campaign_report
@@ -25,6 +26,8 @@ from heimdall_qa.operations import scaffold_contract_round
 from heimdall_qa.operations import validate_campaign_file
 from heimdall_qa.operations import validate_round_file
 from heimdall_qa.operations import write_starter
+from heimdall_qa.projects import ProjectsRegistry
+from heimdall_qa.serve import api
 from heimdall_qa.serve.app import create_app
 from heimdall_qa.serve.bind import assert_local_bind
 
@@ -32,7 +35,10 @@ from heimdall_qa.serve.bind import assert_local_bind
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="heimdall-qa",
-        description="Heimdall QA review harness",
+        description=(
+            "Heimdall QA review harness. Run it with no command to open the desktop"
+            " client over every project you have registered."
+        ),
     )
     parser.add_argument(
         "--version",
@@ -45,6 +51,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print exception cause and traceback",
     )
+    # No `--root` here on purpose. A flag on the main parser would be *silently*
+    # discarded by the subcommand's own default — argparse copies the subparser's
+    # namespace over this one — so `heimdall-qa --root ~/api run r.yaml` would measure
+    # the working directory and say nothing about it. The bare form needs no root: the
+    # working directory is the default everywhere, and `--root` lives on `desktop`,
+    # `serve` and the rest, where argparse enforces it.
     subparsers = parser.add_subparsers(dest="command")
     init_parser = subparsers.add_parser(
         "init",
@@ -204,6 +216,21 @@ def build_parser() -> argparse.ArgumentParser:
     serve_parser.add_argument("--root", default=None)
     serve_parser.add_argument("--config", default=None)
     serve_parser.add_argument("--secrets", default=None)
+    serve_parser.add_argument("--mcp-port", type=int, default=None)
+    desktop_parser = subparsers.add_parser(
+        "desktop",
+        help="Open the review client in a native window",
+    )
+    desktop_parser.add_argument(
+        "target",
+        nargs="?",
+        default=None,
+        help="Optional campaign or round YAML; omit to open the collection workspace",
+    )
+    desktop_parser.add_argument("--root", default=None)
+    desktop_parser.add_argument("--config", default=None)
+    desktop_parser.add_argument("--secrets", default=None)
+    desktop_parser.add_argument("--mcp-port", type=int, default=None)
     fixture_parser = subparsers.add_parser(
         "fixture",
         help="Print faker/validate-docbr identity JSON for case authors",
@@ -256,6 +283,11 @@ def _settings(args: argparse.Namespace, *, runs_dir: Path | None = None) -> Sett
 
 
 def _dispatch(args: argparse.Namespace) -> int:
+    # No subcommand means the client. `heimdall-qa` on its own is the command the
+    # documentation opens with, and making it print argparse's usage instead would be
+    # the harness asking the reader to guess which of thirteen verbs opens the window.
+    if args.command is None:
+        return _run_desktop(args)
     if args.command == "init":
         return _run_init(args)
     if args.command == "validate":
@@ -274,6 +306,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _run_last_run(args)
     if args.command == "serve":
         return _run_serve(args)
+    if args.command == "desktop":
+        return _run_desktop(args)
     if args.command == "fixture":
         return _run_fixture(args)
     return 0
@@ -411,24 +445,103 @@ def _run_last_run(args: argparse.Namespace) -> int:
 
 
 def _run_serve(args: argparse.Namespace) -> int:
+    """The same client as `desktop`, in whatever browser the reader already has.
+
+    Kept because a window on a remote box is not a thing, and because a reviewer
+    debugging the client wants devtools. What it is *not* is a second renderer: it
+    mounts the built bundle from `serve/webapp.py`, exactly like the pywebview window
+    does, and it refuses to start if the bundle has not been built.
+
+    The printed URL carries the token, and that is not a convenience: every `/api/*`
+    route demands one, so a bare `http://host:port` opened in a browser would render an
+    empty shell with a 401 in the console for every call. This used to print exactly
+    that. The fragment is the same channel the window uses — never sent to the server,
+    unreadable from another origin, and scrubbed by the client on its first paint.
+
+    `flush=True` because this line is the only way to reach the client and the call
+    below never returns. Off a terminal — a pipe, a log file, a process manager —
+    stdout is block-buffered, so an unflushed URL sits in the buffer until the process
+    ends, which is to say never, and the reviewer is left with a port and no token.
+    """
     import uvicorn
+
+    from heimdall_qa.serve.webapp import webapp_dir
 
     settings = _settings(args)
     assert_local_bind(settings.config.ui.host)
+    token = api.new_token()
     client = httpx.Client(timeout=10.0)
+    remember_root(args)
     workspace = build_workspace(settings, client=client, target=getattr(args, "target", None))
-    app = create_app(workspace=workspace)
-    print(f"http://{settings.config.ui.host}:{settings.config.ui.port}")
+    app = create_app(
+        workspace=workspace,
+        api_token=token,
+        webapp=webapp_dir(),
+        mcp_port=_mcp_port(args),
+    )
+    host, port = settings.config.ui.host, settings.config.ui.port
+    print(f"http://{host}:{port}/#token={token}", flush=True)
     try:
         uvicorn.run(
             app,
-            host=settings.config.ui.host,
-            port=settings.config.ui.port,
+            host=host,
+            port=port,
             access_log=False,
         )
     finally:
         client.close()
     return 0
+
+
+def _mcp_port(args: argparse.Namespace) -> int:
+    """The embedded MCP server's port, defaulted in `mcp.runtime` and not here."""
+    return getattr(args, "mcp_port", None) or DEFAULT_MCP_PORT
+
+
+def remember_root(args: argparse.Namespace) -> None:
+    """Record a `--root` so the next launch opens it without being told again.
+
+    Only an explicit `--root` is remembered. The working directory is *not*: every
+    other command treats it as a default, and a client that silently enrolled whatever
+    directory it happened to be started from would fill the registry with the shell's
+    own habits.
+
+    A directory that does not look like a project is **not** an error here — the reader
+    may be opening one they are about to `init`. It is a note on stderr and the launch
+    continues, because the alternative is refusing to show somebody the project they
+    just asked to see.
+    """
+    raw = getattr(args, "root", None)
+    if not raw:
+        return
+    try:
+        entry = ProjectsRegistry().add(Path(raw))
+    except HarnessError as err:
+        if err.code != "REGISTRY_NOT_A_PROJECT":
+            raise
+        print(
+            f"note: {err.message} — opening it for now, but not remembering it",
+            file=sys.stderr,
+        )
+        return
+    print(f"remembered project {entry.id} at {entry.root}", file=sys.stderr)
+
+
+def _run_desktop(args: argparse.Namespace) -> int:
+    """The same workspace as `serve`, with a window instead of a port to open.
+
+    Imported here rather than at the top of the module: `--help` must not need
+    pywebview, and neither must any other subcommand. The whole tree is importable
+    without a GUI stack, which is what keeps the core installable on a server.
+    """
+    from heimdall_qa.desktop.app import run_desktop
+
+    remember_root(args)
+    return run_desktop(
+        _settings(args),
+        target=getattr(args, "target", None),
+        mcp_port=_mcp_port(args),
+    )
 
 
 def _print_verbose(err: BaseException) -> None:

@@ -113,3 +113,84 @@ jobs:
       # Builds the fixture with the Maven wrapper, starts it, reads its source tree,
       # and runs a round against the running application.
       - run: bash examples/spring-fixture/gate.sh
+
+  client:
+    name: The client — typecheck, lint, test, and a bundle that is not stale
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/webapp/package-lock.json
+      # `ci` and not `install`: the lockfile is the build, and this job is where that
+      # claim is measured. The workspace is inside `desktop/`, outside `src/`, so the
+      # Python package never learns Node exists.
+      - run: npm ci
+        working-directory: desktop/webapp
+      - run: npm run typecheck
+        working-directory: desktop/webapp
+      - run: npm run lint
+        working-directory: desktop/webapp
+      - run: npm test
+        working-directory: desktop/webapp
+      - run: npm run build
+        working-directory: desktop/webapp
+      # The bundle is committed so `pip install` never needs Node — the same contract a
+      # lockfile has, and the reason a source install and a wheel install draw the same
+      # screen. A rebuild that differs from what is committed means the committed copy
+      # is stale, and the reviewer would be looking at last week's client.
+      #
+      # `git add -N` first: without it, a bundle that was never committed is untracked
+      # and `git diff` reports nothing at all, which is the drift this step exists to
+      # catch reported as success.
+      - name: The committed bundle matches the sources
+        run: |
+          git add -N src/heimdall_qa/desktop/webapp
+          git diff --stat -- src/heimdall_qa/desktop/webapp
+          git diff --exit-code -- src/heimdall_qa/desktop/webapp
+
+  wheel:
+    name: The wheel — the client's bundle is actually inside it
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build --wheel
+      # The trap this exists for, and it is not hypothetical: `package-data` with a `*`
+      # glob does not cross a `/` in setuptools, so a nested asset tree is silently left
+      # out of the wheel while the source checkout keeps working. `panel/detail.html`
+      # shipped broken that way once, before phase 6 deleted it. The client's bundle is
+      # five directories deep and is the largest thing in the distribution.
+      - name: The client's bundle is in the wheel
+        run: |
+          python - <<'PY'
+          import glob
+          import zipfile
+
+          wheel = glob.glob("dist/*.whl")[0]
+          names = zipfile.ZipFile(wheel).namelist()
+          required = [
+              "heimdall_qa/desktop/webapp/index.html",
+              "heimdall_qa/desktop/app.py",
+              "heimdall_qa/serve/webapp.py",
+          ]
+          missing = [name for name in required if name not in names]
+          assets = [name for name in names if "desktop/webapp/assets/" in name]
+          if missing:
+              raise SystemExit(f"FAIL: absent from the wheel: {missing}")
+          if len(assets) < 5:
+              raise SystemExit(f"FAIL: only {len(assets)} client asset(s) in the wheel")
+          # And the renderer the client replaced is gone, not merely unused: a wheel
+          # that still carried the Jinja tree would be shipping a second screen.
+          stale = [name for name in names if "serve/templates/" in name]
+          if stale:
+              raise SystemExit(f"FAIL: the retired renderer is in the wheel: {stale}")
+          print(f"{wheel}: {len(names)} entries, {len(assets)} client assets")
+          PY

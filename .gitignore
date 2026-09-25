@@ -34,6 +34,7 @@ runs/
 
 # ── Python ────────────────────────────────────────────────────────────────────
 .venv/
+.venv*
 venv/
 __pycache__/
 *.py[cod]
@@ -46,6 +47,26 @@ coverage.xml
 htmlcov/
 dist/
 build/
+
+# ── The desktop client's toolchain ────────────────────────────────────────────
+# `node_modules/` is not a build artifact of this project; it is a copy of the
+# registry, and `bin/audit-remote` reads every file `git ls-files -co` reports. Left
+# unignored it would enter the published set, be scanned line by line for product
+# tokens and copied file by file into the audit tree, for a dependency list nobody
+# reviews. The *built* bundle is the opposite: it is committed on purpose (under
+# `src/heimdall_qa/desktop/webapp/`) so `pip install` never runs npm, so nothing here
+# may ignore it.
+node_modules/
+.npm/
+.pnpm-store/
+# Vite's caches. The output directory is `src/heimdall_qa/desktop/webapp/` on purpose,
+# both to escape this rule and because the wheel has to ship it.
+desktop/node_modules/
+desktop/webapp/node_modules/
+desktop/webapp/.vite/
+desktop/webapp/coverage/
+desktop/webapp/playwright-report/
+desktop/webapp/test-results/
 
 # ── The Java parity target ────────────────────────────────────────────────────
 # `examples/spring-fixture/` is source; `target/` is that source compiled into 21 MB

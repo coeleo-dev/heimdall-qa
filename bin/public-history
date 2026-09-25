@@ -32,7 +32,9 @@ ARCHIVE="${ARCHIVE_BRANCH:-master}"
 #: Every branch allowed to exist and hold product: the archive, which is never pushed.
 #: A branch outside this list and outside the published one is a question rather than a
 #: failure — someone made it for a reason, and the reason decides whether it may stay.
-ARCHIVE_BRANCHES="${ARCHIVE_BRANCHES:-master ui-browser}"
+#: `desktop` is declared ahead of its PR: the client was built on it, and `--check`
+#: would otherwise refuse a branch that is named in this repository's own plan.
+ARCHIVE_BRANCHES="${ARCHIVE_BRANCHES:-master ui-browser desktop}"
 MESSAGE="Heimdall QA 0.1.0 — the first public tree.
 
 A review harness for the HTTP surface of a REST API, published as a single

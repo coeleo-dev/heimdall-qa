@@ -17,6 +17,7 @@ from heimdall_qa.schema.load import existing_case_ids
 from heimdall_qa.schema.load import iter_cases
 from heimdall_qa.schema.load import load_case
 from heimdall_qa.schema.load import load_cases
+from heimdall_qa.schema.load import load_yaml
 from heimdall_qa.schema.load import split_selector
 
 #: Two cases of one area, in the order a round has to run them: the replay spends
@@ -127,3 +128,57 @@ def test_existing_case_ids_reads_the_disk_order(tmp_path: Path):
         "ingest-I-replay",
     ]
     assert existing_case_ids(tmp_path / "cases" / "absent.yaml") == []
+
+
+def test_an_edited_file_is_re_read_and_not_served_from_the_cache(tmp_path: Path):
+    """The cache is keyed on the file's stamp, so an edit is never a stale read.
+
+    Indexing a project parses and validates the same file a dozen times — once per round
+    that includes it and again for each round's validation — so the result is cached.
+    The one way that becomes a bug is if the cache outlives the file: a reviewer who
+    saves a case and does not see the tree change would have no way to tell a broken
+    cache from a broken save.
+    """
+    path = tmp_path / "cases" / "thing.yaml"
+    path.parent.mkdir()
+    path.write_text(
+        "thing-H01:\n"
+        "  contract: contracts/thing.yaml\n"
+        "  kind: H01\n"
+        "  expect:\n"
+        "    status: 202\n",
+        encoding="utf-8",
+    )
+    assert [case.id for case in load_cases(path)] == ["thing-H01"]
+
+    path.write_text(
+        "thing-H01:\n"
+        "  contract: contracts/thing.yaml\n"
+        "  kind: H01\n"
+        "  expect:\n"
+        "    status: 202\n"
+        "thing-N-omit:\n"
+        "  contract: contracts/thing.yaml\n"
+        "  kind: N-omit\n"
+        "  expect:\n"
+        "    status: 400\n",
+        encoding="utf-8",
+    )
+    assert [case.id for case in load_cases(path)] == ["thing-H01", "thing-N-omit"]
+
+
+def test_a_caller_cannot_poison_the_cache_by_mutating_what_it_loaded(tmp_path: Path):
+    """What a load hands over is the caller's; the cached copy is nobody's.
+
+    The parse is cached, and the cheapest way to serve it is to hand out the same dict
+    — which would make one caller's edit visible to every later reader, across projects
+    and across requests, with no file to point at. The copy on the way out is what makes
+    that impossible, and this is the assertion that keeps it there.
+    """
+    path = tmp_path / "cases" / "thing.yaml"
+    path.parent.mkdir()
+    path.write_text("thing-H01:\n  contract: contracts/thing.yaml\n", encoding="utf-8")
+
+    first = load_yaml(path)
+    first["injected"] = True
+    assert "injected" not in load_yaml(path)

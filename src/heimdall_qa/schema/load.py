@@ -12,11 +12,14 @@ inside it is the same reference with a fragment — `cases/ingest.yaml#ingest-H0
 and that is the only selector shape there is.
 """
 
+import copy
+from collections.abc import Callable
 from collections.abc import Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import NamedTuple
+from typing import cast
 
 import yaml
 
@@ -32,6 +35,15 @@ if TYPE_CHECKING:
 #: What separates a case file from the one case inside it. There is no second
 #: spelling: a selector a human has to guess at is a selector nobody uses.
 SELECTOR = "#"
+
+#: Parsed YAML, keyed by the file's own stamp. See `load_yaml` for why it exists and
+#: why the limit is enforced by clearing rather than by evicting one entry.
+_YAML_CACHE: dict[tuple[str, int, int], dict[str, Any]] = {}
+_YAML_CACHE_LIMIT = 1024
+
+#: Validated models, keyed by `(kind, path, mtime_ns, size)`. See `_validated`.
+_MODEL_CACHE: dict[tuple[str, str, int, int], object] = {}
+_MODEL_CACHE_LIMIT = 1024
 
 
 class LoadedCase(NamedTuple):
@@ -107,15 +119,68 @@ def split_selector(raw: str) -> tuple[str, str]:
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
-    with path.open(encoding="utf-8") as handle:
-        data = yaml.load(handle, Loader=_StrictLoader)
+    """The mapping a YAML file holds, or a `ValueError` naming what is wrong with it.
+
+    `yaml.YAMLError` is not a `ValueError`, and that one fact leaked. Every caller in
+    this codebase catches `(ValidationError, ValueError, OSError)` for "this file is
+    bad" — that is the declared vocabulary, and `runner._LOAD_ERRORS` spells it out —
+    so a YAML *syntax* typo, the most ordinary mistake in a file a person hand-writes,
+    escaped as an internal error wherever the tuple did not also happen to name
+    `YAMLError`. Saving a contract with a stray `[` returned a 500 instead of
+    `CONTRACT_UNREADABLE`, and `heimdall-qa validate` on a round whose coverage
+    contract had one reported `STEP_INTERNAL` — "the harness broke" — for a typo.
+
+    The message is passed through unchanged, so the line and column the parser reports
+    still reach the reader. Only the type changes, to the one every caller already
+    catches. `OSError` is left alone: a missing file is not a malformed one.
+
+    **Parsed once per file per change.** This is not an optimisation for its own sake:
+    it is what keeps the review screen responsive. Indexing a project re-reads the same
+    case file once per round that includes it and again for every validation of that
+    round, which on a real collection was 1059 parses of 179 files — seven seconds of
+    PyYAML, per unit the plan moves to, with the UI blocked behind it. The key is the
+    file's own stamp (`mtime_ns` and size), so an edit invalidates it and nothing has
+    to remember to. The copy on the way out is deliberate: 1% of the parse cost, and it
+    keeps a caller that mutates what it loaded from poisoning every later reader.
+    """
+    stamp = _stamp(path)
+    if stamp is not None:
+        cached = _YAML_CACHE.get(stamp)
+        if cached is not None:
+            return copy.deepcopy(cached)
+    try:
+        with path.open(encoding="utf-8") as handle:
+            data = yaml.load(handle, Loader=_StrictLoader)
+    except yaml.YAMLError as exc:
+        raise ValueError(str(exc)) from exc
     if not isinstance(data, dict):
         raise ValueError(f"YAML must be a mapping: {path}")
+    if stamp is not None:
+        if len(_YAML_CACHE) >= _YAML_CACHE_LIMIT:
+            # A session that edits the same file forty times would otherwise grow this
+            # without bound. Clearing wholesale costs one re-parse of what is in use
+            # and cannot leak a stale entry, which is worth more than hit rate here.
+            _YAML_CACHE.clear()
+        _YAML_CACHE[stamp] = data
+        return copy.deepcopy(data)
     return data
 
 
+def _stamp(path: Path) -> tuple[str, int, int] | None:
+    """`(path, mtime_ns, size)` — what a parsed file is cached under.
+
+    `None` when the file cannot be stat'd, which is the case `load_yaml` is about to
+    report as an `OSError` anyway: a missing file is not cached and not a cache miss.
+    """
+    try:
+        info = path.stat()
+    except OSError:
+        return None
+    return (str(path), info.st_mtime_ns, info.st_size)
+
+
 def load_contract(path: Path) -> Contract:
-    return Contract.model_validate(load_yaml(path))
+    return _validated("contract", path, lambda: Contract.model_validate(load_yaml(path)))
 
 
 def load_cases(path: Path) -> list[CaseFile]:
@@ -126,6 +191,12 @@ def load_cases(path: Path) -> list[CaseFile]:
     shared captures, and `H01` creating what the `I-*` cases replay is not an
     accident a sort can be trusted to preserve.
     """
+    # A fresh list around the cached models: the caller owns the list it is handed,
+    # and every caller in this codebase only reads the cases. See `_validated`.
+    return list(_validated("cases", path, lambda: tuple(_build_cases(path))))
+
+
+def _build_cases(path: Path) -> list[CaseFile]:
     cases: list[CaseFile] = []
     for case_id, body in _case_bodies(path).items():
         if not isinstance(body, dict):
@@ -220,12 +291,39 @@ def _case_bodies(path: Path) -> dict[str, Any]:
 
 
 def load_round(path: Path) -> RoundFile:
-    return RoundFile.model_validate(load_yaml(path))
+    return _validated("round", path, lambda: RoundFile.model_validate(load_yaml(path)))
 
 
 def load_suite(path: Path) -> SuiteFile:
-    return SuiteFile.model_validate(load_yaml(path))
+    return _validated("suite", path, lambda: SuiteFile.model_validate(load_yaml(path)))
 
 
 def load_campaign(path: Path) -> CampaignFile:
-    return CampaignFile.model_validate(load_yaml(path))
+    return _validated("campaign", path, lambda: CampaignFile.model_validate(load_yaml(path)))
+
+
+def _validated[T](kind: str, path: Path, build: Callable[[], T]) -> T:
+    """One file's validated model, built once per change.
+
+    The other half of `load_yaml`'s cache, and the half that matters more: indexing a
+    project validates the same case file once per round that includes it — 13775
+    `model_validate` calls to draw one tree — and the validation is not free even when
+    the parse is. Read-only by contract: nothing in this codebase assigns to a field of
+    a loaded model (the one place that needs a variation calls `model_copy`), which is
+    what makes handing the same object to every caller safe rather than a trap.
+
+    Raises are never cached. A file reported as broken stays broken until it is fixed,
+    and the next read is what finds that out.
+    """
+    stamp = _stamp(path)
+    if stamp is None:
+        return build()
+    key = (kind, *stamp)
+    cached = _MODEL_CACHE.get(key)
+    if cached is not None:
+        return cast(T, cached)
+    value = build()
+    if len(_MODEL_CACHE) >= _MODEL_CACHE_LIMIT:
+        _MODEL_CACHE.clear()
+    _MODEL_CACHE[key] = value
+    return value

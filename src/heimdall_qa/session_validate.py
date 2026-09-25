@@ -358,24 +358,63 @@ def _seed_findings(
     findings: list[ValidationFinding] = []
     for item in cases:
         contract = _contract_of(item, contracts, root, project)
-        findings.extend(_case_seed_findings(item, project))
+        findings.extend(_case_seed_findings(item, project, contract))
         if contract is not None and contract.baseline:
             findings.extend(_baseline_seed_findings(item, contract, root, project))
     return findings
 
 
+def _rule_declared_set(kind: str, contract: Contract | None) -> dict[str, Any]:
+    """The `set` the contract's own rule declares, as leaf paths to values.
+
+    A rule case names the rule it triggers (`N-rule-INVALID_CPF`), and the contract
+    declares what triggers it. Where the case restates that value in its own
+    `diff.set`, the value is the case's **subject** — and the filler check below
+    cannot tell it from a seed nobody filled, because the two have the same shape.
+    `'11111111111'` is eleven ones: as a filler that is laziness, as a CPF it is a
+    document whose check digits cannot pass. The contract is what says which one it is,
+    and this is where that is read.
+
+    Sibling of `autofill.mechanical_diff`, which builds a rule case's `diff` from this
+    same `set`; a case written by machine and a case written by hand then agree on what
+    the rule's trigger is.
+    """
+    if contract is None:
+        return {}
+    if kind.startswith("N-rule-"):
+        rules = contract.rules
+        wanted = kind.removeprefix("N-rule-")
+    elif kind.startswith("P-"):
+        rules = contract.live_only_rules
+        wanted = kind.removeprefix("P-")
+    else:
+        return {}
+    for rule in rules:
+        if rule.id == wanted:
+            return {path: value for path, value in _leaves(rule.set or {})}
+    return {}
+
+
 def _case_seed_findings(
     item: LoadedCase,
     project: ProjectView,
+    contract: Contract | None = None,
 ) -> list[ValidationFinding]:
     findings: list[ValidationFinding] = []
     generated = set(item.case.generate or {})
     assigned = item.case.diff.get("set") if isinstance(item.case.diff.get("set"), dict) else {}
+    declared = _rule_declared_set(item.case.kind, contract)
     for path, value in _leaves(assigned):
         if not isinstance(value, str):
             continue
         if is_seed(value) and path not in generated:
             findings.append(_seed_finding(item.reference, f"diff.set.{path}", value))
+            continue
+        if declared.get(path) == value:
+            # The rule this case triggers declares this exact value, so the case is
+            # stating its trigger and not leaving a seed. Read as a filler, the advice
+            # would be to `generate` a *valid* document — the one value that cannot
+            # provoke the rule the case exists for.
             continue
         kind = _identity_kind(path.rsplit(".", 1)[-1], project)
         if kind is not None and _FILLER.match(value):

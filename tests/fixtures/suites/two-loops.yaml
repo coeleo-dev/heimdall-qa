@@ -1,0 +1,21 @@
+id: two-loops
+catalog:
+  notes: A round written as a suite, so its tree children are steps and not case files.
+steps:
+  - loop:
+      times: 2
+      case: cases/chain.yaml#chain-H01
+  - loop:
+      times: 1
+      case: cases/chain.yaml#chain-H01-linked
+  - probe:
+      id: two-loops
+      oracle:
+        catalog: session
+        metering: body_amount
+        ingest: flat_session
+      surfaces:
+        - id: wallet
+          get: /qa/note
+          jsonpath: $.status
+          expect: exact

@@ -39,6 +39,7 @@ from heimdall_qa.errors import to_dict
 from heimdall_qa.findings import ValidationFinding
 from heimdall_qa.findings import explain
 from heimdall_qa.operations import Settings
+from heimdall_qa.projects import ProjectsRegistry
 from heimdall_qa.serve.bind import assert_local_bind
 
 INSTRUCTIONS = """\
@@ -51,9 +52,25 @@ a fixture can generate, and never make a failing round pass by editing its expec
 — a waiver needs a registered gap."""
 
 
+def _default_root() -> Path:
+    """The first project the client has open, or the working directory.
+
+    A server launched by an MCP client has no meaningful working directory: it is
+    whatever the client happened to start from, which is often the home directory or
+    `/`. Falling back to the registry means a model that says
+    `validate_round("rounds/smoke.yaml")` with no root measures the project the person
+    has open — which is the one they are asking about — instead of failing against a
+    directory nobody chose.
+    """
+    entries = ProjectsRegistry().load()
+    if entries:
+        return entries[0].root
+    return Path.cwd()
+
+
 def _settings(root: str | None, *, runs_dir: str | None = None) -> Settings:
     """The wiring, with the server's two defaults rather than the CLI's."""
-    where = Path(root) if root else Path.cwd()
+    where = Path(root) if root else _default_root()
     return operations.resolve_settings(
         where,
         runs_dir=Path(runs_dir) if runs_dir else where / "runs",

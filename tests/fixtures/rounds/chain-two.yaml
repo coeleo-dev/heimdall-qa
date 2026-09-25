@@ -1,0 +1,8 @@
+id: chain-two
+suite: suites/unused.yaml
+mode: review
+dimensions:
+  - function
+environment: sandbox
+include:
+  - cases/chain.yaml

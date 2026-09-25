@@ -201,6 +201,54 @@ def test_a_baseline_seed_the_case_does_not_fill_is_refused(tmp_path: Path):
     assert "SEED_PLACEHOLDER" in _codes(findings)
 
 
+def test_the_value_a_rule_declares_is_not_read_as_a_filler(tmp_path: Path):
+    """`N-rule-INVALID_CPF` sends eleven ones because that CPF cannot pass.
+
+    The shape is a filler — one character repeated — and the meaning is the case's
+    whole subject. `HARDCODED_ID` already reads a broken document that way, through
+    `_literal_kind`'s `is_valid_document` test; this pins that the seed rule agrees,
+    so one value never gets an author two opposite answers.
+    """
+    contract = {
+        **_CONTRACT,
+        "rules": [
+            {
+                "id": "INVALID_CPF",
+                "status": 400,
+                "error": "Invalid CPF",
+                "set": {"document_number": "11111111111"},
+            }
+        ],
+    }
+    round_path = _tree(
+        tmp_path,
+        contract=contract,
+        case={
+            **_H01,
+            "kind": "N-rule-INVALID_CPF",
+            "expect": {"status": 400},
+            "diff": {"set": {"document_number": "11111111111"}},
+        },
+    )
+    assert "SEED_PLACEHOLDER" not in _codes(
+        validate_round(round_path, tmp_path, PROJECT)
+    )
+
+
+def test_a_filler_no_rule_declares_is_still_refused(tmp_path: Path):
+    """The repair is naming the rule, not writing a repeated character.
+
+    Without this the rule above would be a hole: `'11111111111'` under a document
+    field would be waved through anywhere. It is the *contract* that says the value is
+    a rule's trigger, and a case that claims no rule does not get to say so.
+    """
+    round_path = _tree(
+        tmp_path,
+        case={**_H01, "diff": {"set": {"document_number": "11111111111"}}},
+    )
+    assert "SEED_PLACEHOLDER" in _codes(validate_round(round_path, tmp_path, PROJECT))
+
+
 # ── HARDCODED_ID ───────────────────────────────────────────────────────────────
 
 
@@ -400,6 +448,44 @@ def test_the_cli_lists_the_rules_without_needing_a_round(tmp_path: Path):
     from heimdall_qa.cli import main
 
     assert main(["validate", "--explain"]) == 0
+
+
+# ── a file that does not parse is a finding, not an internal error ────────────
+
+
+def test_a_contract_with_a_yaml_typo_is_unreadable_and_not_step_internal(tmp_path: Path):
+    """The most ordinary mistake in a hand-written file, reported as one.
+
+    `yaml.YAMLError` is not a `ValueError`, so `_by_contract`'s
+    `(ValidationError, ValueError, OSError)` did not catch a YAML *syntax* error: a
+    stray `[` in a contract surfaced as `STEP_INTERNAL` — "the harness broke" — for a
+    typo, and through the desktop client it surfaced as a 500 with no message at all,
+    because the same call is what the collection index runs on every refresh.
+    """
+    round_path = _tree(tmp_path)
+    (tmp_path / "contracts" / "echo.yaml").write_text(
+        "endpoint: POST /qa/echo\nfields: {}\nrules: [\n",
+        encoding="utf-8",
+    )
+
+    findings = validate_round(round_path, tmp_path, PROJECT)
+
+    assert "CONTRACT_UNREADABLE" in _codes(findings)
+    unreadable = next(item for item in findings if item.code == "CONTRACT_UNREADABLE")
+    # The parser's own line and column survive, because that is what the reader acts
+    # on: `line 4, column 1` is a place to put the cursor.
+    assert "while parsing" in unreadable.message
+    assert "line 4, column 1" in unreadable.message
+
+
+def test_a_round_with_a_yaml_typo_is_unreadable_and_not_step_internal(tmp_path: Path):
+    """The same hole one level up: the round itself, not a contract it points at."""
+    round_path = _tree(tmp_path)
+    round_path.write_text("id: echo\ninclude: [\n", encoding="utf-8")
+
+    findings = validate_round(round_path, tmp_path, PROJECT)
+
+    assert _codes(findings) == {"ROUND_UNREADABLE"}
 
 
 # ── the rules that left the vocabulary ─────────────────────────────────────────

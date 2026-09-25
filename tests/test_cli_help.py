@@ -1,3 +1,4 @@
+import ast
 import subprocess
 import sys
 from pathlib import Path
@@ -86,12 +87,33 @@ def test_validate_h01_only_round_cli_fails():
 
 
 def test_fastapi_is_confined_to_serve():
+    """Only the serving layer may depend on the web framework.
+
+    Measured with `ast` and not by searching for the word: this is a rule about
+    *imports*, and a docstring that explains which app the desktop shell reuses is not
+    a dependency on it. The substring version flagged that prose and would have kept
+    flagging every honest sentence about the framework, which is how a real leak would
+    eventually get waved through.
+    """
     src = ROOT / "src" / "heimdall_qa"
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     assert "fastapi" in pyproject.lower()
-    leaked: list[str] = []
-    for path in src.rglob("*.py"):
-        text = path.read_text(encoding="utf-8")
-        if "fastapi" in text.lower() and "serve" not in path.parts:
-            leaked.append(str(path.relative_to(src)))
+    leaked = [
+        str(path.relative_to(src))
+        for path in sorted(src.rglob("*.py"))
+        if "serve" not in path.parts and _imports_fastapi(path)
+    ]
     assert leaked == []
+
+
+def _imports_fastapi(path: Path) -> bool:
+    """Whether a module imports `fastapi` or anything under it, at any nesting."""
+    module = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for node in ast.walk(module):
+        if isinstance(node, ast.Import):
+            if any(alias.name.split(".")[0] == "fastapi" for alias in node.names):
+                return True
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            if node.module.split(".")[0] == "fastapi":
+                return True
+    return False

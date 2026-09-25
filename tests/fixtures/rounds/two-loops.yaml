@@ -1,0 +1,8 @@
+id: two-loops
+suite: suites/two-loops.yaml
+mode: review
+dimensions:
+  - function
+environment: sandbox
+include:
+  - cases/chain.yaml

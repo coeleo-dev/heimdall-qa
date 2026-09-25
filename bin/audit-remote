@@ -45,6 +45,20 @@ bin/audit-remote
 tests/test_agent_protocol.py
 tests/test_skills.py
 tests/test_toy_example.py'
+#: Trees that are *generated*, and therefore not read as prose by claims 2 and 3.
+#:
+#: The desktop client's bundle is committed — it has to be, so `pip install` never
+#: needs Node — and it is 5.7 MB of minified JavaScript, one line of it 200 kB. It is
+#: a compiler's output, not something a person typed, and the two claims that read
+#: files exist to catch a name someone typed into the harness.
+#:
+#: The coverage is not lost by skipping it: a name can only reach the bundle through
+#: `desktop/webapp/src/**`, `index.html` and `index.css`, which are published and read
+#: like any other source. A dependency's name would have to come from `node_modules`,
+#: which is neither published nor read. Claims 2 and 3 report this exclusion in their
+#: own output, because a gate that overstates what it read is the failure this script
+#: exists to prevent.
+export HEIMDALL_AUDIT_GENERATED='src/heimdall_qa/desktop/webapp'
 
 step "claim 1 — the published set carries no product path"
 "$PY" - <<'PY'
@@ -86,6 +100,7 @@ from pathlib import Path
 
 pattern = re.compile(os.environ["HEIMDALL_AUDIT_TOKENS"], re.IGNORECASE)
 allowed = set(os.environ["HEIMDALL_AUDIT_ALLOWED"].splitlines())
+generated = tuple(os.environ["HEIMDALL_AUDIT_GENERATED"].split())
 listing = subprocess.run(
     ["git", "ls-files", "-co", "--exclude-standard"],
     capture_output=True,
@@ -95,7 +110,11 @@ listing = subprocess.run(
 listing = [path for path in listing if Path(path).is_file()]
 
 offenders: list[str] = []
+skipped = 0
 for path in listing:
+    if path.startswith(generated):
+        skipped += 1
+        continue
     if path in allowed:
         continue
     try:
@@ -111,7 +130,10 @@ if offenders:
     raise SystemExit(
         f"FAIL: {len(offenders)} line(s) name the product outside the guards"
     )
-print(f"  {len(listing)} files read, {len(allowed)} allowed to name it")
+print(
+    f"  {len(listing) - skipped} files read, {len(allowed)} allowed to name it,"
+    f" {skipped} generated and not read (their sources are)"
+)
 PY
 
 step "claim 3 — src/heimdall_qa/ names no product"
@@ -120,12 +142,18 @@ step "claim 3 — src/heimdall_qa/ names no product"
 # under the `pipefail` this file sets the pipeline reports failure — so a core that
 # named the product would have been reported as product-neutral. This is the claim the
 # whole boundary rests on; it does not get to be the one that cannot fail.
-offenders="$(grep -rInE "$HEIMDALL_AUDIT_TOKENS" src/heimdall_qa/ 2>/dev/null | head -20 || true)"
+#
+# `--exclude-dir=webapp` is the generated bundle, for the reason spelled out at
+# `HEIMDALL_AUDIT_GENERATED`: it is the client's build output, and the sources it is
+# built from are grep'd along with everything else.
+offenders="$(
+    grep -rInE --exclude-dir=webapp "$HEIMDALL_AUDIT_TOKENS" src/heimdall_qa/ 2>/dev/null | head -20 || true
+)"
 if [ -n "$offenders" ]; then
     printf '%s\n' "$offenders" >&2
     fail "the core names a product; that is the one thing it may never do"
 fi
-echo "  the core is product-neutral"
+echo "  the core is product-neutral (the generated webapp bundle is skipped)"
 
 step "claim 4 — the core suite passes in the tree as it would ship"
 # The directory is per-process, and that is not tidiness. The toy gate runs this gate

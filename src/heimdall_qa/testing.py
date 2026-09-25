@@ -48,3 +48,20 @@ def content_at(repo_root: Path, **log_paths: str) -> Path:
     """
     project = project_at(repo_root / "qa" / "project.yaml", **log_paths)
     return project.content_root(repo_root)
+
+
+def stub_client(root: Path) -> Path:
+    """A directory that passes the client check, for tests that are about the API.
+
+    `create_app` refuses to build without a built bundle, which is right — the whole
+    point of `WEBAPP_NOT_BUILT` is that a missing bundle must not open blank. But an
+    API test does not exercise the bundle, and pointing every one of them at the real
+    one would make the core's suite depend on `npm run build` having happened in this
+    checkout. One file is all the check asks for.
+    """
+    directory = root / "webapp"
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "index.html").write_text(
+        "<!doctype html><title>stub</title>", encoding="utf-8"
+    )
+    return directory

@@ -22,6 +22,7 @@ import yaml
 from pydantic import ValidationError
 from yaml import YAMLError
 
+from heimdall_qa import keys
 from heimdall_qa.campaign import campaign_status as _campaign_status
 from heimdall_qa.campaign import validate_campaign as _validate_campaign
 from heimdall_qa.collection import is_campaign_yaml
@@ -36,6 +37,10 @@ from heimdall_qa.findings import ValidationFinding
 from heimdall_qa.fixtures import build_payload
 from heimdall_qa.onboarding import write_starter_tree
 from heimdall_qa.project import ProjectView
+from heimdall_qa.projects import ProjectEntry
+from heimdall_qa.projects import ProjectRef
+from heimdall_qa.projects import ProjectsRegistry
+from heimdall_qa.projects import id_for
 from heimdall_qa.runner import execute_round
 from heimdall_qa.scaffold import scaffold_endpoint as _scaffold_endpoint
 from heimdall_qa.scaffold import scaffold_round as _scaffold_round
@@ -333,28 +338,115 @@ def build_workspace(
     *,
     client: httpx.Client,
     target: str | None = None,
+    registry: ProjectsRegistry | None = None,
 ) -> WorkspaceSession:
-    """The review session a `serve` process walks, focused on `target` if given."""
+    """The review session a client walks, over every project it has been told about.
+
+    The project the command was pointed at comes first and the registry follows, which
+    is what makes `heimdall-qa` inside a checkout draw that checkout at the top of the
+    tree with everything else one click away. `target` is resolved against that first
+    project: a target is a path inside one project's content, and with several open the
+    one `--root` or the working directory named is the one that was meant.
+    """
+    projects = open_projects(settings, registry=registry)
     focus: Path | None = None
     campaign: str | None = None
     if target:
-        path = resolve_path(settings.root, target, settings.config.project)
+        first = projects[0]
+        path = resolve_path(first.root, target, first.config.project)
         if is_campaign_yaml(path):
             campaign = _load_campaign_or_invalid(path).id
         else:
             _load_round_or_invalid(path)
             focus = path
-    workspace = WorkspaceSession(
-        root=settings.root,
-        config=settings.config,
-        client=client,
-        runs_dir=settings.runs_dir,
-        secrets=settings.secrets,
-        focus=focus,
-    )
+    workspace = WorkspaceSession(projects=projects, client=client, focus=focus)
     if campaign is not None:
-        workspace.select(f"campaign:{campaign}")
+        workspace.select(keys.for_campaign(projects[0].id, campaign))
     return workspace
+
+
+def open_projects(
+    settings: Settings,
+    *,
+    registry: ProjectsRegistry | None = None,
+) -> tuple[ProjectRef, ...]:
+    """The named project first, then every project the registry remembers.
+
+    Registration order is kept, because it is the order the reviewer built the file in
+    and re-sorting it would move their projects around under them for no reason they
+    asked for.
+
+    A registry line whose directory is gone is **skipped, not fatal**: a checkout that
+    was moved, renamed or deleted is ordinary, and refusing to launch the client over
+    one stale line would leave the reviewer no way to reach the dialog that removes it.
+    The line stays in the file — the client is not going to quietly rewrite a person's
+    registry to hide a problem they can see and fix.
+    """
+    registry = registry if registry is not None else ProjectsRegistry()
+    first = project_ref(settings)
+    opened = [first]
+    seen = {first.id}
+    for entry in registry.load():
+        if entry.id in seen or not entry.root.is_dir():
+            continue
+        seen.add(entry.id)
+        opened.append(open_project(entry))
+    return tuple(opened)
+
+
+def project_ref(settings: Settings, *, name: str | None = None) -> ProjectRef:
+    """The project a resolved `Settings` describes, as the workspace draws it.
+
+    Pure renaming of what `resolve_settings` already decided: the id comes from the
+    root's resolved path, so a project registered by the launcher and the same project
+    opened without the registry are the same project and not two trees over one root.
+    """
+    return ProjectRef(
+        id=id_for(settings.root),
+        name=name or settings.root.name,
+        root=settings.root,
+        runs_dir=settings.runs_dir,
+        config=settings.config,
+        secrets=dict(settings.secrets),
+    )
+
+
+def open_project(entry: ProjectEntry) -> ProjectRef:
+    """A registered entry, resolved the way any project is: config, secrets, runs."""
+    root = entry.root
+    return project_ref(
+        resolve_settings(root, runs_dir=runs_dir_for(root)),
+        name=entry.name,
+    )
+
+
+def register_project(
+    root: Path,
+    *,
+    registry: ProjectsRegistry | None = None,
+) -> ProjectRef:
+    """Register a root and resolve it, so the tree can draw it at once.
+
+    One function because the gate, the file and the resolution are one act: a root the
+    gate refuses must not be opened either, and a root written to the file that then
+    failed to resolve would be a project the file promises and the tree cannot draw.
+    """
+    entry = (registry if registry is not None else ProjectsRegistry()).add(root)
+    return open_project(entry)
+
+
+def runs_dir_for(root: Path) -> Path:
+    """Where a project's evidence lives when nobody said otherwise.
+
+    One `runs/` per project, beside its campaigns. That is not tidiness: two projects
+    can each hold a round called `smoke`, and a run is found by round **id**, so a
+    shared run directory would let one project's run answer for the other's round.
+
+    The CLI's own default is still the working directory's `runs/` — a command run from
+    inside a project gets the same answer either way — and this is the client's default
+    for the projects it did not start in.
+    """
+    return root / "runs"
 
 
 def under(base: Path, raw: str) -> Path:

@@ -111,15 +111,22 @@ def visible_steps(suite: SuiteFile) -> list[VisibleStep]:
 def loop_label(loop: LoopSpec) -> str:
     """What a suite step calls itself in the queue.
 
-    The family comes from the **case id**, not from the path: with a selector the
-    path is `cases/metering.yaml#metering-H01` and its stem is the file's name, so
-    a label read off the path says `loop metering.yaml#metering ×10` — wrong
-    without failing, which is the worst kind of wrong. A path with no selector
-    names a file that holds one case, and its stem is still the family.
+    The case comes from the **id**, not from the path: with a selector the path is
+    `cases/metering.yaml#metering-H01` and its stem is the file's name, so a label read
+    off the path says `loop metering.yaml#metering ×1` — wrong without failing, which
+    is the worst kind of wrong. A path with no selector names a file that holds one
+    case, and its stem is that case.
+
+    The whole id and not its first segment. The family alone (`loop math ×1`) is the
+    label two steps of `rounds/chain-two.yaml` both earned, and two rows that read the
+    same are two rows a reviewer cannot tell apart, cannot open one at a time, and
+    cannot review: the tree keys them apart by label, so identical labels are identical
+    nodes. `×times` stays on the end because a loop that runs a case ten times is not
+    the same step as one that runs it once.
     """
     path, case_id = split_selector(loop.case)
-    family = (case_id or Path(path).stem).split("-")[0]
-    return f"loop {family} ×{loop.times}"
+    name = case_id or Path(path).stem
+    return f"loop {name} ×{loop.times}"
 
 
 def execute_suite_round(
@@ -228,8 +235,17 @@ class SuiteRun:
                 self.records.append(outcome.record)
 
     def snapshot_begin(self, probe_id: str) -> None:
+        """Photograph the state a probe is about to be compared against.
+
+        Once per run, and that is the whole contract. `_drain_begins` walks the
+        begins declared before a step and is called for *every* visible step, so a
+        second call here would photograph a state the run has already mutated: the
+        baseline would be the after, the delta zero, and the conference would agree
+        with itself. Guarded the same way `snapshot_missing` is, because `photos` is
+        already the record of what has been photographed.
+        """
         probe = self._probes.get(probe_id)
-        if probe is None:
+        if probe is None or probe.id in self.photos:
             return
         self.snapshot(probe)
 
